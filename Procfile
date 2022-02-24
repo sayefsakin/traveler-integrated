@@ -1,1 +1,1 @@
-web: run_script.sh
+web: ./run_script.sh
