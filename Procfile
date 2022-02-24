@@ -1,1 +1,1 @@
-web: ./run_script.sh
+web: python3 serve.py
