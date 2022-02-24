@@ -1,1 +1,1 @@
-web: gunicorn serve:app
+web: run_script.sh
