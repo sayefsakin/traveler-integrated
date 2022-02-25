@@ -19,4 +19,4 @@ RUN tar -xvf 77d9bd8d-c7c6-4060-a8ae-ad2efc4dd6fd.tar
 RUN rm 77d9bd8d-c7c6-4060-a8ae-ad2efc4dd6fd.tar
 
 WORKDIR /traveler-integrated
-CMD ./serve.py
+CMD ./serve.py -p 80
