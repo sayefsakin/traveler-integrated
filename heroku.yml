@@ -2,4 +2,4 @@ build:
   docker:
     web: Dockerfile
 run:
-  web: ./serve.py -p $PORT
+  web: ./serve.py -p $PORT -d /home/data
