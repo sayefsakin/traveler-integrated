@@ -16,7 +16,7 @@ def iterUploadFile(text):
 
 @router.get('/')
 def index():
-    return RedirectResponse(url='/static/index.html')
+    return RedirectResponse(url='/static/interface.html')
 
 
 @router.get('/datasets')
