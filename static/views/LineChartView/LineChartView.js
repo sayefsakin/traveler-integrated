@@ -67,12 +67,6 @@ class LineChartView extends ZoomableTimelineView { // abstracts a lot of common 
 
       for (var i=fetchedData.length-1; i>=0; i--) {
         let tmp = fetchedData[i]['Value'];
-        let div = fetchedData[i]['Timestamp'];
-        // if(i>0) {
-        //   tmp = tmp - fetchedData[i-1]['Value'];
-        //   div = div - fetchedData[i-1]['Timestamp'];
-        // }
-        // tmp = tmp / div;
         if (tmp < minY) minY = tmp;
         if (tmp > maxY) maxY = tmp;
       }
