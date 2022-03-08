@@ -21,7 +21,7 @@ class IntervalHistogramView extends
       left: 40
     };
 
-    this.xScale = d3.scaleLinear();
+    this.xScale = d3.scaleLinear(); // log scale in x-axis doesnt make sense for every type of dataset
     this.yScale = d3.scaleSymlog();
     this.binScale = d3.scaleLinear();
     this.binScale.domain([0, 1]);
