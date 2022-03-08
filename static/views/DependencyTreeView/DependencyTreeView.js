@@ -142,6 +142,21 @@ class DependencyTreeView extends LinkedMixin( // Ensures that this.linkedState i
 
     this.glContainer.on('destroy', () => { this.handleDestroyEvent();});
     this.linkedState.on('selectionChanged' + '.dep', () => { this.render(); });
+
+    function toggleAll(d) {
+      if (d.children) {
+        d.children.forEach(toggleAll);
+        if (d.children) {
+          d._children = d.children;
+          d.children = null;
+        } else {
+          d.children = d._children;
+          d._children = null;
+        }
+      }
+    }
+    this.tree.children.forEach(toggleAll);
+
   }
 
   handleDestroyEvent() {
