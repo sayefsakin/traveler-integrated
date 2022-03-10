@@ -146,7 +146,7 @@ class IntervalHistogramView extends
       // Still loading...
       return;
     }
-    primitiveList = ['all_primitives', null].concat(Object.keys(primitiveList));
+    primitiveList = ['all_primitives', null].concat(Object.keys(primitiveList).sort());
     let options = this.primitiveMenu.selectAll('option')
       .data(primitiveList, d => d);
     options.exit().remove();
