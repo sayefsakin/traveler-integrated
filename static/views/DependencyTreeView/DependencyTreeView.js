@@ -151,13 +151,15 @@ class DependencyTreeView extends LinkedMixin( // Ensures that this.linkedState i
       }
       if (d.children) {
         d.children.forEach(toggleAll);
-        // if (d.children) {
-        //   d._children = d.children;
-        //   d.children = null;
-        // } else {
-        //   d.children = d._children;
-        //   d._children = null;
-        // }
+        if(d.depth >= 5) {
+          if (d.children) {
+            d._children = d.children;
+            d.children = null;
+          } else {
+            d.children = d._children;
+            d._children = null;
+          }
+        }
       }
     }
     this.tree.children.forEach(toggleAll);
