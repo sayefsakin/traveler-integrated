@@ -21,7 +21,16 @@ app.include_router(profile.router)
 
 if __name__ == '__main__':
     logger = ClientLogger()
-    asyncio.get_event_loop().run_until_complete(db.load(log=logger.log))
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        asyncio.run(db.load(log=logger.log))
+    except KeyboardInterrupt:
+        pass
+
+
+    # asyncio.get_event_loop().run_until_complete(db.load(log=logger.log))
     if args.log_level == 'warning':
         # Uvicorn's "serving on" message won't display; as we use warning as the
         # default, we at least include one line of info for new users (actual
