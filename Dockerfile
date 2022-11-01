@@ -1,7 +1,7 @@
 FROM ubuntu:latest
 USER root
 RUN apt-get update
-RUN apt-get -y install curl findutils vim git jq gcc g++ sudo ntpdate python3.9 python3.9-pip wget
+RUN apt-get -y install curl findutils vim git jq gcc g++ sudo ntpdate python3.9 python3-pip wget
 
 WORKDIR /home
 RUN git clone -b heroku https://github.com/sayefsakin/traveler-integrated
