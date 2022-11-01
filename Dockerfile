@@ -18,4 +18,4 @@ RUN tar -xvf 77d9bd8d-c7c6-4060-a8ae-ad2efc4dd6fd.tar -C /home/data
 RUN rm 77d9bd8d-c7c6-4060-a8ae-ad2efc4dd6fd.tar
 
 WORKDIR /home/traveler-integrated
-CMD ./serve.py -p 80 -d /home/data
+CMD ./serve.py -p 8080 -d /home/data
