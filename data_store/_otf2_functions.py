@@ -6,6 +6,8 @@ import diskcache
 import numpy as np
 from sortedcontainers import SortedList
 from intervaltree import Interval, IntervalTree
+
+from data_handler.DataCompStore import DataCompStore
 from .sparseUtilizationList import SparseUtilizationList
 from .dependencyTree import DependencyTreeNode
 from . import logToConsole
@@ -68,6 +70,8 @@ async def processOtf2(self, datasetId, file, log=logToConsole):
     await self.buildSparseUtilizationLists(datasetId, log)
     gc.collect()
     await self.buildDependencyTree(datasetId, log)
+    gc.collect()
+    await self.buildDSComps(datasetId, log)
     gc.collect()
     self.finishLoadingSourceFile(datasetId, file.name)
 
@@ -554,3 +558,6 @@ async def buildDependencyTree(self, datasetId, log=logToConsole):
     if results:
         results.finalizeTreeNode()
     self[datasetId]['dependencyTree'] = results
+
+async def buildDSComps(datasetId, log):
+    allDSStores = DataCompStore()

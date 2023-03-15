@@ -10,7 +10,7 @@ import diskcache
 # Possible files / metadata structures that we create / open / update
 diskCacheIndices = ['info', 'primitives', 'primitiveLinks', 'intervals', 'guids', 'events', 'procMetrics']
 requiredDiskCacheIndices = ['info', 'primitives', 'primitiveLinks']
-pickles = ['trees', 'physl', 'python', 'cpp', 'sparseUtilizationList', 'intervalIndex', 'dependencyTree']
+pickles = ['trees', 'physl', 'python', 'cpp', 'sparseUtilizationList', 'intervalIndex', 'dependencyTree', 'dataStores']
 requiredPickleDicts = ['trees']
 defaultInfo = {
     'sourceFiles': [],
