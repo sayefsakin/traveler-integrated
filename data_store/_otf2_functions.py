@@ -71,8 +71,6 @@ async def processOtf2(self, datasetId, file, log=logToConsole):
     gc.collect()
     await self.buildDependencyTree(datasetId, log)
     gc.collect()
-    await self.buildDSComps(datasetId, log)
-    gc.collect()
     self.finishLoadingSourceFile(datasetId, file.name)
 
 async def processRawTrace(self, datasetId, file, log):
@@ -558,6 +556,3 @@ async def buildDependencyTree(self, datasetId, log=logToConsole):
     if results:
         results.finalizeTreeNode()
     self[datasetId]['dependencyTree'] = results
-
-async def buildDSComps(datasetId, log):
-    allDSStores = DataCompStore()

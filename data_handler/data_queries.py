@@ -1,6 +1,8 @@
 import json
 import socket
 
+from data_store.sparseUtilizationList import SparseUtilizationList
+
 
 class DataQueriesInterface:
     # Range parameter is a list of pair, where each pair is (begin, end) of a certain attribute.
@@ -26,35 +28,73 @@ class DataQueriesInterface:
         client_socket.send(msg)
 
     def recvOverTheSocket(self, client_socket):
-        data = client_socket.recv(16).decode()
-        print('Received from Server 1 : ' + data)
+        dataString = ""
+        while True:
+            data = client_socket.recv(16).decode()
+            print('Received from Server 1 : ' + data)
+            if int(data) == -1:
+                break
+            data = client_socket.recv(int(data)).decode()
+            print('Received from Server 2 : ')
+            dataString += data
 
-        data = client_socket.recv(int(data)).decode()
-        print('Received from Server 2 : ' + data)
-        if len(data) == 0:
+        print('Received from Server 3 : ')
+        if len(dataString) == 0:
             return {}
-        return json.loads(data)
+        return json.loads(dataString)
 
-    def GetDataInRange(self, bins, begin, end, locations, primitive):
+    def postProcessForUtilization(self, dataDict):
+        print("in post processing")
+        sul = SparseUtilizationList()
+
+
+        formattedResults = dict()
+        formattedResults['locations'] = dict()
+        allLocations = set()
+        for dp in dataDict['data']:
+            locKey = str(int(float(dp["location"])))
+            if locKey not in formattedResults['locations']:
+                formattedResults['locations'][locKey] = list()
+                allLocations.add(locKey)
+            formattedResults['locations'][locKey].append(int(float(dp["time"])))
+
+        for loc in formattedResults['locations']:
+            formattedResults['locations'][loc].sort()
+            for idx, tm in enumerate(formattedResults['locations'][loc]):
+                if idx%2 == 0:
+                    sul.setIntervalAtLocation({'index': tm, 'counter': 1, 'util': 0}, str(loc))
+                else:
+                    sul.setIntervalAtLocation({'index': tm, 'counter': -1, 'util': 0}, str(loc))
+        print("going to finalize with locations")
+        print(allLocations)
+        sul.finalize(allLocations)
+        print("sorting of loc is done")
+        return sul
+
+    def GetDataInRange(self, bins, begin, end, locations, primitive, dataStoreType: str = None):
         print("inside the get data in range")
 
         dictionary = {
             "begin": str(begin),
-            "end": str(end)
+            "end": str(end),
+            "db_store": dataStoreType,
         }
+        if locations:
+            dictionary["locations"] = locations
+        print(dictionary)
 
         client_socket = socket.socket()
         client_socket.connect((self.host, self.port))
 
         self.sendOverTheSocket(client_socket, dictionary)
         dataDict = self.recvOverTheSocket(client_socket)
+        ret = self.postProcessForUtilization(dataDict)
         print("received data over socket in dict format")
-        print(dataDict["project"])
 
         client_socket.close()
 
 
-        return [0,0,0,0]
+        return ret
 
 
     def GetAttributeOfEvent(self, event_id):

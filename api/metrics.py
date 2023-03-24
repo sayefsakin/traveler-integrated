@@ -3,7 +3,10 @@ import json
 from fastapi import APIRouter, HTTPException
 from starlette.responses import StreamingResponse
 
+from data_handler.data_queries import DataQueriesInterface
 from . import db, validateDataset
+
+from data_handler import data_queries
 
 router = APIRouter()
 
@@ -69,6 +72,7 @@ def get_utilization_histogram(datasetId: str,
                               primitive: str = None):
     datasetId = validateDataset(datasetId, requiredFiles=['otf2'], filesMustBeReady=['otf2'])
 
+
     if begin is None:
         begin = db[datasetId]['info']['intervalDomain'][0]
     if end is None:
@@ -79,21 +83,32 @@ def get_utilization_histogram(datasetId: str,
     if locations:
         locations = locations.split(',')
 
+    dqi = DataQueriesInterface()
+    # kd_sul = dqi.GetDataInRange(bins, begin, end, locations, primitive, "kd_tree")
+    kd_sul = dqi.GetDataInRange(bins, begin, end, locations, primitive, "segment_tree")
+
+    print('found location in location dict in sul')
+    for k in kd_sul.locationDict:
+        print(k)
     if primitive is not None:
         if primitive not in db[datasetId]['sparseUtilizationList']['primitives']:
             raise HTTPException(status_code=404, detail='No utilization data for primitive: %s' % primitive)
         if locations:
             ret['locations'] = {}
             for location in locations:
-                ret['locations'][location] = db[datasetId]['sparseUtilizationList']['primitives'][primitive].calcUtilizationForLocation(bins, begin, end, location)
+                # ret['locations'][location] = db[datasetId]['sparseUtilizationList']['primitives'][primitive].calcUtilizationForLocation(bins, begin, end, location)
+                ret['locations'][location] = kd_sul.calcUtilizationForLocation(bins, begin, end, location)
         else:
-            ret['data'] = db[datasetId]['sparseUtilizationList']['primitives'][primitive].calcUtilizationHistogram(bins, begin, end)
+            # ret['data'] = db[datasetId]['sparseUtilizationList']['primitives'][primitive].calcUtilizationHistogram(bins, begin, end)
+            ret['data'] = kd_sul.calcUtilizationHistogram(bins, begin, end)
     elif locations:
         ret['locations'] = {}
         for location in locations:
-            ret['locations'][location] = db[datasetId]['sparseUtilizationList']['intervals'].calcUtilizationForLocation(bins, begin, end, location)
+            # ret['locations'][location] = db[datasetId]['sparseUtilizationList']['intervals'].calcUtilizationForLocation(bins, begin, end, location)
+            ret['locations'][location] = kd_sul.calcUtilizationForLocation(bins, begin, end, str(location))
     else:
-        ret['data'] = db[datasetId]['sparseUtilizationList']['intervals'].calcUtilizationHistogram(bins, begin, end)
+        # ret['data'] = db[datasetId]['sparseUtilizationList']['intervals'].calcUtilizationHistogram(bins, begin, end)
+        ret['data'] = kd_sul.calcUtilizationHistogram(bins, begin, end)
 
     ret['metadata'] = {'begin': begin, 'end': end, 'bins': bins}
     return ret

@@ -110,12 +110,24 @@ void testSearchQueries(Kdtree *kdtree, Segment_tree_2_type *Segment_tree_2, int 
 }
 
 void sendOverTheSocket(int new_socket, const char *json){
-    uint64_t jsonSize = strlen(json);
+    int64_t maxSocketBuffer = 10000;
+    int64_t cJsonSize = strlen(json);
+    int cstart = 0;
     char t[20];
-    sprintf(t, "%016lu", jsonSize);
+
+    while(cJsonSize > 0) {
+        int64_t jsonSize = min(maxSocketBuffer, cJsonSize);
+        sprintf(t, "%016lu", jsonSize);
+        printf("msg leng string %s\n", t);
+        send(new_socket, t, MSG_SIZE_IN_BYTE, 0);
+        send(new_socket, &json[cstart], jsonSize, 0);
+        cJsonSize -= jsonSize;
+        cstart += jsonSize;
+    }
+    cJsonSize = -1;
+    sprintf(t, "%016ld", cJsonSize);
     printf("msg leng string %s\n", t);
     send(new_socket, t, MSG_SIZE_IN_BYTE, 0);
-    send(new_socket, json, jsonSize, 0);
     printf("Hello message sent\n");
 }
 
@@ -137,15 +149,223 @@ Document rcvOverTheSocket(int new_socket){
     return d;
 }
 
-void startServerListening() {
+Document kdTreeSearchQuery( Kdtree *kdtree,
+                        uint64_t time_begin,
+                        uint64_t time_end,
+                        uint64_t location_begin,
+                        uint64_t location_end,
+                        uint64_t minId,
+                        uint64_t maxId) {
+    vector<Point_d> result;
+    Point_d p(time_begin, location_begin, minId);
+    Point_d q(time_end, location_end, maxId);
+
+    cout << "doing window query (" << p.x() << "," << p.y() << ") (" << q.x() << "," << q.y() << ")" << endl;
+    // Searching an exact range
+    // using default value 0.0 for epsilon fuzziness parameter
+    // Fuzzy_box exact_range(r); replaced by
+    Fuzzy_iso_box exact_range(p,q);
+    kdtree->search( back_inserter( result ), exact_range);
+    cout << "kd tree points are with size: " << result.size() << endl;
+    copy (result.begin(), result.end(), ostream_iterator<Point_d>(cout,"\n") );
+    cout << endl;
+
+    Document document;
+    document.SetObject();
+
+    Value a(kArrayType);
+
+    Document::AllocatorType& allocator = document.GetAllocator();
+
+    for(int i = 0; i < result.size(); i++) {
+        Value obj(kObjectType);
+        Value val(kObjectType);
+
+        string time_string = to_string(result[i].x());
+
+        val.SetString(time_string.c_str(), static_cast<SizeType>(time_string.length()), allocator);
+        obj.AddMember("time", val, allocator);
+
+        string location_string = to_string(result[i].y());
+        val.SetString(location_string.c_str(), static_cast<SizeType>(location_string.length()), allocator);
+        obj.AddMember("location", val, allocator);
+
+        string iid_string = to_string(result[i].z());
+        val.SetString(iid_string.c_str(), static_cast<SizeType>(iid_string.length()), allocator);
+        obj.AddMember("interval_id", val, allocator);
+
+        a.PushBack(obj, allocator);
+    }
+
+    document.AddMember("data", a, allocator);
+    Value obj2(kObjectType);
+    Value val(kObjectType);
+
+    string begin_string = to_string(time_begin);
+    val.SetString(begin_string.c_str(), static_cast<SizeType>(begin_string.length()), allocator);
+    obj2.AddMember("begin", val, allocator);
+
+    string end_string = to_string(time_end);
+    val.SetString(end_string.c_str(), static_cast<SizeType>(end_string.length()), allocator);
+    obj2.AddMember("end", val, allocator);
+
+    document.AddMember("metadata", obj2, allocator);
+/*
+    rapidjson::StringBuffer strbuf;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(strbuf);
+    document.Accept(writer);
+
+    const char *jsonString = strbuf.GetString();
+    cout << jsonString << endl;
+*/
+    return document;
+}
+
+Document sgmntTreeSearchQuery(Segment_tree_2_type *Segment_tree_2,
+                        uint64_t time_begin,
+                        uint64_t time_end,
+                        uint64_t location_begin,
+                        uint64_t location_end,
+                        uint64_t minId,
+                        uint64_t maxId) {
+
+    vector<Interval> OutputList1;
+    Point_d p((double)time_begin, (double)location_begin, minId);
+    Point_d q((double)time_end, (double)location_end, maxId);
+
+    cout << "doing window query with segment tree (" << p.x() << "," << p.y() << ") (" << q.x() << "," << q.y() << ")" << endl;
+    Interval a=Interval(Pure_interval(Key(p.x(),(p.y()*2)-1), Key(q.x(),q.y()*2)),"z");
+    Segment_tree_2->window_query(a,std::back_inserter(OutputList1));
+    vector<Interval>::iterator j = OutputList1.begin();
+    cout << "\nwindow_query with segment tree result size: " << OutputList1.size() << endl;;
+
+    Document document;
+    document.SetObject();
+    Value a1(kArrayType);
+    Document::AllocatorType& allocator = document.GetAllocator();
+
+    while(j!=OutputList1.end()){
+        Point_pairs pp = getPointIntervalFromPureInterval((*j).first);
+
+        Value obj(kObjectType);
+        Value val(kObjectType);
+
+        string time_string = to_string(pp.first.x());
+        val.SetString(time_string.c_str(), static_cast<SizeType>(time_string.length()), allocator);
+        obj.AddMember("time", val, allocator);
+
+        string location_string = to_string(pp.first.y());
+        val.SetString(location_string.c_str(), static_cast<SizeType>(location_string.length()), allocator);
+        obj.AddMember("location", val, allocator);
+
+        string iid_string((*j).second);
+        val.SetString(iid_string.c_str(), static_cast<SizeType>(iid_string.length()), allocator);
+        obj.AddMember("interval_id", val, allocator);
+
+        a1.PushBack(obj, allocator);
+
+
+        Value obj1(kObjectType);
+        Value val1(kObjectType);
+
+        string time_string1 = to_string(pp.second.x());
+        val1.SetString(time_string1.c_str(), static_cast<SizeType>(time_string1.length()), allocator);
+        obj1.AddMember("time", val1, allocator);
+
+        string location_string1 = to_string(pp.second.y());
+        val1.SetString(location_string1.c_str(), static_cast<SizeType>(location_string1.length()), allocator);
+        obj1.AddMember("location", val1, allocator);
+
+        string iid_string1((*j).second);
+        val1.SetString(iid_string1.c_str(), static_cast<SizeType>(iid_string1.length()), allocator);
+        obj1.AddMember("interval_id", val1, allocator);
+
+        a1.PushBack(obj1, allocator);
+
+        j++;
+    }
+
+    document.AddMember("data", a1, allocator);
+    Value obj2(kObjectType);
+    Value val(kObjectType);
+
+    string begin_string = to_string(time_begin);
+    val.SetString(begin_string.c_str(), static_cast<SizeType>(begin_string.length()), allocator);
+    obj2.AddMember("begin", val, allocator);
+
+    string end_string = to_string(time_end);
+    val.SetString(end_string.c_str(), static_cast<SizeType>(end_string.length()), allocator);
+    obj2.AddMember("end", val, allocator);
+
+    document.AddMember("metadata", obj2, allocator);
+/*
+    rapidjson::StringBuffer strbuf;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(strbuf);
+    document.Accept(writer);
+
+    const char *jsonString = strbuf.GetString();
+    cout << jsonString << endl;
+*/
+    return document;
+}
+
+Document processReceivedRequest(Kdtree *kdtree,
+                                Segment_tree_2_type *Segment_tree_2,
+                                Document *d,
+                                uint64_t minId, uint64_t maxId,
+                                uint64_t minLocation, uint64_t maxLocation) {
+    Document queryResults;
+    if(!(*d).HasMember("db_store")) {
+        cout << "please provide db_store for ds request" << endl;
+        return queryResults;
+    }
+    string ds_request((*d)["db_store"].GetString());
+
+    uint64_t time_begin = stol(((*d)["begin"].GetString())) < 0 ? 0 : stoul(((*d)["begin"].GetString()));
+    uint64_t time_end = stol(((*d)["end"].GetString())) < 0 ? 0 : stoul(((*d)["end"].GetString()));
+
+    uint64_t location_begin = minLocation;
+    uint64_t location_end = maxLocation;
+    vector<uint64_t> locationsList;
+    if((*d).HasMember("locations")) {
+        for (SizeType i = 0; i < (*d)["locations"].Size(); i++){
+            locationsList.push_back(stol((*d)["locations"][i].GetString()));
+        }
+        cout << locationsList.size() << endl;
+        sort(locationsList.begin(), locationsList.end());
+        location_begin = locationsList[0];
+        location_end = locationsList[locationsList.size()-1];
+    }
+    if((*d).HasMember("location_end")) {
+        location_end = stoul(((*d)["location_end"].GetString()));
+    }
+
+    string KDTREE("kd_tree");
+    string SGTREE("segment_tree");
+
+    if(ds_request == KDTREE) {
+        cout << "got KD Tree request" << endl;
+        return kdTreeSearchQuery(kdtree, time_begin, time_end, location_begin, location_end, minId, maxId);
+        // process with kdtree
+    } else if(ds_request == SGTREE) {
+        cout << "got Segment Tree request" << endl;
+        return sgmntTreeSearchQuery(Segment_tree_2, time_begin, time_end, location_begin, location_end, minId, maxId);
+        // process with segment tree
+    } else {
+        cout << "invalid ds request" << endl;
+    }
+    return queryResults;
+}
+
+void startServerListening(Kdtree *kdtree,
+                        Segment_tree_2_type *Segment_tree_2,
+                        uint64_t minId, uint64_t maxId,
+                        uint64_t minLocation, uint64_t maxLocation) {
     int PORT = 8080;
-    int server_fd, new_socket, valread;
+    int server_fd, new_socket;
     struct sockaddr_in address;
     int opt = 1;
     int addrlen = sizeof(address);
-    char buffer[1024] = { 0 };
-    char* hello = "Hello from server";
-
 
     //const char* json = "{\"project\":\"rapidjson\",\"stars\":10}";
     string jstring = "{\"project\":\"sayef\",\"stars\":10}";
@@ -190,9 +410,12 @@ void startServerListening() {
             }
 
         Document d = rcvOverTheSocket(new_socket);
-        printf("begin = %s\n", d["begin"].GetString());
-        printf("end = %s\n", d["end"].GetString());
-        sendOverTheSocket(new_socket, json);
+        Document queryResults = processReceivedRequest(kdtree, Segment_tree_2, &d, minId, maxId, minLocation, maxLocation);
+
+        StringBuffer qbuffer;
+        Writer<StringBuffer> qwriter(qbuffer);
+        queryResults.Accept(qwriter);
+        sendOverTheSocket(new_socket, qbuffer.GetString());
 
 
         // closing the connected socket
@@ -203,26 +426,6 @@ void startServerListening() {
     // closing the listening socket
     shutdown(server_fd, SHUT_RDWR);
 }
-/*
-void base64Testing(){
-    auto bs = base64::to_base64("655366");
-    std::cout << bs << '\n'; // SGVsbG8sIFdvcmxkIQ==
-    auto s = base64::from_base64(bs);
-    std::cout << s << '\n'; // Hello, World!
-    while(1) {
-        uint64_t bstest;
-        cin >> bstest;
-        if(!bstest) break;
-        char t[20];
-        sprintf(t, "%016d", bstest);
-        auto bs = base64::to_base64(t);
-        cout << bs << endl;
-        auto s = base64::from_base64(bs);
-        cout << s << endl;
-        cout << sizeof(t) << " " << sizeof(bstest) << endl;
-    }
-
-}*/
 
 int main()
 {
@@ -233,12 +436,12 @@ int main()
     urlparser.baseUrl = "http://localhost:8000";
     urlparser.datasetId = "589ca754-ef75-426c-8d51-841cc61dc84a";//"9b9d5286-736c-481a-ba29-0f871979967c";
     urlparser.travelerApi = "intervals";//"primitives";
-
+/*
     urlparser.urlParameters.Parse(R""""({
                                       "begin":"192648732",
                                       "end":"255840252"
                                       })"""");
-    //cout << "json data " << urlparser.urlParameters["primitive"].GetString() << endl;
+*/    //cout << "json data " << urlparser.urlParameters["primitive"].GetString() << endl;
 
     Document fetchedData = urlparser.fetchContentFromURL();
     if(fetchedData.IsNull() || kArrayType != fetchedData.GetType()) { cout << "nothing is in the content" << endl; return 0;}
@@ -253,8 +456,10 @@ int main()
     int totalPrimitives = 0;
     int cPrimitiveNumber = -1;
 
-    int minId = 100000;
-    int maxId = 0;
+    uint64_t minId = 1000000000;
+    uint64_t maxId = 0;
+    uint64_t minLocation = 1000000000;
+    uint64_t maxLocation = 0;
     for (auto& v : fetchedData.GetArray()) {
         Point_2 interval_enter((double)v.GetObject()["enter"]["Timestamp"].GetInt(), stod(v.GetObject()["Location"].GetString()));
         Point_2 interval_end((double)v.GetObject()["leave"]["Timestamp"].GetInt(), stod(v.GetObject()["Location"].GetString()));
@@ -271,7 +476,10 @@ int main()
 
         //points_2d.emplace_back(interval_enter)
 
-        int intervalId = stoi(v.GetObject()["intervalId"].GetString());
+        uint64_t locationId = stoul(v.GetObject()["Location"].GetString());
+        minLocation = min(minLocation, locationId);
+        maxLocation = max(maxLocation, locationId);
+        uint64_t intervalId = stoul(v.GetObject()["intervalId"].GetString());
         minId = min(minId, intervalId);
         maxId = max(maxId, intervalId);
 
@@ -285,8 +493,8 @@ int main()
     }
     Segment_tree_2_type Segment_tree_2(InputList.begin(),InputList.end());
     cout << "kd tree and segment tree build done with total interval count: " << totalIntervals <<  " " << cPrimitiveNumber << endl;
-    testSearchQueries(&kdtree, &Segment_tree_2, minId, maxId);
+    //testSearchQueries(&kdtree, &Segment_tree_2, minId, maxId);
 
-    //startServerListening();
+    startServerListening(&kdtree, &Segment_tree_2, minId, maxId, minLocation, maxLocation);
     return EXIT_SUCCESS;
 }
