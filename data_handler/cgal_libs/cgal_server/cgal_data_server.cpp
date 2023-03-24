@@ -20,7 +20,16 @@
 
 #include <CGAL/property_map.h>
 
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <unistd.h>
+
 #include "curl_get.cpp"
+#include "rapidjson/document.h"
+#include "rapidjson/writer.h"
+#include "rapidjson/stringbuffer.h"
+
+#define MSG_SIZE_IN_BYTE 16
 
 using namespace std;
 
@@ -47,6 +56,10 @@ typedef KertTraits::Interval Interval;
 typedef KertTraits::Pure_interval Pure_interval;
 typedef KertTraits::Key Key;
 typedef pair<Point_2, Point_2> Point_pairs;
+
+
+typedef map<string, int> Primtive_mapping;
+typedef vector<string> Primitive_reverse_mapping;
 
 Pure_interval getPurIntervalFromPoint(Point_2 p, Point_2 q) {
     return Pure_interval(Key(p.x(),(p.y()*2)-1), Key(q.x(),q.y()*2));
@@ -96,6 +109,120 @@ void testSearchQueries(Kdtree *kdtree, Segment_tree_2_type *Segment_tree_2, int 
     }
 }
 
+void sendOverTheSocket(int new_socket, const char *json){
+    uint64_t jsonSize = strlen(json);
+    char t[20];
+    sprintf(t, "%016lu", jsonSize);
+    printf("msg leng string %s\n", t);
+    send(new_socket, t, MSG_SIZE_IN_BYTE, 0);
+    send(new_socket, json, jsonSize, 0);
+    printf("Hello message sent\n");
+}
+
+Document rcvOverTheSocket(int new_socket){
+    char *buffer;
+    buffer = (char *)malloc(MSG_SIZE_IN_BYTE);
+    int valread = read(new_socket, buffer, MSG_SIZE_IN_BYTE);
+    int msg_size = atoi(buffer);
+    printf("%d\n", msg_size);
+    Document d;
+    if(!msg_size) return d;
+    buffer = (char *)malloc(msg_size+1);
+    memset(buffer, 0, msg_size+1);
+    valread = read(new_socket, buffer, msg_size);
+    printf("%s\n", buffer);
+    d.Parse(buffer);
+    memset(buffer, 0, msg_size+1);
+    buffer = NULL;
+    return d;
+}
+
+void startServerListening() {
+    int PORT = 8080;
+    int server_fd, new_socket, valread;
+    struct sockaddr_in address;
+    int opt = 1;
+    int addrlen = sizeof(address);
+    char buffer[1024] = { 0 };
+    char* hello = "Hello from server";
+
+
+    //const char* json = "{\"project\":\"rapidjson\",\"stars\":10}";
+    string jstring = "{\"project\":\"sayef\",\"stars\":10}";
+    const char* json = jstring.data();
+
+    // Creating socket file descriptor
+    if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+        perror("socket failed");
+        exit(EXIT_FAILURE);
+    }
+
+    // Forcefully attaching socket to the port 8080
+    if (setsockopt(server_fd, SOL_SOCKET,
+                SO_REUSEADDR | SO_REUSEPORT, &opt,
+                sizeof(opt))) {
+        perror("setsockopt");
+        exit(EXIT_FAILURE);
+    }
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = INADDR_ANY;
+    address.sin_port = htons(PORT);
+
+    // Forcefully attaching socket to the port 8080
+    if (bind(server_fd, (struct sockaddr*)&address,
+            sizeof(address))
+        < 0) {
+        perror("bind failed");
+        exit(EXIT_FAILURE);
+    }
+    if (listen(server_fd, 3) < 0) {
+        perror("listen");
+        exit(EXIT_FAILURE);
+    }
+
+    while(1) {
+        if ((new_socket
+                = accept(server_fd, (struct sockaddr*)&address,
+                        (socklen_t*)&addrlen))
+                < 0) {
+                perror("accept");
+                exit(EXIT_FAILURE);
+            }
+
+        Document d = rcvOverTheSocket(new_socket);
+        printf("begin = %s\n", d["begin"].GetString());
+        printf("end = %s\n", d["end"].GetString());
+        sendOverTheSocket(new_socket, json);
+
+
+        // closing the connected socket
+        close(new_socket);
+    }
+
+
+    // closing the listening socket
+    shutdown(server_fd, SHUT_RDWR);
+}
+/*
+void base64Testing(){
+    auto bs = base64::to_base64("655366");
+    std::cout << bs << '\n'; // SGVsbG8sIFdvcmxkIQ==
+    auto s = base64::from_base64(bs);
+    std::cout << s << '\n'; // Hello, World!
+    while(1) {
+        uint64_t bstest;
+        cin >> bstest;
+        if(!bstest) break;
+        char t[20];
+        sprintf(t, "%016d", bstest);
+        auto bs = base64::to_base64(t);
+        cout << bs << endl;
+        auto s = base64::from_base64(bs);
+        cout << s << endl;
+        cout << sizeof(t) << " " << sizeof(bstest) << endl;
+    }
+
+}*/
 
 int main()
 {
@@ -104,14 +231,14 @@ int main()
     //urlparser.urlString = "http://localhost:8000/datasets/9b9d5286-736c-481a-ba29-0f871979967c/intervalHistograms?bins=100";
     //urlparser.baseUrl = "http://localhost:8000/datasets/9b9d5286-736c-481a-ba29-0f871979967c/primitives";
     urlparser.baseUrl = "http://localhost:8000";
-    urlparser.datasetId = "8b3289c9-a740-4091-a56d-e4d55af526b5";//"589ca754-ef75-426c-8d51-841cc61dc84a";//"9b9d5286-736c-481a-ba29-0f871979967c";
+    urlparser.datasetId = "589ca754-ef75-426c-8d51-841cc61dc84a";//"9b9d5286-736c-481a-ba29-0f871979967c";
     urlparser.travelerApi = "intervals";//"primitives";
-/*
+
     urlparser.urlParameters.Parse(R""""({
                                       "begin":"192648732",
                                       "end":"255840252"
                                       })"""");
-*/    //cout << "json data " << urlparser.urlParameters["primitive"].GetString() << endl;
+    //cout << "json data " << urlparser.urlParameters["primitive"].GetString() << endl;
 
     Document fetchedData = urlparser.fetchContentFromURL();
     if(fetchedData.IsNull() || kArrayType != fetchedData.GetType()) { cout << "nothing is in the content" << endl; return 0;}
@@ -121,12 +248,27 @@ int main()
     //int numberOfEvents = 1000;
     int totalIntervals = 0;
     Kdtree kdtree;
+    Primtive_mapping primitiveMapping;
+    string cPrimitive;
+    int totalPrimitives = 0;
+    int cPrimitiveNumber = -1;
 
     int minId = 100000;
     int maxId = 0;
     for (auto& v : fetchedData.GetArray()) {
         Point_2 interval_enter((double)v.GetObject()["enter"]["Timestamp"].GetInt(), stod(v.GetObject()["Location"].GetString()));
         Point_2 interval_end((double)v.GetObject()["leave"]["Timestamp"].GetInt(), stod(v.GetObject()["Location"].GetString()));
+
+        cPrimitive = v.GetObject()["Primitive"].GetString();
+        cPrimitiveNumber = -1;
+        Primtive_mapping::iterator lb = primitiveMapping.lower_bound(cPrimitive);
+        if(lb != primitiveMapping.end() && !(primitiveMapping.key_comp()(cPrimitive, lb->first))) {
+            cPrimitiveNumber = lb->second;
+        } else {
+            primitiveMapping.insert(lb, Primtive_mapping::value_type(cPrimitive, ++totalPrimitives));
+            cPrimitiveNumber = totalPrimitives;
+        }
+
         //points_2d.emplace_back(interval_enter)
 
         int intervalId = stoi(v.GetObject()["intervalId"].GetString());
@@ -142,7 +284,9 @@ int main()
         //if(numberOfEvents<=0) break;
     }
     Segment_tree_2_type Segment_tree_2(InputList.begin(),InputList.end());
-    cout << "kd tree and segment tree build done with total interval count: " << totalIntervals << endl;
-    //testSearchQueries(&kdtree, &Segment_tree_2, minId, maxId);
+    cout << "kd tree and segment tree build done with total interval count: " << totalIntervals <<  " " << cPrimitiveNumber << endl;
+    testSearchQueries(&kdtree, &Segment_tree_2, minId, maxId);
+
+    //startServerListening();
     return EXIT_SUCCESS;
 }
