@@ -30,6 +30,7 @@
 #include "rapidjson/stringbuffer.h"
 
 #define MSG_SIZE_IN_BYTE 16
+#define DEBUG 0
 
 using namespace std;
 
@@ -82,18 +83,18 @@ void testSearchQueries(Kdtree *kdtree, Segment_tree_2_type *Segment_tree_2, int 
     Point_d qd(q.x(), q.y(), maxId);
     //Point_d rd(224244492, 12);
 
-    cout << "doing window query (" << p.x() << "," << p.y() << ") (" << q.x() << "," << q.y() << ")" << endl;
+    if(DEBUG) cout << "doing window query (" << p.x() << "," << p.y() << ") (" << q.x() << "," << q.y() << ")" << endl;
     // Searching an exact range
     // using default value 0.0 for epsilon fuzziness parameter
     // Fuzzy_box exact_range(r); replaced by
     Fuzzy_iso_box exact_range(pd,qd);
     kdtree->search( back_inserter( result ), exact_range);
-    cout << "kd tree points are with size: " << result.size() << endl;
+    if(DEBUG) cout << "kd tree points are with size: " << result.size() << endl;
     copy (result.begin(), result.end(), ostream_iterator<Point_d>(cout,"\n") );
-    cout << endl;
+    if(DEBUG) cout << endl;
 /*
-    cout << "KD Tree" << endl;
-    cout << kdtree << endl;
+    if(DEBUG) cout << "KD Tree" << endl;
+    if(DEBUG) cout << kdtree << endl;
 */
     //segmentTreeTest(points_2d);
     //buildSegmentTreeFromPointVector(points_2d);
@@ -101,10 +102,10 @@ void testSearchQueries(Kdtree *kdtree, Segment_tree_2_type *Segment_tree_2, int 
     Interval a=Interval(Pure_interval(Key(p.x(),(p.y()*2)-1), Key(q.x(),q.y()*2)),"z");
     Segment_tree_2->window_query(a,std::back_inserter(OutputList1));
     vector<Interval>::iterator j = OutputList1.begin();
-    cout << "\nwindow_query with segment tree result size: " << OutputList1.size() << endl;;
+    if(DEBUG) cout << "\nwindow_query with segment tree result size: " << OutputList1.size() << endl;;
     while(j!=OutputList1.end()){
         Point_pairs pp = getPointIntervalFromPureInterval((*j).first);
-        cout << pp.first << " " << pp.second <<  " id " << (*j).second << endl;
+        if(DEBUG) cout << pp.first << " " << pp.second <<  " id " << (*j).second << endl;
         j++;
     }
 }
@@ -118,7 +119,7 @@ void sendOverTheSocket(int new_socket, const char *json){
     while(cJsonSize > 0) {
         int64_t jsonSize = min(maxSocketBuffer, cJsonSize);
         sprintf(t, "%016lu", jsonSize);
-        printf("msg leng string %s\n", t);
+        if(DEBUG) printf("msg leng string %s\n", t);
         send(new_socket, t, MSG_SIZE_IN_BYTE, 0);
         send(new_socket, &json[cstart], jsonSize, 0);
         cJsonSize -= jsonSize;
@@ -126,9 +127,9 @@ void sendOverTheSocket(int new_socket, const char *json){
     }
     cJsonSize = -1;
     sprintf(t, "%016ld", cJsonSize);
-    printf("msg leng string %s\n", t);
+    if(DEBUG) printf("msg leng string %s\n", t);
     send(new_socket, t, MSG_SIZE_IN_BYTE, 0);
-    printf("Hello message sent\n");
+    if(DEBUG) printf("Hello message sent\n");
 }
 
 Document rcvOverTheSocket(int new_socket){
@@ -136,13 +137,13 @@ Document rcvOverTheSocket(int new_socket){
     buffer = (char *)malloc(MSG_SIZE_IN_BYTE);
     int valread = read(new_socket, buffer, MSG_SIZE_IN_BYTE);
     int msg_size = atoi(buffer);
-    printf("%d\n", msg_size);
+    if(DEBUG) printf("%d\n", msg_size);
     Document d;
     if(!msg_size) return d;
     buffer = (char *)malloc(msg_size+1);
     memset(buffer, 0, msg_size+1);
     valread = read(new_socket, buffer, msg_size);
-    printf("%s\n", buffer);
+    if(DEBUG) printf("%s\n", buffer);
     d.Parse(buffer);
     memset(buffer, 0, msg_size+1);
     buffer = NULL;
@@ -160,15 +161,15 @@ Document kdTreeSearchQuery( Kdtree *kdtree,
     Point_d p(time_begin, location_begin, minId);
     Point_d q(time_end, location_end, maxId);
 
-    cout << "doing window query (" << p.x() << "," << p.y() << ") (" << q.x() << "," << q.y() << ")" << endl;
+    if(DEBUG) cout << "doing window query (" << p.x() << "," << p.y() << ") (" << q.x() << "," << q.y() << ")" << endl;
     // Searching an exact range
     // using default value 0.0 for epsilon fuzziness parameter
     // Fuzzy_box exact_range(r); replaced by
     Fuzzy_iso_box exact_range(p,q);
     kdtree->search( back_inserter( result ), exact_range);
-    cout << "kd tree points are with size: " << result.size() << endl;
+    if(DEBUG) cout << "kd tree points are with size: " << result.size() << endl;
     copy (result.begin(), result.end(), ostream_iterator<Point_d>(cout,"\n") );
-    cout << endl;
+    if(DEBUG) cout << endl;
 
     Document document;
     document.SetObject();
@@ -216,7 +217,7 @@ Document kdTreeSearchQuery( Kdtree *kdtree,
     document.Accept(writer);
 
     const char *jsonString = strbuf.GetString();
-    cout << jsonString << endl;
+    if(DEBUG) cout << jsonString << endl;
 */
     return document;
 }
@@ -233,11 +234,11 @@ Document sgmntTreeSearchQuery(Segment_tree_2_type *Segment_tree_2,
     Point_d p((double)time_begin, (double)location_begin, minId);
     Point_d q((double)time_end, (double)location_end, maxId);
 
-    cout << "doing window query with segment tree (" << p.x() << "," << p.y() << ") (" << q.x() << "," << q.y() << ")" << endl;
+    if(DEBUG) cout << "doing window query with segment tree (" << p.x() << "," << p.y() << ") (" << q.x() << "," << q.y() << ")" << endl;
     Interval a=Interval(Pure_interval(Key(p.x(),(p.y()*2)-1), Key(q.x(),q.y()*2)),"z");
     Segment_tree_2->window_query(a,std::back_inserter(OutputList1));
     vector<Interval>::iterator j = OutputList1.begin();
-    cout << "\nwindow_query with segment tree result size: " << OutputList1.size() << endl;;
+    if(DEBUG) cout << "\nwindow_query with segment tree result size: " << OutputList1.size() << endl;;
 
     Document document;
     document.SetObject();
@@ -304,7 +305,7 @@ Document sgmntTreeSearchQuery(Segment_tree_2_type *Segment_tree_2,
     document.Accept(writer);
 
     const char *jsonString = strbuf.GetString();
-    cout << jsonString << endl;
+    if(DEBUG) cout << jsonString << endl;
 */
     return document;
 }
@@ -316,7 +317,7 @@ Document processReceivedRequest(Kdtree *kdtree,
                                 uint64_t minLocation, uint64_t maxLocation) {
     Document queryResults;
     if(!(*d).HasMember("db_store")) {
-        cout << "please provide db_store for ds request" << endl;
+        if(DEBUG) cout << "please provide db_store for ds request" << endl;
         return queryResults;
     }
     string ds_request((*d)["db_store"].GetString());
@@ -331,7 +332,7 @@ Document processReceivedRequest(Kdtree *kdtree,
         for (SizeType i = 0; i < (*d)["locations"].Size(); i++){
             locationsList.push_back(stol((*d)["locations"][i].GetString()));
         }
-        cout << locationsList.size() << endl;
+        if(DEBUG) cout << locationsList.size() << endl;
         sort(locationsList.begin(), locationsList.end());
         location_begin = locationsList[0];
         location_end = locationsList[locationsList.size()-1];
@@ -344,15 +345,15 @@ Document processReceivedRequest(Kdtree *kdtree,
     string SGTREE("segment_tree");
 
     if(ds_request == KDTREE) {
-        cout << "got KD Tree request" << endl;
+        if(DEBUG) cout << "got KD Tree request" << endl;
         return kdTreeSearchQuery(kdtree, time_begin, time_end, location_begin, location_end, minId, maxId);
         // process with kdtree
     } else if(ds_request == SGTREE) {
-        cout << "got Segment Tree request" << endl;
+        if(DEBUG) cout << "got Segment Tree request" << endl;
         return sgmntTreeSearchQuery(Segment_tree_2, time_begin, time_end, location_begin, location_end, minId, maxId);
         // process with segment tree
     } else {
-        cout << "invalid ds request" << endl;
+        if(DEBUG) cout << "invalid ds request" << endl;
     }
     return queryResults;
 }
@@ -400,6 +401,7 @@ void startServerListening(Kdtree *kdtree,
         exit(EXIT_FAILURE);
     }
 
+    cout << "Server now listening" << endl;
     while(1) {
         if ((new_socket
                 = accept(server_fd, (struct sockaddr*)&address,
@@ -422,7 +424,7 @@ void startServerListening(Kdtree *kdtree,
         close(new_socket);
     }
 
-
+    cout << "Server not listening and shut down" << endl;
     // closing the listening socket
     shutdown(server_fd, SHUT_RDWR);
 }
@@ -441,10 +443,9 @@ int main()
                                       "begin":"192648732",
                                       "end":"255840252"
                                       })"""");
-*/    //cout << "json data " << urlparser.urlParameters["primitive"].GetString() << endl;
-
+*/
     Document fetchedData = urlparser.fetchContentFromURL();
-    if(fetchedData.IsNull() || kArrayType != fetchedData.GetType()) { cout << "nothing is in the content" << endl; return 0;}
+    if(fetchedData.IsNull() || kArrayType != fetchedData.GetType()) { if(DEBUG) cout << "nothing is in the content" << endl; return 0;}
 
     Point_vector points_2d;
     vector<Interval> InputList;
@@ -492,7 +493,7 @@ int main()
         //if(numberOfEvents<=0) break;
     }
     Segment_tree_2_type Segment_tree_2(InputList.begin(),InputList.end());
-    cout << "kd tree and segment tree build done with total interval count: " << totalIntervals <<  " " << cPrimitiveNumber << endl;
+    if(DEBUG) cout << "kd tree and segment tree build done with total interval count: " << totalIntervals <<  " " << cPrimitiveNumber << endl;
     //testSearchQueries(&kdtree, &Segment_tree_2, minId, maxId);
 
     startServerListening(&kdtree, &Segment_tree_2, minId, maxId, minLocation, maxLocation);

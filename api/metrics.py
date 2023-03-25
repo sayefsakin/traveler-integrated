@@ -105,7 +105,7 @@ def get_utilization_histogram(datasetId: str,
         ret['locations'] = {}
         for location in locations:
             # ret['locations'][location] = db[datasetId]['sparseUtilizationList']['intervals'].calcUtilizationForLocation(bins, begin, end, location)
-            ret['locations'][location] = kd_sul.calcUtilizationForLocation(bins, begin, end, str(location))
+            ret['locations'][location] = kd_sul.calcUtilizationForLocation(bins, begin, end, location)
     else:
         # ret['data'] = db[datasetId]['sparseUtilizationList']['intervals'].calcUtilizationHistogram(bins, begin, end)
         ret['data'] = kd_sul.calcUtilizationHistogram(bins, begin, end)
