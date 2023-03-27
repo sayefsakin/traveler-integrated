@@ -19,6 +19,7 @@
 #include <CGAL/Range_segment_tree_traits.h>
 
 #include <CGAL/property_map.h>
+#include <CGAL/Orthogonal_k_neighbor_search.h>
 
 #include <netinet/in.h>
 #include <sys/socket.h>
@@ -30,7 +31,6 @@
 #include "rapidjson/stringbuffer.h"
 
 #define MSG_SIZE_IN_BYTE 16
-#define DEBUG 0
 
 using namespace std;
 
@@ -62,6 +62,9 @@ typedef pair<Point_2, Point_2> Point_pairs;
 typedef map<string, int> Primtive_mapping;
 typedef vector<string> Primitive_reverse_mapping;
 
+typedef CGAL::Orthogonal_k_neighbor_search<Traits> Kd_tree_search;
+typedef Kd_tree_search::Tree NNKdtree;
+
 Pure_interval getPurIntervalFromPoint(Point_2 p, Point_2 q) {
     return Pure_interval(Key(p.x(),(p.y()*2)-1), Key(q.x(),q.y()*2));
 }
@@ -71,15 +74,16 @@ Point_pairs getPointIntervalFromPureInterval(Pure_interval pi) {
     return Point_pairs(p,q);
 }
 
-void testSearchQueries(Kdtree *kdtree, Segment_tree_2_type *Segment_tree_2, int minId, int maxId) {
+void testSearchQueries(Kdtree *kdtree, Segment_tree_2_type *Segment_tree_2, int minId, int maxId, NNKdtree *nnkdtree) {
 
     list<Point_d> result;
-    Point_2 p(192648732, 11);
-    Point_2 q(255840252, 13);
+    Point_2 p(236941312, 2);
+    Point_2 q(236941313, 2);
+    //Point_2 q(255840252, 13);
     Point_2 r(224244492, 12);
 
-
-    Point_d pd(p.x(), p.y(), minId);
+    cout << minId << " " << maxId << endl;
+    Point_d pd(p.x(), p.y(), maxId);
     Point_d qd(q.x(), q.y(), maxId);
     //Point_d rd(224244492, 12);
 
@@ -92,6 +96,11 @@ void testSearchQueries(Kdtree *kdtree, Segment_tree_2_type *Segment_tree_2, int 
     if(DEBUG) cout << "kd tree points are with size: " << result.size() << endl;
     copy (result.begin(), result.end(), ostream_iterator<Point_d>(cout,"\n") );
     if(DEBUG) cout << endl;
+
+    Kd_tree_search search((*nnkdtree), pd, 1);
+
+    cout << "nearest neighbor " << (search.end()-1)->first << endl;
+
 /*
     if(DEBUG) cout << "KD Tree" << endl;
     if(DEBUG) cout << kdtree << endl;
@@ -148,6 +157,28 @@ Document rcvOverTheSocket(int new_socket){
     memset(buffer, 0, msg_size+1);
     buffer = NULL;
     return d;
+}
+
+Document kdTreeGetAttributeQuery(NNKdtree *nnkdtree, uint64_t cTime, uint64_t cLocation, uint64_t minId, uint64_t maxId) {
+    list<Point_d> result;
+    Point_2 p(cTime, cLocation);
+    Point_2 q(cTime+1, cLocation);
+
+    Point_d pd(p.x(), p.y(), 0);
+    Point_d qd(q.x(), q.y(), maxId);
+
+    if(DEBUG) cout << "doing event attribute query (" << p.x() << "," << p.y() << ") (" << q.x() << "," << q.y() << ")" << endl;
+    Kd_tree_search search((*nnkdtree), pd, 1);
+    cout << "nearest neighbor " << (search.end()-1)->first << endl;
+
+    Document document;
+    document.SetObject();
+    Document::AllocatorType& allocator = document.GetAllocator();
+    Value val(kObjectType);
+    string begin_string = to_string(int64_t(search.begin()->first.z()));
+    val.SetString(begin_string.c_str(), static_cast<SizeType>(begin_string.length()), allocator);
+    document.AddMember("event_id", val, allocator);
+    return document;
 }
 
 Document kdTreeSearchQuery( Kdtree *kdtree,
@@ -211,6 +242,46 @@ Document kdTreeSearchQuery( Kdtree *kdtree,
     obj2.AddMember("end", val, allocator);
 
     document.AddMember("metadata", obj2, allocator);
+/*
+    rapidjson::StringBuffer strbuf;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(strbuf);
+    document.Accept(writer);
+
+    const char *jsonString = strbuf.GetString();
+    if(DEBUG) cout << jsonString << endl;
+*/
+    return document;
+}
+
+Document sgmntTreeGetAttributeQuery(Segment_tree_2_type *Segment_tree_2,
+                        uint64_t cTime,
+                        uint64_t cLocation,
+                        uint64_t minId,
+                        uint64_t maxId) {
+
+    vector<Interval> OutputList1;
+    Point_d p((double)cTime, (double)cLocation, minId);
+    Point_d q((double)cTime+1, (double)cLocation, maxId);
+
+    if(DEBUG) cout << "doing window query with segment tree (" << p.x() << "," << p.y() << ") (" << q.x() << "," << q.y() << ")" << endl;
+    Interval a=Interval(Pure_interval(Key(p.x(),(p.y()*2)-1), Key(q.x(),q.y()*2)),"z");
+    Segment_tree_2->window_query(a,std::back_inserter(OutputList1));
+    vector<Interval>::iterator j = OutputList1.begin();
+    if(DEBUG) cout << "\n get attribute query with segment tree result size: " << OutputList1.size() << endl;;
+
+    Document document;
+    document.SetObject();
+    Document::AllocatorType& allocator = document.GetAllocator();
+
+    while(j!=OutputList1.end()){
+        Point_pairs pp = getPointIntervalFromPureInterval((*j).first);
+        Value val(kObjectType);
+        string begin_string((*j).second);
+        val.SetString(begin_string.c_str(), static_cast<SizeType>(begin_string.length()), allocator);
+        document.AddMember("event_id", val, allocator);
+        break;
+        j++;
+    }
 /*
     rapidjson::StringBuffer strbuf;
     rapidjson::Writer<rapidjson::StringBuffer> writer(strbuf);
@@ -311,6 +382,7 @@ Document sgmntTreeSearchQuery(Segment_tree_2_type *Segment_tree_2,
 }
 
 Document processReceivedRequest(Kdtree *kdtree,
+                                NNKdtree *nkdtree,
                                 Segment_tree_2_type *Segment_tree_2,
                                 Document *d,
                                 uint64_t minId, uint64_t maxId,
@@ -322,43 +394,68 @@ Document processReceivedRequest(Kdtree *kdtree,
     }
     string ds_request((*d)["db_store"].GetString());
 
-    uint64_t time_begin = stol(((*d)["begin"].GetString())) < 0 ? 0 : stoul(((*d)["begin"].GetString()));
-    uint64_t time_end = stol(((*d)["end"].GetString())) < 0 ? 0 : stoul(((*d)["end"].GetString()));
-
-    uint64_t location_begin = minLocation;
-    uint64_t location_end = maxLocation;
-    vector<uint64_t> locationsList;
-    if((*d).HasMember("locations")) {
-        for (SizeType i = 0; i < (*d)["locations"].Size(); i++){
-            locationsList.push_back(stol((*d)["locations"][i].GetString()));
-        }
-        if(DEBUG) cout << locationsList.size() << endl;
-        sort(locationsList.begin(), locationsList.end());
-        location_begin = locationsList[0];
-        location_end = locationsList[locationsList.size()-1];
+    if(!(*d).HasMember("command")) {
+        if(DEBUG) cout << "please provide a command for ds request" << endl;
+        return queryResults;
     }
-    if((*d).HasMember("location_end")) {
-        location_end = stoul(((*d)["location_end"].GetString()));
-    }
+    string qCommand((*d)["command"].GetString());
 
+    string GETDATAINRANGE("GetDataInRange");
+    string GETEVENTATTRIBUTE("GetEventAttribute");
     string KDTREE("kd_tree");
     string SGTREE("segment_tree");
 
-    if(ds_request == KDTREE) {
-        if(DEBUG) cout << "got KD Tree request" << endl;
-        return kdTreeSearchQuery(kdtree, time_begin, time_end, location_begin, location_end, minId, maxId);
-        // process with kdtree
-    } else if(ds_request == SGTREE) {
-        if(DEBUG) cout << "got Segment Tree request" << endl;
-        return sgmntTreeSearchQuery(Segment_tree_2, time_begin, time_end, location_begin, location_end, minId, maxId);
-        // process with segment tree
-    } else {
-        if(DEBUG) cout << "invalid ds request" << endl;
+    if(qCommand == GETDATAINRANGE) {
+
+        uint64_t time_begin = stol(((*d)["begin"].GetString())) < 0 ? 0 : stoul(((*d)["begin"].GetString()));
+        uint64_t time_end = stol(((*d)["end"].GetString())) < 0 ? 0 : stoul(((*d)["end"].GetString()));
+
+        uint64_t location_begin = minLocation;
+        uint64_t location_end = maxLocation;
+        vector<uint64_t> locationsList;
+        if((*d).HasMember("locations")) {
+            for (SizeType i = 0; i < (*d)["locations"].Size(); i++){
+                locationsList.push_back(stol((*d)["locations"][i].GetString()));
+            }
+            if(DEBUG) cout << locationsList.size() << endl;
+            sort(locationsList.begin(), locationsList.end());
+            location_begin = locationsList[0];
+            location_end = locationsList[locationsList.size()-1];
+        }
+        if((*d).HasMember("location_end")) {
+            location_end = stoul(((*d)["location_end"].GetString()));
+        }
+
+        if(ds_request == KDTREE) {
+            if(DEBUG) cout << "got KD Tree request" << endl;
+            return kdTreeSearchQuery(kdtree, time_begin, time_end, location_begin, location_end, minId, maxId);
+        } else if(ds_request == SGTREE) {
+            if(DEBUG) cout << "got Segment Tree request" << endl;
+            return sgmntTreeSearchQuery(Segment_tree_2, time_begin, time_end, location_begin, location_end, minId, maxId);
+        } else {
+            if(DEBUG) cout << "invalid ds request" << endl;
+        }
+
+    } else if(qCommand == GETEVENTATTRIBUTE) {
+
+        uint64_t cTime = stol(((*d)["time"].GetString())) < 0 ? 0 : stoul(((*d)["time"].GetString()));
+        uint64_t cLocation = stol((*d)["location"].GetString());
+
+        if(ds_request == KDTREE) {
+            if(DEBUG) cout << "got KD Tree request" << endl;
+            return kdTreeGetAttributeQuery(nkdtree, cTime, cLocation, minId, maxId);
+        } else if(ds_request == SGTREE) {
+            if(DEBUG) cout << "got Segment Tree request" << endl;
+            return sgmntTreeGetAttributeQuery(Segment_tree_2, cTime, cLocation, minId, maxId);
+        } else {
+            if(DEBUG) cout << "invalid ds request" << endl;
+        }
     }
     return queryResults;
 }
 
 void startServerListening(Kdtree *kdtree,
+                        NNKdtree *nkdtree,
                         Segment_tree_2_type *Segment_tree_2,
                         uint64_t minId, uint64_t maxId,
                         uint64_t minLocation, uint64_t maxLocation) {
@@ -412,7 +509,7 @@ void startServerListening(Kdtree *kdtree,
             }
 
         Document d = rcvOverTheSocket(new_socket);
-        Document queryResults = processReceivedRequest(kdtree, Segment_tree_2, &d, minId, maxId, minLocation, maxLocation);
+        Document queryResults = processReceivedRequest(kdtree, nkdtree, Segment_tree_2, &d, minId, maxId, minLocation, maxLocation);
 
         StringBuffer qbuffer;
         Writer<StringBuffer> qwriter(qbuffer);
@@ -461,6 +558,7 @@ int main()
     uint64_t maxId = 0;
     uint64_t minLocation = 1000000000;
     uint64_t maxLocation = 0;
+    vector<Point_d> nnpoints;
     for (auto& v : fetchedData.GetArray()) {
         Point_2 interval_enter((double)v.GetObject()["enter"]["Timestamp"].GetInt(), stod(v.GetObject()["Location"].GetString()));
         Point_2 interval_end((double)v.GetObject()["leave"]["Timestamp"].GetInt(), stod(v.GetObject()["Location"].GetString()));
@@ -487,15 +585,21 @@ int main()
         kdtree.insert(Point_d(interval_enter.x(), interval_enter.y(), intervalId));
         kdtree.insert(Point_d(interval_end.x(), interval_end.y(), intervalId));
 
+        nnpoints.push_back(Point_d(interval_enter.x(), interval_enter.y(), intervalId));
+        nnpoints.push_back(Point_d(interval_end.x(), interval_end.y(), intervalId));
+
         InputList.emplace_back(Interval(getPurIntervalFromPoint(interval_enter, interval_end), v.GetObject()["intervalId"].GetString()));
         totalIntervals++;
         //numberOfEvents--;
         //if(numberOfEvents<=0) break;
     }
+    NNKdtree nnkdtree(nnpoints.begin(), nnpoints.end());
+    nnkdtree.build();
+
     Segment_tree_2_type Segment_tree_2(InputList.begin(),InputList.end());
     if(DEBUG) cout << "kd tree and segment tree build done with total interval count: " << totalIntervals <<  " " << cPrimitiveNumber << endl;
-    //testSearchQueries(&kdtree, &Segment_tree_2, minId, maxId);
+    testSearchQueries(&kdtree, &Segment_tree_2, minId, maxId, &nnkdtree);
 
-    startServerListening(&kdtree, &Segment_tree_2, minId, maxId, minLocation, maxLocation);
+    //startServerListening(&kdtree, &nnkdtree, &Segment_tree_2, minId, maxId, minLocation, maxLocation);
     return EXIT_SUCCESS;
 }

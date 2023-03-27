@@ -75,9 +75,10 @@ class DataQueriesInterface:
         print("inside the get data in range")
 
         dictionary = {
+            "command": "GetDataInRange",
             "begin": str(begin),
             "end": str(end),
-            "db_store": dataStoreType,
+            "db_store": dataStoreType
         }
         if locations:
             dictionary["locations"] = locations
@@ -92,13 +93,33 @@ class DataQueriesInterface:
         print("received data over socket in dict format")
 
         client_socket.close()
-
-
         return ret
 
 
-    def GetAttributeOfEvent(self, event_id):
-        pass
+    def GetAttributeOfEvent(self, timestamp, location, dataStoreType: str = None):
+        print("inside the get attribute of event")
+
+        dictionary = {
+            "command": "GetEventAttribute",
+            "time": str(timestamp),
+            "location": str(location),
+            "db_store": dataStoreType
+        }
+        print(dictionary)
+
+        client_socket = socket.socket()
+        client_socket.connect((self.host, self.port))
+
+        self.sendOverTheSocket(client_socket, dictionary)
+        dataDict = self.recvOverTheSocket(client_socket)
+        if 'event_id' not in dataDict:
+            ret = None
+        else:
+            ret = dataDict['event_id']
+        print("received data over socket in dict format")
+
+        client_socket.close()
+        return ret
 
     def GetDataForMatchedPattern(self, range, pattern_list):
         pass
