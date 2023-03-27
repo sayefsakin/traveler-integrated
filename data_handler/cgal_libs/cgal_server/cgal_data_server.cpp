@@ -177,16 +177,15 @@ Document kdTreeGetAttributeQuery(Kdtree *nnkdtree, uint64_t cTime, uint64_t cLoc
     vector<Point_d> leftResult;
     while(1) {
         Point_d npd(p.x()-two, p.y(), minId);
-        Point_d nqd(q.x()+two, q.y(), maxId);
+        Point_d nqd(q.x(), q.y(), maxId);
         Fuzzy_iso_box exact_range(npd,nqd);
         nnkdtree->search( back_inserter( leftResult ), exact_range);
         if(DEBUG) cout << "kd tree points are with size: " << leftResult.size() <<  " " << two << endl;
         copy (leftResult.begin(), leftResult.end(), ostream_iterator<Point_d>(cout,"\n") );
         if(DEBUG) cout << endl;
-        if(leftResult.size()>0 || two > (1<<31)) break;
+        if(leftResult.size()>0 || two > (1<<30)) break;
         two <<= 1;
     }
-
     if(leftResult.size() > 1) {
         int64_t diff = abs(leftResult[0].x() - p.x());
         int ind = 0;
@@ -198,8 +197,39 @@ Document kdTreeGetAttributeQuery(Kdtree *nnkdtree, uint64_t cTime, uint64_t cLoc
         }
         leftResult[0] = leftResult[ind];
     }
-    result = leftResult;
-    if(DEBUG) cout << "nearest neighbor in left " << result[0].z() << endl;
+
+    if(leftResult.size() > 0) {
+        if(DEBUG) cout << "nearest neighbor in left " << leftResult[0].z() << endl;
+
+        vector<Point_d> rightResult;
+        while(1) {
+            Point_d npd(p.x(), p.y(), minId);
+            Point_d nqd(q.x()+two, q.y(), maxId);
+            Fuzzy_iso_box exact_range(npd,nqd);
+            nnkdtree->search( back_inserter( rightResult ), exact_range);
+            if(DEBUG) cout << "kd tree points are with size: " << rightResult.size() <<  " " << two << endl;
+            copy (rightResult.begin(), rightResult.end(), ostream_iterator<Point_d>(cout,"\n") );
+            if(DEBUG) cout << endl;
+            if(rightResult.size()>0 || two > (1<<30)) break;
+            two <<= 1;
+        }
+        if(rightResult.size() > 1) {
+            int64_t diff = abs(rightResult[0].x() - p.x());
+            int ind = 0;
+            for(int i = 1; i<rightResult.size(); i++) {
+                if(abs(rightResult[i].x() - p.x()) < diff) {
+                    diff = abs(rightResult[i].x() - p.x());
+                    ind = i;
+                }
+            }
+            rightResult[0] = rightResult[ind];
+        }
+        if(DEBUG) cout << "nearest neighbor in right " << rightResult[0].z() << endl;
+        if(leftResult[0].z() == rightResult[0].z())
+            result = leftResult;
+    }
+
+    if(result.size()>0) if(DEBUG) cout << "actual nearest neighbor " << result[0].z() << endl;
 
     Document document;
     document.SetObject();
