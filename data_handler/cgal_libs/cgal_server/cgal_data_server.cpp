@@ -83,7 +83,7 @@ void testSearchQueries(Kdtree *kdtree, Segment_tree_2_type *Segment_tree_2, int 
     Point_2 r(224244492, 12);
 
     cout << minId << " " << maxId << endl;
-    Point_d pd(p.x(), p.y(), maxId);
+    Point_d pd(p.x(), p.y(), minId);
     Point_d qd(q.x(), q.y(), maxId);
     //Point_d rd(224244492, 12);
 
@@ -91,12 +91,17 @@ void testSearchQueries(Kdtree *kdtree, Segment_tree_2_type *Segment_tree_2, int 
     // Searching an exact range
     // using default value 0.0 for epsilon fuzziness parameter
     // Fuzzy_box exact_range(r); replaced by
-    Fuzzy_iso_box exact_range(pd,qd);
-    kdtree->search( back_inserter( result ), exact_range);
-    if(DEBUG) cout << "kd tree points are with size: " << result.size() << endl;
-    copy (result.begin(), result.end(), ostream_iterator<Point_d>(cout,"\n") );
-    if(DEBUG) cout << endl;
-
+    uint64_t two = 1;
+    while(1) {
+        Point_d nqd(q.x()+two, q.y(), maxId);
+        Fuzzy_iso_box exact_range(pd,nqd);
+        kdtree->search( back_inserter( result ), exact_range);
+        if(DEBUG) cout << "kd tree points are with size: " << result.size() <<  " " << two << endl;
+        copy (result.begin(), result.end(), ostream_iterator<Point_d>(cout,"\n") );
+        if(DEBUG) cout << endl;
+        if(result.size()>0 || two > (1<<31)) break;
+        two <<= 1;
+    }
     Kd_tree_search search((*nnkdtree), pd, 1);
 
     cout << "nearest neighbor " << (search.end()-1)->first << endl;
@@ -159,25 +164,53 @@ Document rcvOverTheSocket(int new_socket){
     return d;
 }
 
-Document kdTreeGetAttributeQuery(NNKdtree *nnkdtree, uint64_t cTime, uint64_t cLocation, uint64_t minId, uint64_t maxId) {
-    list<Point_d> result;
+Document kdTreeGetAttributeQuery(Kdtree *nnkdtree, uint64_t cTime, uint64_t cLocation, uint64_t minId, uint64_t maxId) {
+    vector<Point_d> result;
     Point_2 p(cTime, cLocation);
     Point_2 q(cTime+1, cLocation);
 
-    Point_d pd(p.x(), p.y(), 0);
+    Point_d pd(p.x(), p.y(), minId);
     Point_d qd(q.x(), q.y(), maxId);
 
     if(DEBUG) cout << "doing event attribute query (" << p.x() << "," << p.y() << ") (" << q.x() << "," << q.y() << ")" << endl;
-    Kd_tree_search search((*nnkdtree), pd, 1);
-    cout << "nearest neighbor " << (search.end()-1)->first << endl;
+    uint64_t two = 1;
+    vector<Point_d> leftResult;
+    while(1) {
+        Point_d npd(p.x()-two, p.y(), minId);
+        Point_d nqd(q.x()+two, q.y(), maxId);
+        Fuzzy_iso_box exact_range(npd,nqd);
+        nnkdtree->search( back_inserter( leftResult ), exact_range);
+        if(DEBUG) cout << "kd tree points are with size: " << leftResult.size() <<  " " << two << endl;
+        copy (leftResult.begin(), leftResult.end(), ostream_iterator<Point_d>(cout,"\n") );
+        if(DEBUG) cout << endl;
+        if(leftResult.size()>0 || two > (1<<31)) break;
+        two <<= 1;
+    }
+
+    if(leftResult.size() > 1) {
+        int64_t diff = abs(leftResult[0].x() - p.x());
+        int ind = 0;
+        for(int i = 1; i<leftResult.size(); i++) {
+            if(abs(leftResult[i].x() - p.x()) < diff) {
+                diff = abs(leftResult[i].x() - p.x());
+                ind = i;
+            }
+        }
+        leftResult[0] = leftResult[ind];
+    }
+    result = leftResult;
+    if(DEBUG) cout << "nearest neighbor in left " << result[0].z() << endl;
 
     Document document;
     document.SetObject();
     Document::AllocatorType& allocator = document.GetAllocator();
-    Value val(kObjectType);
-    string begin_string = to_string(int64_t(search.begin()->first.z()));
-    val.SetString(begin_string.c_str(), static_cast<SizeType>(begin_string.length()), allocator);
-    document.AddMember("event_id", val, allocator);
+    if(result.size()>0) {
+        Value val(kObjectType);
+        //string begin_string = to_string(int64_t(search.begin()->first.z()));
+        string begin_string = to_string(int64_t(result[0].z()));
+        val.SetString(begin_string.c_str(), static_cast<SizeType>(begin_string.length()), allocator);
+        document.AddMember("event_id", val, allocator);
+    }
     return document;
 }
 
@@ -443,7 +476,7 @@ Document processReceivedRequest(Kdtree *kdtree,
 
         if(ds_request == KDTREE) {
             if(DEBUG) cout << "got KD Tree request" << endl;
-            return kdTreeGetAttributeQuery(nkdtree, cTime, cLocation, minId, maxId);
+            return kdTreeGetAttributeQuery(kdtree, cTime, cLocation, minId, maxId);
         } else if(ds_request == SGTREE) {
             if(DEBUG) cout << "got Segment Tree request" << endl;
             return sgmntTreeGetAttributeQuery(Segment_tree_2, cTime, cLocation, minId, maxId);
@@ -598,8 +631,8 @@ int main()
 
     Segment_tree_2_type Segment_tree_2(InputList.begin(),InputList.end());
     if(DEBUG) cout << "kd tree and segment tree build done with total interval count: " << totalIntervals <<  " " << cPrimitiveNumber << endl;
-    testSearchQueries(&kdtree, &Segment_tree_2, minId, maxId, &nnkdtree);
+    //testSearchQueries(&kdtree, &Segment_tree_2, minId, maxId, &nnkdtree);
 
-    //startServerListening(&kdtree, &nnkdtree, &Segment_tree_2, minId, maxId, minLocation, maxLocation);
+    startServerListening(&kdtree, &nnkdtree, &Segment_tree_2, minId, maxId, minLocation, maxLocation);
     return EXIT_SUCCESS;
 }
