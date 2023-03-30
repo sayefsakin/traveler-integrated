@@ -25,6 +25,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include <chrono>
 #include "curl_get.cpp"
 #include "rapidjson/document.h"
 #include "rapidjson/writer.h"
@@ -125,10 +126,10 @@ void testSearchQueries(Kdtree *kdtree, Segment_tree_2_type *Segment_tree_2, int 
 }
 
 void sendOverTheSocket(int new_socket, const char *json){
-    int64_t maxSocketBuffer = 10000;
+    int64_t maxSocketBuffer = 100000;
     int64_t cJsonSize = strlen(json);
     int cstart = 0;
-    char t[20];
+    char t[30];
 
     while(cJsonSize > 0) {
         int64_t jsonSize = min(maxSocketBuffer, cJsonSize);
@@ -596,7 +597,8 @@ int main()
     //urlparser.urlString = "http://localhost:8000/datasets/9b9d5286-736c-481a-ba29-0f871979967c/intervalHistograms?bins=100";
     //urlparser.baseUrl = "http://localhost:8000/datasets/9b9d5286-736c-481a-ba29-0f871979967c/primitives";
     urlparser.baseUrl = "http://localhost:8000";
-    urlparser.datasetId = "589ca754-ef75-426c-8d51-841cc61dc84a";//"9b9d5286-736c-481a-ba29-0f871979967c";
+    //urlparser.datasetId = "772c7330-d4eb-485b-866a-3b315063f9af";// "589ca754-ef75-426c-8d51-841cc61dc84a";//"9b9d5286-736c-481a-ba29-0f871979967c";
+    urlparser.datasetId = "8b3289c9-a740-4091-a56d-e4d55af526b5";//kmeans
     urlparser.travelerApi = "intervals";//"primitives";
 /*
     urlparser.urlParameters.Parse(R""""({
@@ -623,8 +625,8 @@ int main()
     uint64_t maxLocation = 0;
     vector<Point_d> nnpoints;
     for (auto& v : fetchedData.GetArray()) {
-        Point_2 interval_enter((double)v.GetObject()["enter"]["Timestamp"].GetInt(), stod(v.GetObject()["Location"].GetString()));
-        Point_2 interval_end((double)v.GetObject()["leave"]["Timestamp"].GetInt(), stod(v.GetObject()["Location"].GetString()));
+        Point_2 interval_enter((double)v.GetObject()["enter"]["Timestamp"].GetInt64(), stod(v.GetObject()["Location"].GetString()));
+        Point_2 interval_end((double)v.GetObject()["leave"]["Timestamp"].GetInt64(), stod(v.GetObject()["Location"].GetString()));
 
         cPrimitive = v.GetObject()["Primitive"].GetString();
         cPrimitiveNumber = -1;
@@ -653,14 +655,26 @@ int main()
 
         InputList.emplace_back(Interval(getPurIntervalFromPoint(interval_enter, interval_end), v.GetObject()["intervalId"].GetString()));
         totalIntervals++;
+        if(totalIntervals % 2500 == 0)
+            cout << ".";
+        if(totalIntervals % 100000 == 0)
+            cout << " processed " << totalIntervals << " intervals" << endl;
         //numberOfEvents--;
         //if(numberOfEvents<=0) break;
     }
-    NNKdtree nnkdtree(nnpoints.begin(), nnpoints.end());
-    nnkdtree.build();
 
+    NNKdtree nnkdtree(nnpoints.begin(), nnpoints.end());
+    std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+    nnkdtree.build();
+    std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+
+    std::cout << "KD Tree build time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
+
+    begin = std::chrono::steady_clock::now();
     Segment_tree_2_type Segment_tree_2(InputList.begin(),InputList.end());
-    if(DEBUG) cout << "kd tree and segment tree build done with total interval count: " << totalIntervals <<  " " << cPrimitiveNumber << endl;
+    end = std::chrono::steady_clock::now();
+    std::cout << "Segment Tree build time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
+    cout << "kd tree and segment tree build done with total interval count: " << totalIntervals <<  " " << cPrimitiveNumber << endl;
     //testSearchQueries(&kdtree, &Segment_tree_2, minId, maxId, &nnkdtree);
 
     startServerListening(&kdtree, &nnkdtree, &Segment_tree_2, minId, maxId, minLocation, maxLocation);

@@ -30,11 +30,15 @@ class DataQueriesInterface:
     def recvOverTheSocket(self, client_socket):
         dataString = ""
         while True:
-            data = client_socket.recv(16).decode()
-            print('Received from Server 1 : ' + data)
-            if int(data) == -1:
+            data_len = int(client_socket.recv(16).decode())
+            print('Received from Server 1 : ' + str(data_len))
+            if data_len == -1:
                 break
-            data = client_socket.recv(int(data)).decode()
+            data = client_socket.recv(data_len).decode()
+            while len(data) != data_len:
+                print('mismatched data length')
+                r_data_len = data_len - len(data)
+                data += client_socket.recv(r_data_len).decode()
             print('Received from Server 2 : ')
             dataString += data
 
