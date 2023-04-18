@@ -87,8 +87,7 @@ def get_utilization_histogram(datasetId: str,
 
     dqi = DataQueriesInterface()
     for i in range(3):
-        ta = datetime.datetime.now()
-        a = round(time.time() * 1000)
+        timerStart = round(time.time() * 1000)
 
         utilObject = db[datasetId]['sparseUtilizationList']['intervals']
         if i == 1:
@@ -97,6 +96,8 @@ def get_utilization_histogram(datasetId: str,
             utilObject = dqi.GetDataInRange(bins, begin, end, locations, primitive, "segment_tree")
         elif primitive is not None:
             utilObject = db[datasetId]['sparseUtilizationList']['primitives'][primitive]
+
+        fetchTimer = round(time.time() * 1000)
 
         if primitive is not None:
             if primitive not in db[datasetId]['sparseUtilizationList']['primitives']:
@@ -114,18 +115,16 @@ def get_utilization_histogram(datasetId: str,
         else:
             ret['data'] = utilObject.calcUtilizationHistogram(bins, begin, end)
 
-        tb = datetime.datetime.now()
-        b = round(time.time() * 1000)
-        tc = tb - ta
-        c = b - a
+        postProcessTimer = round(time.time() * 1000)
+
         if i == 0:
             print('SAT ', end='')
         elif i == 1:
             print('KDT ', end='')
         elif i == 2:
             print('SGT ', end='')
-        print('time difference: ', tc.seconds, ' ', tc.microseconds * 0.001)
-        print('time difference: ', c)
-
+        print('fetch time: ', '{:6d}'.format(fetchTimer - timerStart), end=' ms ')
+        print('post processing time: ', '{:6d}'.format(postProcessTimer - fetchTimer), ' ms')
+    print()
     ret['metadata'] = {'begin': begin, 'end': end, 'bins': bins}
     return ret

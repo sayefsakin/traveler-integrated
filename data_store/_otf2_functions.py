@@ -1,7 +1,10 @@
 import copy
+import datetime
 import os
 import re
 import gc
+import time
+
 import diskcache
 import numpy as np
 from sortedcontainers import SortedList
@@ -68,8 +71,8 @@ async def processOtf2(self, datasetId, file, log=logToConsole):
     await self.connectIntervals(datasetId, log)
     gc.collect()
     await self.buildSparseUtilizationLists(datasetId, log)
-    gc.collect()
-    await self.buildDependencyTree(datasetId, log)
+    # gc.collect()
+    # await self.buildDependencyTree(datasetId, log)
     gc.collect()
     self.finishLoadingSourceFile(datasetId, file.name)
 
@@ -100,6 +103,7 @@ async def processRawTrace(self, datasetId, file, log):
             continue
 
         if metricLineMatch is not None:
+            continue
             # This is a metric line
             location = metricLineMatch.group(1)
             timestamp = int(metricLineMatch.group(2))
@@ -141,6 +145,8 @@ async def processRawTrace(self, datasetId, file, log):
                 # Add to primitive / guid counts
                 newR += counts[0]
                 seenR += counts[1]
+                if numEvents > 502174: # 8000000:
+                    break
             currentEvent = {'metrics': {}}
             currentEvent['Event'] = eventLineMatch.group(1)
             currentEvent['Location'] = eventLineMatch.group(2)
@@ -283,7 +289,8 @@ async def buildIntervalTree(self, datasetId, log):
             leave = intervalObj['leave']['Timestamp'] + 1
             # Need to add one because IntervalTree can't handle zero-length intervals
             # (and because IntervalTree is not inclusive of upper bounds in queries)
-
+            if enter == leave:
+                continue
             iTreeInterval = Interval(enter, leave, intervalId)
 
             count += 1
@@ -306,12 +313,12 @@ async def buildIntervalTree(self, datasetId, log):
 async def connectIntervals(self, datasetId, log=logToConsole):
     await log('Connecting intervals with the same GUID (.=2500 intervals)')
 
-    guids = {}
+    # guids = {}
     # TODO: using a simple dict piles up GUIDs and intervalIds in memory... if
     # this gets too big, a (REALLY slow) alternative to guids = {}:
     #
-    # idDir = os.path.join(self.dbDir, datasetId)
-    # guids = self.datasets[datasetId]['guids'] = diskcache.Index(os.path.join(idDir, 'guids.diskCacheIndex'))
+    idDir = os.path.join(self.dbDir, datasetId)
+    guids = self.datasets[datasetId]['guids'] = diskcache.Index(os.path.join(idDir, 'guids.diskCacheIndex'))
     #
     # ... also, I'm not totally sure that guids[guid].append(intervalId) below
     # even works correctly with a diskcache.Index; it might need the slower
@@ -332,7 +339,8 @@ async def connectIntervals(self, datasetId, log=logToConsole):
         else:
             if not guid in guids:
                 guids[guid] = []
-            guids[guid].append(intervalId)
+            # guids[guid].append(intervalId)
+            guids[guid] = guids[guid] + [intervalId]
 
         # Connect to most recent interval with the parent GUID
         parentGuid = intervalObj.get('Parent GUID', intervalObj['enter'].get('Parent GUID', None))
@@ -378,6 +386,7 @@ async def connectIntervals(self, datasetId, log=logToConsole):
 
 async def buildSparseUtilizationLists(self, datasetId, log=logToConsole):
     # create allSuls obj
+    priorBuildTime = round(time.time() * 1000)
     allSuls = {'intervals': SparseUtilizationList(), 'metrics': dict(), 'primitives': dict(), 'intervalHistograms': dict()}
     intervalHistograms = dict()
     preMetricValue = dict()
@@ -491,6 +500,9 @@ async def buildSparseUtilizationLists(self, datasetId, log=logToConsole):
     self[datasetId]['sparseUtilizationList'] = allSuls
     self[datasetId]['info']['intervalDurationDomain'] = intervalDurationDomainDict
 
+    postBuildTime = round(time.time() * 1000)
+    totalBuildTime = postBuildTime - priorBuildTime
+    print('time difference: ', totalBuildTime)
 
 async def buildDependencyTree(self, datasetId, log=logToConsole):
     def is_include_primitive_name(primitive: str):

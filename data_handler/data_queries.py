@@ -21,8 +21,8 @@ class DataQueriesInterface:
         # msg = "Hello from python client"
         msg = json.dumps(dict).encode()
         msg_size = f"{len(msg):016d}"
-        print('message length ' + msg_size)
-        print('message length ' + str(len(msg_size.encode())))
+        # print('message length ' + msg_size)
+        # print('message length ' + str(len(msg_size.encode())))
 
         client_socket.send(msg_size.encode())
         client_socket.send(msg)
@@ -31,24 +31,24 @@ class DataQueriesInterface:
         dataString = ""
         while True:
             data_len = int(client_socket.recv(16).decode())
-            print('Received from Server 1 : ' + str(data_len))
+            # print('Received from Server 1 : ' + str(data_len))
             if data_len == -1:
                 break
             data = client_socket.recv(data_len).decode()
             while len(data) != data_len:
-                print('mismatched data length')
+                # print('mismatched data length')
                 r_data_len = data_len - len(data)
                 data += client_socket.recv(r_data_len).decode()
-            print('Received from Server 2 : ')
+            # print('Received from Server 2 : ')
             dataString += data
 
-        print('Received from Server 3 : ')
+        # print('Received from Server 3 : ')
         if len(dataString) == 0:
             return {}
         return json.loads(dataString)
 
     def postProcessForUtilization(self, dataDict):
-        print("in post processing")
+        # print("in post processing")
         sul = SparseUtilizationList()
 
 
@@ -69,14 +69,14 @@ class DataQueriesInterface:
                     sul.setIntervalAtLocation({'index': tm, 'counter': 1, 'util': 0}, str(loc))
                 else:
                     sul.setIntervalAtLocation({'index': tm, 'counter': -1, 'util': 0}, str(loc))
-        print("going to finalize with locations")
-        print(allLocations)
+        # print("going to finalize with locations")
+        # print(allLocations)
         sul.finalize(allLocations)
-        print("sorting of loc is done")
+        # print("sorting of loc is done")
         return sul
 
     def GetDataInRange(self, bins, begin, end, locations, primitive, dataStoreType: str = None):
-        print("inside the get data in range")
+        # print("inside the get data in range")
 
         dictionary = {
             "command": "GetDataInRange",
@@ -86,7 +86,7 @@ class DataQueriesInterface:
         }
         if locations:
             dictionary["locations"] = locations
-        print(dictionary)
+        # print(dictionary)
 
         client_socket = socket.socket()
         client_socket.connect((self.host, self.port))
@@ -94,7 +94,7 @@ class DataQueriesInterface:
         self.sendOverTheSocket(client_socket, dictionary)
         dataDict = self.recvOverTheSocket(client_socket)
         ret = self.postProcessForUtilization(dataDict)
-        print("received data over socket in dict format")
+        # print("received data over socket in dict format")
 
         client_socket.close()
         return ret

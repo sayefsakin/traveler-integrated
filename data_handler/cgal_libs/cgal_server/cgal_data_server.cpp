@@ -98,9 +98,9 @@ void testSearchQueries(Kdtree *kdtree, Segment_tree_2_type *Segment_tree_2, int 
         Fuzzy_iso_box exact_range(pd,nqd);
         kdtree->search( back_inserter( result ), exact_range);
         if(DEBUG) cout << "kd tree points are with size: " << result.size() <<  " " << two << endl;
-        copy (result.begin(), result.end(), ostream_iterator<Point_d>(cout,"\n") );
+        if(DEBUG) copy (result.begin(), result.end(), ostream_iterator<Point_d>(cout,"\n") );
         if(DEBUG) cout << endl;
-        if(result.size()>0 || two > (1<<31)) break;
+        if(result.size()>0 || two > (uint64_t)(1<<31)) break;
         two <<= 1;
     }
     Kd_tree_search search((*nnkdtree), pd, 1);
@@ -150,14 +150,14 @@ void sendOverTheSocket(int new_socket, const char *json){
 Document rcvOverTheSocket(int new_socket){
     char *buffer;
     buffer = (char *)malloc(MSG_SIZE_IN_BYTE);
-    int valread = read(new_socket, buffer, MSG_SIZE_IN_BYTE);
+    read(new_socket, buffer, MSG_SIZE_IN_BYTE);
     int msg_size = atoi(buffer);
     if(DEBUG) printf("%d\n", msg_size);
     Document d;
     if(!msg_size) return d;
     buffer = (char *)malloc(msg_size+1);
     memset(buffer, 0, msg_size+1);
-    valread = read(new_socket, buffer, msg_size);
+    read(new_socket, buffer, msg_size);
     if(DEBUG) printf("%s\n", buffer);
     d.Parse(buffer);
     memset(buffer, 0, msg_size+1);
@@ -182,7 +182,7 @@ Document kdTreeGetAttributeQuery(Kdtree *nnkdtree, uint64_t cTime, uint64_t cLoc
         Fuzzy_iso_box exact_range(npd,nqd);
         nnkdtree->search( back_inserter( leftResult ), exact_range);
         if(DEBUG) cout << "kd tree points are with size: " << leftResult.size() <<  " " << two << endl;
-        copy (leftResult.begin(), leftResult.end(), ostream_iterator<Point_d>(cout,"\n") );
+        if(DEBUG) copy (leftResult.begin(), leftResult.end(), ostream_iterator<Point_d>(cout,"\n") );
         if(DEBUG) cout << endl;
         if(leftResult.size()>0 || two > (1<<30)) break;
         two <<= 1;
@@ -190,7 +190,7 @@ Document kdTreeGetAttributeQuery(Kdtree *nnkdtree, uint64_t cTime, uint64_t cLoc
     if(leftResult.size() > 1) {
         int64_t diff = abs(leftResult[0].x() - p.x());
         int ind = 0;
-        for(int i = 1; i<leftResult.size(); i++) {
+        for(unsigned i = 1; i<leftResult.size(); i++) {
             if(abs(leftResult[i].x() - p.x()) < diff) {
                 diff = abs(leftResult[i].x() - p.x());
                 ind = i;
@@ -209,7 +209,7 @@ Document kdTreeGetAttributeQuery(Kdtree *nnkdtree, uint64_t cTime, uint64_t cLoc
             Fuzzy_iso_box exact_range(npd,nqd);
             nnkdtree->search( back_inserter( rightResult ), exact_range);
             if(DEBUG) cout << "kd tree points are with size: " << rightResult.size() <<  " " << two << endl;
-            copy (rightResult.begin(), rightResult.end(), ostream_iterator<Point_d>(cout,"\n") );
+            if(DEBUG) copy (rightResult.begin(), rightResult.end(), ostream_iterator<Point_d>(cout,"\n") );
             if(DEBUG) cout << endl;
             if(rightResult.size()>0 || two > (1<<30)) break;
             two <<= 1;
@@ -217,7 +217,7 @@ Document kdTreeGetAttributeQuery(Kdtree *nnkdtree, uint64_t cTime, uint64_t cLoc
         if(rightResult.size() > 1) {
             int64_t diff = abs(rightResult[0].x() - p.x());
             int ind = 0;
-            for(int i = 1; i<rightResult.size(); i++) {
+            for(unsigned i = 1; i<rightResult.size(); i++) {
                 if(abs(rightResult[i].x() - p.x()) < diff) {
                     diff = abs(rightResult[i].x() - p.x());
                     ind = i;
@@ -261,9 +261,14 @@ Document kdTreeSearchQuery( Kdtree *kdtree,
     // using default value 0.0 for epsilon fuzziness parameter
     // Fuzzy_box exact_range(r); replaced by
     Fuzzy_iso_box exact_range(p,q);
+
+    std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
     kdtree->search( back_inserter( result ), exact_range);
+    std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+    std::cout << "KD Tree window query time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
+
     if(DEBUG) cout << "kd tree points are with size: " << result.size() << endl;
-    copy (result.begin(), result.end(), ostream_iterator<Point_d>(cout,"\n") );
+    if(DEBUG) copy (result.begin(), result.end(), ostream_iterator<Point_d>(cout,"\n") );
     if(DEBUG) cout << endl;
 
     Document document;
@@ -273,7 +278,7 @@ Document kdTreeSearchQuery( Kdtree *kdtree,
 
     Document::AllocatorType& allocator = document.GetAllocator();
 
-    for(int i = 0; i < result.size(); i++) {
+    for(unsigned i = 0; i < result.size(); i++) {
         Value obj(kObjectType);
         Value val(kObjectType);
 
@@ -338,7 +343,7 @@ Document sgmntTreeGetAttributeQuery(Segment_tree_2_type *Segment_tree_2,
     Document::AllocatorType& allocator = document.GetAllocator();
 
     while(j!=OutputList1.end()){
-        Point_pairs pp = getPointIntervalFromPureInterval((*j).first);
+        //Point_pairs pp = getPointIntervalFromPureInterval((*j).first);
         Value val(kObjectType);
         string begin_string((*j).second);
         val.SetString(begin_string.c_str(), static_cast<SizeType>(begin_string.length()), allocator);
@@ -371,7 +376,12 @@ Document sgmntTreeSearchQuery(Segment_tree_2_type *Segment_tree_2,
 
     if(DEBUG) cout << "doing window query with segment tree (" << p.x() << "," << p.y() << ") (" << q.x() << "," << q.y() << ")" << endl;
     Interval a=Interval(Pure_interval(Key(p.x(),(p.y()*2)-1), Key(q.x(),q.y()*2)),"z");
+
+    std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
     Segment_tree_2->window_query(a,std::back_inserter(OutputList1));
+    std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+    std::cout << "Segment Tree window query time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
+
     vector<Interval>::iterator j = OutputList1.begin();
     if(DEBUG) cout << "\nwindow_query with segment tree result size: " << OutputList1.size() << endl;;
 
@@ -491,10 +501,10 @@ Document processReceivedRequest(Kdtree *kdtree,
         }
 
         if(ds_request == KDTREE) {
-            if(DEBUG) cout << "got KD Tree request" << endl;
+            cout << "got KD Tree request" << endl;
             return kdTreeSearchQuery(kdtree, time_begin, time_end, location_begin, location_end, minId, maxId);
         } else if(ds_request == SGTREE) {
-            if(DEBUG) cout << "got Segment Tree request" << endl;
+            cout << "got Segment Tree request" << endl;
             return sgmntTreeSearchQuery(Segment_tree_2, time_begin, time_end, location_begin, location_end, minId, maxId);
         } else {
             if(DEBUG) cout << "invalid ds request" << endl;
@@ -529,10 +539,6 @@ void startServerListening(Kdtree *kdtree,
     int opt = 1;
     int addrlen = sizeof(address);
 
-    //const char* json = "{\"project\":\"rapidjson\",\"stars\":10}";
-    string jstring = "{\"project\":\"sayef\",\"stars\":10}";
-    const char* json = jstring.data();
-
     // Creating socket file descriptor
     if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
         perror("socket failed");
@@ -562,7 +568,7 @@ void startServerListening(Kdtree *kdtree,
         exit(EXIT_FAILURE);
     }
 
-    cout << "Server now listening" << endl;
+    cout << "Server is now listening" << endl;
     while(1) {
         if ((new_socket
                 = accept(server_fd, (struct sockaddr*)&address,
@@ -590,7 +596,7 @@ void startServerListening(Kdtree *kdtree,
     shutdown(server_fd, SHUT_RDWR);
 }
 
-int main()
+int main(int argc, char *argv[])
 {
     vector<string> primitives;
     UrlParser urlparser;
@@ -598,14 +604,17 @@ int main()
     //urlparser.baseUrl = "http://localhost:8000/datasets/9b9d5286-736c-481a-ba29-0f871979967c/primitives";
     urlparser.baseUrl = "http://localhost:8000";
     //urlparser.datasetId = "772c7330-d4eb-485b-866a-3b315063f9af";// "589ca754-ef75-426c-8d51-841cc61dc84a";//"9b9d5286-736c-481a-ba29-0f871979967c";
-    urlparser.datasetId = "8b3289c9-a740-4091-a56d-e4d55af526b5";//kmeans
+    //urlparser.datasetId = "8b3289c9-a740-4091-a56d-e4d55af526b5";//kmeans
+    urlparser.datasetId = "589ca754-ef75-426c-8d51-841cc61dc84a"; // dgemm
     urlparser.travelerApi = "intervals";//"primitives";
+    if(argc>1) urlparser.datasetId = argv[1];
 /*
     urlparser.urlParameters.Parse(R""""({
-                                      "begin":"192648732",
-                                      "end":"255840252"
+                                      "begin":"813481624",
+                                      "end":"7644595297"
                                       })"""");
 */
+
     Document fetchedData = urlparser.fetchContentFromURL();
     if(fetchedData.IsNull() || kArrayType != fetchedData.GetType()) { if(DEBUG) cout << "nothing is in the content" << endl; return 0;}
 
@@ -674,7 +683,7 @@ int main()
     Segment_tree_2_type Segment_tree_2(InputList.begin(),InputList.end());
     end = std::chrono::steady_clock::now();
     std::cout << "Segment Tree build time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
-    cout << "kd tree and segment tree build done with total interval count: " << totalIntervals <<  " " << cPrimitiveNumber << endl;
+    cout << "kd tree and segment tree build done" << endl << "Total interval count: " << totalIntervals <<  ", Primitive count: " << cPrimitiveNumber << endl;
     //testSearchQueries(&kdtree, &Segment_tree_2, minId, maxId, &nnkdtree);
 
     startServerListening(&kdtree, &nnkdtree, &Segment_tree_2, minId, maxId, minLocation, maxLocation);
