@@ -406,6 +406,7 @@ class ZoomableTimelineView extends LinkedMixin( // Ensures that this.linkedState
     this.d3el.select('canvas')
       .style('transform-origin', '0px 0px')
       .style('transform', `scale(${chartShape.zoomFactor}, 1)`)
+      .style('position', `relative`)
       .style('left', `${chartShape.leftOffset}px`);
 
     // Update the eventCapturer rect
