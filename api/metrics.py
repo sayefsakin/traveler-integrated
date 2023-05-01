@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException
 from starlette.responses import StreamingResponse
 
 from data_handler.data_queries import DataQueriesInterface
+from data_handler.ds_profiled_data.ds_profiler import DSProfiler
 from . import db, validateDataset
 
 from data_handler import data_queries
@@ -86,45 +87,47 @@ def get_utilization_histogram(datasetId: str,
         locations = locations.split(',')
 
     dqi = DataQueriesInterface()
-    for i in range(3):
-        timerStart = round(time.time() * 1000)
+    dsp = DSProfiler()
 
-        utilObject = db[datasetId]['sparseUtilizationList']['intervals']
-        if i == 1:
-            utilObject = dqi.GetDataInRange(bins, begin, end, locations, primitive, "kd_tree")
-        elif i == 2:
-            utilObject = dqi.GetDataInRange(bins, begin, end, locations, primitive, "segment_tree")
-        elif primitive is not None:
-            utilObject = db[datasetId]['sparseUtilizationList']['primitives'][primitive]
+    timerStart = round(time.time() * 1000)
 
-        fetchTimer = round(time.time() * 1000)
+    utilObject = db[datasetId]['sparseUtilizationList']['intervals']
+    if dsp.profiled_ds == dsp.KDT or dsp.profiled_ds == dsp.SGT:
+        utilObject = dqi.GetDataInRange(bins, begin, end, locations, primitive, dsp.profiled_ds)
+    elif primitive is not None:
+        utilObject = db[datasetId]['sparseUtilizationList']['primitives'][primitive]
 
-        if primitive is not None:
-            if primitive not in db[datasetId]['sparseUtilizationList']['primitives']:
-                raise HTTPException(status_code=404, detail='No utilization data for primitive: %s' % primitive)
-            if locations:
-                ret['locations'] = {}
-                for location in locations:
-                    ret['locations'][location] = utilObject.calcUtilizationForLocation(bins, begin, end, location)
-            else:
-                ret['data'] = utilObject.calcUtilizationHistogram(bins, begin, end)
-        elif locations:
+    fetchTimer = round(time.time() * 1000)
+
+    if primitive is not None:
+        if primitive not in db[datasetId]['sparseUtilizationList']['primitives']:
+            raise HTTPException(status_code=404, detail='No utilization data for primitive: %s' % primitive)
+        if locations:
             ret['locations'] = {}
             for location in locations:
                 ret['locations'][location] = utilObject.calcUtilizationForLocation(bins, begin, end, location)
         else:
             ret['data'] = utilObject.calcUtilizationHistogram(bins, begin, end)
+    elif locations:
+        ret['locations'] = {}
+        for location in locations:
+            ret['locations'][location] = utilObject.calcUtilizationForLocation(bins, begin, end, location)
+    else:
+        ret['data'] = utilObject.calcUtilizationHistogram(bins, begin, end)
 
-        postProcessTimer = round(time.time() * 1000)
+    postProcessTimer = round(time.time() * 1000)
 
-        if i == 0:
-            print('SAT ', end='')
-        elif i == 1:
-            print('KDT ', end='')
-        elif i == 2:
-            print('SGT ', end='')
-        print('fetch time: ', '{:6d}'.format(fetchTimer - timerStart), end=' ms ')
-        print('post processing time: ', '{:6d}'.format(postProcessTimer - fetchTimer), ' ms')
-    print()
+    # datasetId, begin, end, bins, fetch time, post process time
+    print(datasetId, str(begin), str(end), str(bins), str(fetchTimer - timerStart), str(postProcessTimer - fetchTimer), sep=",")
+    # if i == 0:
+    #     print('SAT ', end='')
+    # elif i == 1:
+    #     print('KDT ', end='')
+    # elif i == 2:
+    #     print('SGT ', end='')
+    # print('fetch time: ', '{:6d}'.format(fetchTimer - timerStart), end=' ms ')
+    # print('post processing time: ', '{:6d}'.format(postProcessTimer - fetchTimer), ' ms')
+    # print()
+
     ret['metadata'] = {'begin': begin, 'end': end, 'bins': bins}
     return ret

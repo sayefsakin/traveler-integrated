@@ -265,8 +265,8 @@ Document kdTreeSearchQuery( Kdtree *kdtree,
     std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
     kdtree->search( back_inserter( result ), exact_range);
     std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
-    std::cout << "KD Tree window query time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
-
+    //std::cout << "KD Tree window query time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
+    cout << time_begin << "," << time_end << "," << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << endl;
     if(DEBUG) cout << "kd tree points are with size: " << result.size() << endl;
     if(DEBUG) copy (result.begin(), result.end(), ostream_iterator<Point_d>(cout,"\n") );
     if(DEBUG) cout << endl;
@@ -501,10 +501,10 @@ Document processReceivedRequest(Kdtree *kdtree,
         }
 
         if(ds_request == KDTREE) {
-            cout << "got KD Tree request" << endl;
+            if(DEBUG) cout << "got KD Tree request" << endl;
             return kdTreeSearchQuery(kdtree, time_begin, time_end, location_begin, location_end, minId, maxId);
         } else if(ds_request == SGTREE) {
-            cout << "got Segment Tree request" << endl;
+            if(DEBUG) cout << "got Segment Tree request" << endl;
             return sgmntTreeSearchQuery(Segment_tree_2, time_begin, time_end, location_begin, location_end, minId, maxId);
         } else {
             if(DEBUG) cout << "invalid ds request" << endl;
@@ -569,6 +569,13 @@ void startServerListening(Kdtree *kdtree,
     }
 
     cout << "Server is now listening" << endl;
+    cout << "ds query begin,ds query end,ds query time (ms)" << endl;
+    ofstream myfile ("cgal_server_check");
+    if (myfile.is_open())
+    {
+        myfile << "This is a line.\n";
+        myfile.close();
+    }
     while(1) {
         if ((new_socket
                 = accept(server_fd, (struct sockaddr*)&address,

@@ -15,11 +15,12 @@ CGET = curl_get
 DGEM_ID = 589ca754-ef75-426c-8d51-841cc61dc84a
 KMEANS_ID = 8b3289c9-a740-4091-a56d-e4d55af526b5
 LULESH_ID = 772c7330-d4eb-485b-866a-3b315063f9af
+DATASET_ID ?= $(DGEM_ID)
 
 all: $(CGAL_SERVER).cpp
 	$(RM) $(CGAL_SERVER)
 	$(CC) $(CFLAGS) -o $(CGAL_SERVER) $(CGAL_SERVER).cpp $(CGET).cpp -I $(INCLUDE) -lcurl
-	./$(CGAL_SERVER) $(DGEM_ID)
+	./$(CGAL_SERVER) $(DATASET_ID)
 
 #cget: $(CGET)
 #
