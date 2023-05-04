@@ -7,7 +7,7 @@ from starlette.responses import StreamingResponse
 
 from data_handler.data_queries import DataQueriesInterface
 from data_handler.ds_profiled_data.ds_profiler import DSProfiler
-from . import db, validateDataset
+from . import db, validateDataset, dsp
 
 from data_handler import data_queries
 
@@ -87,7 +87,6 @@ def get_utilization_histogram(datasetId: str,
         locations = locations.split(',')
 
     dqi = DataQueriesInterface()
-    dsp = DSProfiler()
 
     timerStart = round(time.time() * 1000)
 
@@ -118,7 +117,7 @@ def get_utilization_histogram(datasetId: str,
     postProcessTimer = round(time.time() * 1000)
 
     # datasetId, begin, end, bins, fetch time, post process time
-    print(datasetId, str(begin), str(end), str(bins), str(fetchTimer - timerStart), str(postProcessTimer - fetchTimer), sep=",")
+    print(datasetId, str(begin), str(end), str(bins), str(fetchTimer - timerStart), str(postProcessTimer - fetchTimer), "window", sep=",")
     # if i == 0:
     #     print('SAT ', end='')
     # elif i == 1:

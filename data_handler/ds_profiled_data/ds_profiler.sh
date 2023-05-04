@@ -16,7 +16,7 @@ export DATASET_ID=$KMEANS_ID
 export TOTAL_SAMPLE=10
 
 # change this in the ds_profiler.py file too
-profiled_ds=$KDT
+profiled_ds=$SGT
 serve_watch=$profile_directory"/"$profiled_ds"_serve_check"
 echo "Writing Traveler serve output to file: "$serve_watch
 

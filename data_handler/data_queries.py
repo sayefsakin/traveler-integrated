@@ -101,7 +101,7 @@ class DataQueriesInterface:
 
 
     def GetAttributeOfEvent(self, timestamp, location, dataStoreType: str = None):
-        print("inside the get attribute of event")
+        # print("inside the get attribute of event")
 
         dictionary = {
             "command": "GetEventAttribute",
@@ -109,7 +109,7 @@ class DataQueriesInterface:
             "location": str(location),
             "db_store": dataStoreType
         }
-        print(dictionary)
+        # print(dictionary)
 
         client_socket = socket.socket()
         client_socket.connect((self.host, self.port))
@@ -120,7 +120,7 @@ class DataQueriesInterface:
             ret = None
         else:
             ret = dataDict['event_id']
-        print("received data over socket in dict format")
+        # print("received data over socket in dict format")
 
         client_socket.close()
         return ret

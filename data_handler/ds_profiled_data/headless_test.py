@@ -87,6 +87,60 @@ class GanttLoadingVisible():
                     return each_element
         return False
 
+def conductRandomClicking(driver, timeout, p_freq, TOTAL_SAMPLE):
+    domain_window = 30
+    # zoom out in the gantt y axis to reveal all locations
+    ganttYScroller = driver.find_element(By.CLASS_NAME, "yAxisScrollCapturer")
+    wheel_element(ganttYScroller, -150)
+    # wheel_element(ganttYScroller, -150)
+
+    for i in range(int(TOTAL_SAMPLE/2)):
+        ganttEventCapturerElement = driver.find_elements(By.XPATH, "//*[@class='eventCapturer']")[0]
+        action = ActionChains(driver)
+        action.move_to_element_with_offset(ganttEventCapturerElement, 100, 50)
+                                           # random.randint(1, int(ganttEventCapturerElement.size['width'])),
+                                           # random.randint(1, int(ganttEventCapturerElement.size['height'])))
+        action.click()
+        action.perform()
+    # rightHandleLocation = 0
+    # leftHandleLocation = 0
+    # for each_hover in hoverTarget:
+    #     parent_element = each_hover.find_element(By.XPATH, "..")
+    #     if parent_element.get_attribute("class") == 'rightHandle':
+    #         rightHandleLocation = each_hover.location['x']
+    #     else:
+    #         leftHandleLocation = each_hover.location['x']
+    # handleWindow = rightHandleLocation - leftHandleLocation
+    #
+    # iteration_count = 1
+    # previous_handle = rightHandleLocation
+    # print("iteration,brush percentage,total drawing time (ms)")
+    # for i in range(int(TOTAL_SAMPLE/2)):
+    #     c_begin = random.randint(leftHandleLocation, int(handleWindow * (domain_window / 100)) + leftHandleLocation)
+    #     c_end = random.randint(int(handleWindow * ((100 - domain_window) / 100)) + leftHandleLocation, rightHandleLocation)
+    #     # print(leftHandleLocation, c_begin, c_end, rightHandleLocation)
+    #     for each_hover in hoverTarget:
+    #         parent_element = each_hover.find_element(By.XPATH, "..")
+    #         start = each_hover.location
+    #         drag_offset = c_begin - start['x']
+    #         current_handle = c_begin
+    #         if parent_element.get_attribute("class") == 'rightHandle':
+    #             drag_offset = c_end - start['x']
+    #             previous_handle = c_begin
+    #             current_handle = c_end
+    #         ActionChains(driver).drag_and_drop_by_offset(each_hover, drag_offset, 0).perform()
+    #         startTimer = round(time.time() * 1000)
+    #         WebDriverWait(driver, timeout=timeout, poll_frequency=p_freq).until(GanttLoadingVisible())
+    #         endTimer = round(time.time() * 1000)
+    #         brush_percentage = int(abs(previous_handle - current_handle) / handleWindow * 100.0)
+    #         print(str(iteration_count), str(brush_percentage), str(endTimer - startTimer), sep=",")
+    #         # print('Iteration', '{:2d}'.format(iteration_count), end=' ')
+    #         # print('Brush percentage', '{:3d}%'.format(brush_percentage), end=' ')
+    #         # print('Total drawing time:', '{:5d}'.format(endTimer - startTimer), 'ms')
+    #         iteration_count = iteration_count + 1
+    #     previous_handle = c_end
+
+    print("successfully run the profiling on", driver.title)
 
 def conductBrushing(driver, timeout, p_freq, TOTAL_SAMPLE):
     domain_window = 30
@@ -108,6 +162,7 @@ def conductBrushing(driver, timeout, p_freq, TOTAL_SAMPLE):
 
     iteration_count = 1
     previous_handle = rightHandleLocation
+    # TODO: use a fixed starting seed
     print("iteration,brush percentage,total drawing time (ms)")
     for i in range(int(TOTAL_SAMPLE/2)):
         c_begin = random.randint(leftHandleLocation, int(handleWindow * (domain_window / 100)) + leftHandleLocation)
@@ -173,7 +228,9 @@ if __name__ == '__main__':
         # canvas_elem = driver.find_elements(By.XPATH, "//canvas")
         # for parent_element in canvas_elem:
         #     print(parent_element.rect)
+
         conductBrushing(driver, timeout, p_freq, TOTAL_SAMPLE)
+        # conductRandomClicking(driver, timeout, p_freq, TOTAL_SAMPLE)
 
     # dataset_details = getDatasetDetails(base_params)
     # interval_domain = dataset_details['intervalDomain']

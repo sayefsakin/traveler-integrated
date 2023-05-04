@@ -27,5 +27,5 @@ if __name__ == '__main__':
         # default, we at least include one line of info for new users (actual
         # deployments should probably use critical or error anyway)
         print('Serving on localhost:%s' % args.port)
-        print("dataset id,begin,end,bins,API Fetch Time,Post Processing Time")
+        print("dataset id,begin,end,bins,API Fetch Time,Post Processing Time,query")
     uvicorn.run(app, host='0.0.0.0', port=int(args.port), log_level=args.log_level)

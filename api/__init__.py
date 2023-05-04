@@ -5,6 +5,8 @@ import json
 import asyncio
 import argparse
 from fastapi import HTTPException
+
+from data_handler.ds_profiled_data.ds_profiler import DSProfiler
 from data_store import DataStore
 
 
@@ -30,6 +32,7 @@ args = parser.parse_args()
 traveler_parse_levels = ['info', 'debug', 'trace']
 
 db = DataStore(args.dbDir, args.debug)
+dsp = DSProfiler()
 
 def validateDataset(datasetId, requiredFiles=None, filesMustBeReady=None, allFilesMustBeReady=False):
     if datasetId not in db:

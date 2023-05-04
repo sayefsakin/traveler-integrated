@@ -2,13 +2,14 @@ import bisect
 import copy
 import json
 import math
+import time
 
 from fastapi import APIRouter
 from starlette.responses import StreamingResponse
 
 from data_handler.data_queries import DataQueriesInterface
 from data_store.dependencyTree import find_node_in_dependency_tree
-from . import db, validateDataset
+from . import db, validateDataset, dsp
 
 router = APIRouter()
 
@@ -29,20 +30,27 @@ def get_intervals(datasetId: str, \
         end = db[datasetId]['info']['intervalDomain'][1]
 
     def intervalGenerator():
+        timerStart = round(time.time() * 1000)
         yield '['
-        if location is not None:
+        if location is not None and dsp.profiled_ds != dsp.SAT:
             dqi = DataQueriesInterface()
-            eid = dqi.GetAttributeOfEvent(begin, location, "kd_tree")
-            # eid = dqi.GetAttributeOfEvent(begin, location, "segment_tree")
+            eid = None
+            if dsp.profiled_ds == dsp.KDT:
+                eid = dqi.GetAttributeOfEvent(begin, location, "kd_tree")
+            elif dsp.profiled_ds == dsp.SGT:
+                eid = dqi.GetAttributeOfEvent(begin, location, "segment_tree")
+            fetchTimer = round(time.time() * 1000)
             if eid is not None:
-                print("received event id: ", eid)
+                # print("received event id: ", eid)
                 intervalObj = db[datasetId]['intervals'][eid]
                 yield json.dumps(intervalObj)
+            postProcessTimer = round(time.time() * 1000)
         else:
             firstItem = True
+            fetchTimer = round(time.time() * 1000)
             for i in db[datasetId]['intervalIndex'].iterOverlap(begin, end):
                 intervalObj = db[datasetId]['intervals'][i.data]
-
+                fetchTimer = round(time.time() * 1000)
                 # Filter by location
                 if location is not None and intervalObj['Location'] != location:
                     continue
@@ -68,7 +76,9 @@ def get_intervals(datasetId: str, \
                     yield ','
                 yield json.dumps(intervalObj)
                 firstItem = False
+            postProcessTimer = round(time.time() * 1000)
         yield ']'
+        print(datasetId, str(begin), str(end), str(location), str(fetchTimer - timerStart), str(postProcessTimer - fetchTimer), "attribute", sep=",")
 
     return StreamingResponse(intervalGenerator(), media_type='application/json')
 
