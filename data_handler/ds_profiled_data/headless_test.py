@@ -87,6 +87,19 @@ class GanttLoadingVisible():
                     return each_element
         return False
 
+class UtilizationLoadingVisible():
+    def __init__(self):
+        pass
+
+    def __call__(self, web_driver):
+        loading_elem = web_driver.find_elements(By.XPATH, "//*[@class='overlayShadowEl shadowed']")
+        for each_element in loading_elem:
+            following_sibling = each_element.find_element(By.XPATH, "preceding-sibling::*")
+            if following_sibling.get_attribute("class") == 'GLView UtilizationView':
+                if each_element.is_displayed() is False:
+                    return each_element
+        return False
+
 def conductRandomClicking(driver, timeout, p_freq, TOTAL_SAMPLE):
     domain_window = 30
     # zoom out in the gantt y axis to reveal all locations
@@ -149,6 +162,8 @@ def conductBrushing(driver, timeout, p_freq, TOTAL_SAMPLE):
     wheel_element(ganttYScroller, -150)
     # wheel_element(ganttYScroller, -150)
 
+    element = WebDriverWait(driver, timeout=timeout, poll_frequency=p_freq).until(UtilizationLoadingVisible())
+
     hoverTarget = driver.find_elements(By.XPATH, "//*[@class='hoverTarget']")
     rightHandleLocation = 0
     leftHandleLocation = 0
@@ -164,6 +179,7 @@ def conductBrushing(driver, timeout, p_freq, TOTAL_SAMPLE):
     previous_handle = rightHandleLocation
     # TODO: use a fixed starting seed
     print("iteration,brush percentage,total drawing time (ms)")
+    random.seed(10)
     for i in range(int(TOTAL_SAMPLE/2)):
         c_begin = random.randint(leftHandleLocation, int(handleWindow * (domain_window / 100)) + leftHandleLocation)
         c_end = random.randint(int(handleWindow * ((100 - domain_window) / 100)) + leftHandleLocation, rightHandleLocation)
