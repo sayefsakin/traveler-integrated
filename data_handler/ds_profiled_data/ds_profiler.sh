@@ -14,9 +14,8 @@ LULESH_ID="772c7330-d4eb-485b-866a-3b315063f9af"
 
 export DATASET_ID=$DGEM_ID
 export TOTAL_SAMPLE=10
-
-# change this in the ds_profiler.py file too
 export PROFILED_DS=$KDT
+
 serve_watch=$profile_directory"/"$PROFILED_DS"_serve_check"
 echo "Writing Traveler serve output to file: "$serve_watch
 
