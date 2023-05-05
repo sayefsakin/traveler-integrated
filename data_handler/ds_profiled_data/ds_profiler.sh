@@ -12,12 +12,12 @@ KMEANS_ID="8b3289c9-a740-4091-a56d-e4d55af526b5"
 LULESH_ID="772c7330-d4eb-485b-866a-3b315063f9af"
 #DATASET_ID="DATASET_ID="$DGEM_ID
 
-export DATASET_ID=$KMEANS_ID
+export DATASET_ID=$DGEM_ID
 export TOTAL_SAMPLE=10
 
 # change this in the ds_profiler.py file too
-profiled_ds=$SGT
-serve_watch=$profile_directory"/"$profiled_ds"_serve_check"
+export PROFILED_DS=$KDT
+serve_watch=$profile_directory"/"$PROFILED_DS"_serve_check"
 echo "Writing Traveler serve output to file: "$serve_watch
 
 traveler(){
@@ -38,7 +38,7 @@ traveler(){
 
 cgal(){
   # run the cgal server
-  cgal_watch=$profile_directory"/"$profiled_ds"_cgal_check"
+  cgal_watch=$profile_directory"/"$PROFILED_DS"_cgal_check"
   echo "Writing CGAL server output to file: "$cgal_watch
   cd $traveler_base_directory"/data_handler/cgal_libs/cgal_server"
   rm -f "cgal_server_check"
@@ -55,7 +55,7 @@ cgal(){
 }
 
 profile_window_query(){
-  selenium_watch=$profile_directory"/"$profiled_ds"_selenium_check"
+  selenium_watch=$profile_directory"/"$PROFILED_DS"_selenium_check"
   echo "Running the profiler. Please make sure the XMing is running"
   cd $profile_directory
   python3 headless_test.py > $selenium_watch
@@ -138,7 +138,7 @@ prepare_and_merge_files(){
   mv $selenium_watch $DATASET_ID;
 
   cd $DATASET_ID;
-  paste -d , "$profiled_ds"_* > "$profiled_ds"_merged.csv;
+  paste -d , "$PROFILED_DS"_* > "$PROFILED_DS"_merged.csv;
 
   echo "Formatting all output files";
 }
