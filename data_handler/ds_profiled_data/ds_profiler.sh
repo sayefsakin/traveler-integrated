@@ -13,7 +13,7 @@ LULESH_ID="772c7330-d4eb-485b-866a-3b315063f9af"
 #DATASET_ID="DATASET_ID="$DGEM_ID
 
 export DATASET_ID=$DGEM_ID
-export TOTAL_SAMPLE=10
+export TOTAL_SAMPLE=20
 export PROFILED_DS=$KDT
 
 serve_watch=$profile_directory"/"$PROFILED_DS"_serve_check"

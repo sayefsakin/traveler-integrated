@@ -233,7 +233,7 @@ Document kdTreeGetAttributeQuery(Kdtree *nnkdtree, uint64_t cTime, uint64_t cLoc
 
     if(result.size()>0) if(DEBUG) cout << "actual nearest neighbor " << result[0].z() << endl;
     std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
-    cout << "KDT," << "ds_attribute," << cTime << "," << cLocation << "," << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() <<
+    cout << "KDT," << "ds_attribute," << cTime << "," << cLocation << "," << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() <<
     endl;
     Document document;
     document.SetObject();
@@ -268,8 +268,8 @@ Document kdTreeSearchQuery( Kdtree *kdtree,
     std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
     kdtree->search( back_inserter( result ), exact_range);
     std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
-    //std::cout << "KD Tree window query time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
-    cout << "KDT," << "ds_window," << time_begin << "," << time_end << "," << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() <<
+    //std::cout << "KD Tree window query time = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[ms]" << std::endl;
+    cout << "KDT," << "ds_window," << time_begin << "," << time_end << "," << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() <<
     endl;
     if(DEBUG) cout << "kd tree points are with size: " << result.size() << endl;
     if(DEBUG) copy (result.begin(), result.end(), ostream_iterator<Point_d>(cout,"\n") );
@@ -341,7 +341,7 @@ Document sgmntTreeGetAttributeQuery(Segment_tree_2_type *Segment_tree_2,
     std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
     Segment_tree_2->window_query(a,std::back_inserter(OutputList1));
     std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
-    cout << "SGT," << "ds_attribute," << cTime << "," << cLocation << "," << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << endl;
+    cout << "SGT," << "ds_attribute," << cTime << "," << cLocation << "," << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << endl;
 
     vector<Interval>::iterator j = OutputList1.begin();
     if(DEBUG) cout << "\n get attribute query with segment tree result size: " << OutputList1.size() << endl;;
@@ -388,9 +388,9 @@ Document sgmntTreeSearchQuery(Segment_tree_2_type *Segment_tree_2,
     std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
     Segment_tree_2->window_query(a,std::back_inserter(OutputList1));
     std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
-    cout << "SGT," << "ds_window," << time_begin << "," << time_end << "," << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() <<
+    cout << "SGT," << "ds_window," << time_begin << "," << time_end << "," << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() <<
     endl;
-    if(DEBUG) std::cout << "Segment Tree window query time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
+    if(DEBUG) std::cout << "Segment Tree window query time = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[ms]" << std::endl;
 
     vector<Interval>::iterator j = OutputList1.begin();
     if(DEBUG) cout << "\nwindow_query with segment tree result size: " << OutputList1.size() << endl;;
@@ -579,7 +579,7 @@ void startServerListening(Kdtree *kdtree,
     }
 
     cout << "Server is now listening" << endl;
-    cout << "ds type,ds query type,ds query begin,ds query end,ds query time (ms)" << endl;
+    cout << "ds type,ds query type,ds query begin,ds query end,ds query time (micros)" << endl;
     ofstream myfile ("cgal_server_check");
     if (myfile.is_open())
     {
@@ -694,12 +694,12 @@ int main(int argc, char *argv[])
     nnkdtree.build();
     std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
 
-    std::cout << "KD Tree build time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
+    std::cout << "KD Tree build time = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[microseconds]" << std::endl;
 
     begin = std::chrono::steady_clock::now();
     Segment_tree_2_type Segment_tree_2(InputList.begin(),InputList.end());
     end = std::chrono::steady_clock::now();
-    std::cout << "Segment Tree build time = " << std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() << "[ms]" << std::endl;
+    std::cout << "Segment Tree build time = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[microseconds]" << std::endl;
     cout << "kd tree and segment tree build done" << endl << "Total interval count: " << totalIntervals <<  ", Primitive count: " << cPrimitiveNumber << endl;
     //testSearchQueries(&kdtree, &Segment_tree_2, minId, maxId, &nnkdtree);
 

@@ -88,7 +88,7 @@ def get_utilization_histogram(datasetId: str,
 
     dqi = DataQueriesInterface()
 
-    timerStart = round(time.time() * 1000)
+    timerStart = round(time.time() * 1000000)
 
     utilObject = db[datasetId]['sparseUtilizationList']['intervals']
     if dsp.profiled_ds == dsp.KDT or dsp.profiled_ds == dsp.SGT:
@@ -96,7 +96,7 @@ def get_utilization_histogram(datasetId: str,
     elif primitive is not None:
         utilObject = db[datasetId]['sparseUtilizationList']['primitives'][primitive]
 
-    fetchTimer = round(time.time() * 1000)
+    fetchTimer = round(time.time() * 1000000)
 
     if primitive is not None:
         if primitive not in db[datasetId]['sparseUtilizationList']['primitives']:
@@ -114,7 +114,7 @@ def get_utilization_histogram(datasetId: str,
     else:
         ret['data'] = utilObject.calcUtilizationHistogram(bins, begin, end)
 
-    postProcessTimer = round(time.time() * 1000)
+    postProcessTimer = round(time.time() * 1000000)
 
     # datasetId, begin, end, bins, fetch time, post process time
     print(datasetId, str(begin), str(end), str(bins), str(fetchTimer - timerStart), str(postProcessTimer - fetchTimer), "window", sep=",")
