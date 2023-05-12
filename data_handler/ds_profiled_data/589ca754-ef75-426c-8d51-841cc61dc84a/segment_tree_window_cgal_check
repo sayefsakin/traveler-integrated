@@ -1,0 +1,21 @@
+ds type,ds query type,ds query begin,ds query end,ds query time (micros)
+SGT,ds_window,0,650743205,9558
+SGT,ds_window,0,454842585,8871
+SGT,ds_window,0,470097142,8566
+SGT,ds_window,0,561624480,8444
+SGT,ds_window,0,546369923,8638
+SGT,ds_window,0,450025355,8775
+SGT,ds_window,0,487760311,8812
+SGT,ds_window,0,580893395,8491
+SGT,ds_window,0,518269426,8375
+SGT,ds_window,0,523086654,8332
+SGT,ds_window,0,522283782,8438
+SGT,ds_window,0,478928726,8440
+SGT,ds_window,0,496591897,8333
+SGT,ds_window,0,605782407,8714
+SGT,ds_window,0,656363305,8375
+SGT,ds_window,0,497394769,8447
+SGT,ds_window,0,460462685,8522
+SGT,ds_window,0,553595767,8646
+SGT,ds_window,0,573667552,8437
+SGT,ds_window,0,488563184,8338
