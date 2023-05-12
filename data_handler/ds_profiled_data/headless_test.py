@@ -144,7 +144,7 @@ def conductBrushing(driver, timeout, p_freq, TOTAL_SAMPLE):
     iteration_count = 1
     previous_handle = rightHandleLocation
 
-    print("iteration,brush percentage,total drawing time (ms)")
+    print("iteration,brush percentage,total drawing time (micros)")
     random.seed(10)
     for i in range(int(TOTAL_SAMPLE/2)):
         c_begin = random.randint(leftHandleLocation, int(handleWindow * (domain_window / 100)) + leftHandleLocation)
@@ -160,9 +160,9 @@ def conductBrushing(driver, timeout, p_freq, TOTAL_SAMPLE):
                 previous_handle = c_begin
                 current_handle = c_end
             ActionChains(driver).drag_and_drop_by_offset(each_hover, drag_offset, 0).perform()
-            startTimer = round(time.time() * 1000)
+            startTimer = round(time.time() * 1000000)
             WebDriverWait(driver, timeout=timeout, poll_frequency=p_freq).until(GanttLoadingVisible())
-            endTimer = round(time.time() * 1000)
+            endTimer = round(time.time() * 1000000)
             brush_percentage = int(abs(previous_handle - current_handle) / handleWindow * 100.0)
             print(str(iteration_count), str(brush_percentage), str(endTimer - startTimer), sep=",")
             # print('Iteration', '{:2d}'.format(iteration_count), end=' ')
@@ -195,6 +195,7 @@ if __name__ == '__main__':
         'baseUrl': "http://localhost:8000",
     }
     TOTAL_SAMPLE = int(os.getenv('TOTAL_SAMPLE', 20))
+    QUERY_TYPE = os.getenv('QUERY_TYPE', 'window')
 
     timeout = 500  # in seconds
     p_freq = 0.001  # in seconds
@@ -202,31 +203,17 @@ if __name__ == '__main__':
     with webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=options) as driver:
         url = generateInterfaceUrl(base_params)
         driver.get(url)
-        startTimer = round(time.time() * 1000)
+        startTimer = round(time.time() * 1000000)
         element = WebDriverWait(driver, timeout=timeout, poll_frequency=p_freq).until(GanttLoadingVisible())
-        endTimer = round(time.time() * 1000)
-        # print('Initial Gantt Loading Time: ', '{:6d}'.format(endTimer - startTimer), 'ms ')
+        endTimer = round(time.time() * 1000000)
+        # print('Initial Gantt Loading Time: ', '{:9d}'.format(endTimer - startTimer), 'micros ')
 
         # canvas_elem = driver.find_elements(By.XPATH, "//canvas")
         # for parent_element in canvas_elem:
         #     print(parent_element.rect)
 
-        # conductBrushing(driver, timeout, p_freq, TOTAL_SAMPLE)
-        conductRandomClicking(driver, timeout, p_freq, TOTAL_SAMPLE)
-
-    # dataset_details = getDatasetDetails(base_params)
-    # interval_domain = dataset_details['intervalDomain']
-    #
-    # extra_params = dict()
-    # extra_params['bins'] = 4000
-    # for i in range(10):
-    #     extra_params['begin'] = random.randint(interval_domain[0], int(interval_domain[1] * (domain_window / 100)))
-    #     extra_params['end'] = random.randint(int(interval_domain[0] * ((100 - domain_window) / 100)), interval_domain[1])
-    #     url = generateUtilHistogramUrl(base_params, extra_params)
-    #     print(url, end=' ')
-    #     timerStart = round(time.time() * 1000)
-    #     response = requests.get(url)
-    #     timerEnd = round(time.time() * 1000)
-    #     print('{:6d}'.format(timerEnd - timerStart))
-
+        if QUERY_TYPE == 'window':
+            conductBrushing(driver, timeout, p_freq, TOTAL_SAMPLE)
+        elif QUERY_TYPE == 'attribute':
+            conductRandomClicking(driver, timeout, p_freq, TOTAL_SAMPLE)
 

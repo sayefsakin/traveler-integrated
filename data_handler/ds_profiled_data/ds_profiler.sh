@@ -3,20 +3,25 @@
 
 traveler_base_directory="/mnt/c/Users/sayef/IdeaProjects/traveler-integrated"
 profile_directory=$traveler_base_directory"/data_handler/ds_profiled_data"
+
 KDT="kd_tree"
 SGT="segment_tree"
 SAT="summed_area_table"
+
+Q_WINDOW='window'
+Q_ATTRIBUTE='attribute'
 
 DGEM_ID="589ca754-ef75-426c-8d51-841cc61dc84a"
 KMEANS_ID="8b3289c9-a740-4091-a56d-e4d55af526b5"
 LULESH_ID="772c7330-d4eb-485b-866a-3b315063f9af"
 #DATASET_ID="DATASET_ID="$DGEM_ID
 
-export DATASET_ID=$DGEM_ID
+export DATASET_ID=$LULESH_ID
 export TOTAL_SAMPLE=20
 export PROFILED_DS=$KDT
+export QUERY_TYPE=$Q_WINDOW
 
-serve_watch=$profile_directory"/"$PROFILED_DS"_serve_check"
+serve_watch=$profile_directory"/"$PROFILED_DS"_"$QUERY_TYPE"_serve_check"
 echo "Writing Traveler serve output to file: "$serve_watch
 
 traveler(){
@@ -37,7 +42,7 @@ traveler(){
 
 cgal(){
   # run the cgal server
-  cgal_watch=$profile_directory"/"$PROFILED_DS"_cgal_check"
+  cgal_watch=$profile_directory"/"$PROFILED_DS"_"$QUERY_TYPE"_cgal_check"
   echo "Writing CGAL server output to file: "$cgal_watch
   cd $traveler_base_directory"/data_handler/cgal_libs/cgal_server"
   rm -f "cgal_server_check"
@@ -54,9 +59,18 @@ cgal(){
 }
 
 profile_window_query(){
-  selenium_watch=$profile_directory"/"$PROFILED_DS"_selenium_check"
+  selenium_watch=$profile_directory"/"$PROFILED_DS"_"$QUERY_TYPE"_selenium_check"
   echo "Running the profiler. Please make sure the XMing is running"
   cd $profile_directory
+  export QUERY_TYPE=$Q_WINDOW
+  python3 headless_test.py > $selenium_watch
+}
+
+profile_attribute_query(){
+  selenium_watch=$profile_directory"/"$PROFILED_DS"_"$QUERY_TYPE"_selenium_check"
+  echo "Running the profiler. Please make sure the XMing is running"
+  cd $profile_directory
+  export QUERY_TYPE=$Q_ATTRIBUTE
   python3 headless_test.py > $selenium_watch
 }
 
@@ -110,9 +124,11 @@ killing_all_processes(){
   killing_cgal
   killing_traveler
   echo "killed all processes"
+  export IS_KILLED=1
 }
 
 prepare_and_merge_files(){
+  # dont merge selenium watch, problem with the get attribute query
   sed -i '/Serving on localhost:8000/d' $serve_watch;
   linenumber=$(grep -n "Server is now listening" "$cgal_watch" | head -n 1 | cut -d: -f1);
   sed -i "1,${linenumber}d" "$cgal_watch";
@@ -127,17 +143,23 @@ prepare_and_merge_files(){
   last_line=$(expr $total_line - $TOTAL_SAMPLE);
   sed -i "2,${last_line}d" "$cgal_watch";
 
-  sed -i '$d' $selenium_watch;
+  if [[ $QUERY_TYPE ==  $Q_WINDOW ]]; then
+    sed -i '$d' $selenium_watch;
+  fi
 
   cd $profile_directory;
 #  rm -rf $DATASET_ID;
   mkdir -p $DATASET_ID;
   mv $serve_watch $DATASET_ID;
   mv $cgal_watch $DATASET_ID;
-  mv $selenium_watch $DATASET_ID;
+
+  if [[ $QUERY_TYPE ==  $Q_WINDOW ]]; then
+    mv $selenium_watch $DATASET_ID;
+  fi
 
   cd $DATASET_ID;
-  paste -d , "$PROFILED_DS"_* > "$PROFILED_DS"_merged.csv;
+#  rm -f *_selenium_check;
+  paste -d , "$PROFILED_DS"_"$QUERY_TYPE"_* > "$PROFILED_DS"_"$QUERY_TYPE"_merged.csv;
 
   echo "Formatting all output files";
 }
@@ -147,7 +169,7 @@ traveler
 cgal
 prompt_help
 
-IS_KILLED=0
+export IS_KILLED=0
 while IFS= read -r line; do
   if [[ $line ==  "exit" ]]; then
     killing_all_processes;
@@ -155,17 +177,18 @@ while IFS= read -r line; do
   elif [[ $line ==  "traveler" ]]; then
     killing_traveler;
     traveler;
-    IS_KILLED=0;
+    export IS_KILLED=0;
   elif [[ $line ==  "restart" ]]; then
     killing_all_processes;
     traveler;
     cgal;
-    IS_KILLED=0;
+    export IS_KILLED=0;
   elif [[ $line ==  "window" ]]; then
     profile_window_query;
+  elif [[ $line ==  "attribute" ]]; then
+    profile_attribute_query;
   elif [[ $line ==  "kill" ]]; then
     killing_all_processes;
-    IS_KILLED=1;
   elif [[ $line ==  "prepare" ]]; then
     killing_all_processes;
     prepare_and_merge_files;
