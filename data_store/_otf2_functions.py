@@ -4,6 +4,7 @@ import os
 import re
 import gc
 import time
+import uuid
 
 import diskcache
 import numpy as np
@@ -34,6 +35,10 @@ addAttrParser = re.compile(r'\(?"([^"]*)" <\d+>; [^;]*; ([^\)]*)')
 
 metricLineParser = re.compile(r'^METRIC\s+(\d+)\s+(\d+)\s+Metric:[\s\d,]+Values?: \("([^"]*)" <\d+>; [^;]*; ([^\)]*)')
 memInfoMetricParser = re.compile(r'^METRIC\s+(\d+)\s+(\d+)\s+Metric:[\s\d,]+Values?: \("meminfo:([^"]*)" <\d+>; [^;]*; ([^\)]*)')
+
+synthesized_events = True
+synthesize_vertical_events = 30
+synthesize_horizontal_events = 3
 
 def processEvent(self, datasetId, event):
     newR = seenR = 0
@@ -81,6 +86,9 @@ async def processRawTrace(self, datasetId, file, log):
     idDir = os.path.join(self.dbDir, datasetId)
     procMetrics = self[datasetId]['procMetrics'] = diskcache.Index(os.path.join(idDir, 'procMetrics.diskCacheIndex'))
     procMetricList = self[datasetId]['info']['procMetricList'] = []
+
+    self.original_max_time = 0
+    self.original_max_location = 0
 
     # Temporary counters / lists for sorting
     numEvents = 0
@@ -145,12 +153,16 @@ async def processRawTrace(self, datasetId, file, log):
                 # Add to primitive / guid counts
                 newR += counts[0]
                 seenR += counts[1]
-                if numEvents > 502174: # 8000000:
-                    break
+                # if numEvents > 502174: # 8000000:
+                #     break
             currentEvent = {'metrics': {}}
             currentEvent['Event'] = eventLineMatch.group(1)
             currentEvent['Location'] = eventLineMatch.group(2)
             currentEvent['Timestamp'] = int(eventLineMatch.group(3))
+            if int(currentEvent['Location']) > self.original_max_location:
+                self.original_max_location = int(currentEvent['Location'])
+            if currentEvent['Timestamp'] > self.original_max_time:
+                self.original_max_time = currentEvent['Timestamp']
             attrs = eventLineMatch.group(4)
             for attrMatch in re.finditer(attrParsers[currentEvent['Event']], attrs):
                 currentEvent[attrMatch.group(1)] = attrMatch.group(2)
@@ -186,6 +198,7 @@ async def combineIntervals(self, datasetId, log):
     # Set up database file
     idDir = os.path.join(self.dbDir, datasetId)
     intervals = self[datasetId]['intervals'] = diskcache.Index(os.path.join(idDir, 'intervals.diskCacheIndex'))
+    newListedLocations = natural_sort(self.sortedEventsByLocation.keys())
 
     # Helper function for creating interval objects
     async def createNewInterval(event, lastEvent, intervalId):
@@ -209,10 +222,13 @@ async def combineIntervals(self, datasetId, log):
         return newInterval
 
     await log('Combining enter / leave events into intervals (.=2500 intervals)')
-    numIntervals = mismatchedIntervals = missingPrimitives = 0
+    self.numIntervals = mismatchedIntervals = missingPrimitives = 0
 
     # Keep track of the earliest and latest timestamps we see
     intervalDomain = [float('inf'), float('-inf')]
+
+    self.guid_mapper = dict()
+    self.guid_mapper["0"] = "0"
 
     # Combine the sorted enter / leave events into intervals
     for eventList in self.sortedEventsByLocation.values():
@@ -220,7 +236,7 @@ async def combineIntervals(self, datasetId, log):
         currentInterval = None
         for _, event in eventList:
             assert event is not None
-            intervalId = str(numIntervals)
+            intervalId = str(self.numIntervals)
             if event['Event'] == 'ENTER':
                 # check if there is an enter event in the stack, push a dummy leave event
                 if len(lastEventStack) > 0:
@@ -252,16 +268,46 @@ async def combineIntervals(self, datasetId, log):
                         mismatchedIntervals += 1
                         # Use the enter event's primitive name
                         currentInterval['Primitive'] = currentInterval['enter']['Primitive']
-                intervals[intervalId] = currentInterval
-                # Update intervalDomain
-                intervalDomain[0] = min(intervalDomain[0], currentInterval['enter']['Timestamp'])
-                intervalDomain[1] = max(intervalDomain[1], currentInterval['leave']['Timestamp'])
-                # Log that we've finished the finished interval
-                numIntervals += 1
-                if numIntervals % 2500 == 0:
-                    await log('.', end='')
-                if numIntervals % 100000 == 0:
-                    await log('processed %i intervals' % numIntervals)
+
+                async def updateGeneralInfo(newSynthesizedInterval):
+                    intervals[newSynthesizedInterval['intervalId']] = newSynthesizedInterval
+                    # Update intervalDomain
+                    intervalDomain[0] = min(intervalDomain[0], newSynthesizedInterval['enter']['Timestamp'])
+                    intervalDomain[1] = max(intervalDomain[1], newSynthesizedInterval['leave']['Timestamp'])
+                    # Log that we've finished the finished interval
+                    self.numIntervals += 1
+                    if self.numIntervals % 2500 == 0:
+                        await log('.', end='')
+                    if self.numIntervals % 100000 == 0:
+                        await log('processed %i intervals' % self.numIntervals)
+
+                await updateGeneralInfo(currentInterval)
+                if synthesized_events:
+                    for i in range(0,  synthesize_vertical_events+1):
+                        for j in range(0, synthesize_horizontal_events+1):
+                            guidString = '0' + '-' + str(i) + '-' + str(j)
+                            self.guid_mapper[guidString] = '0'
+                    for i in range(0,  synthesize_vertical_events+1):
+                        for j in range(0, synthesize_horizontal_events+1):
+                            if i == 0 and j == 0:
+                                continue
+                            nci = copy.deepcopy(currentInterval)
+                            nci["Location"] = str((self.original_max_location * i) + int(nci["Location"]))
+                            if nci["Location"] not in newListedLocations:
+                                newListedLocations.append(nci["Location"])
+                            nci["enter"]["Timestamp"] = nci["enter"]["Timestamp"] + (self.original_max_time * j)
+                            nci["leave"]["Timestamp"] = nci["leave"]["Timestamp"] + (self.original_max_time * j)
+
+                            guidString = nci["GUID"] + '-' + str(i) + '-' + str(j)
+                            self.guid_mapper[guidString] = self.guid_mapper.get(guidString, uuid.uuid4().hex)
+                            nci["GUID"] = self.guid_mapper[guidString]
+                            guidString = nci["Parent GUID"] + '-' + str(i) + '-' + str(j)
+                            self.guid_mapper[guidString] = self.guid_mapper.get(guidString, uuid.uuid4().hex)
+                            nci["Parent GUID"] = self.guid_mapper[guidString]
+
+                            nci["intervalId"] = str(self.numIntervals)
+                            await updateGeneralInfo(nci)
+                            nci = None
             currentInterval = None
         # Make sure there are no trailing ENTER events
         if len(lastEventStack) > 0:
@@ -275,9 +321,10 @@ async def combineIntervals(self, datasetId, log):
 
     # Store the full domain of the data in the datasets' info
     self[datasetId]['info']['intervalDomain'] = intervalDomain
-
+    self[datasetId]['info']['locationNames'] = newListedLocations
     await log('')
-    await log('Finished creating %i intervals; %i had no primitive name; %i had mismatching primitives (ENTER primitive used)' % (numIntervals, missingPrimitives, mismatchedIntervals))
+    await log('Finished creating %i intervals; %i had no primitive name; %i had mismatching primitives (ENTER primitive used)' % (self.numIntervals,
+                                                                                                                                  missingPrimitives, mismatchedIntervals))
 
 async def buildIntervalTree(self, datasetId, log):
     await log('Building IntervalTree index of intervals (.=2500 intervals)')
