@@ -82,6 +82,7 @@ class DataQueriesInterface:
             "command": "GetDataInRange",
             "begin": str(begin),
             "end": str(end),
+            "bins": str(bins),
             "db_store": dataStoreType
         }
         if locations:
@@ -93,7 +94,8 @@ class DataQueriesInterface:
 
         self.sendOverTheSocket(client_socket, dictionary)
         dataDict = self.recvOverTheSocket(client_socket)
-        ret = self.postProcessForUtilization(dataDict)
+        ret = dataDict
+        # ret = self.postProcessForUtilization(dataDict)
         # print("received data over socket in dict format")
 
         client_socket.close()
