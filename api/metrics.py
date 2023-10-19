@@ -98,8 +98,8 @@ def get_utilization_histogram(datasetId: str,
 
     fetchTimer = round(time.time() * 1000000)
 
-    kdt_tester = dqi.GetDataInRange(bins, begin, end, locations, primitive, "kd_tree")
-    sgt_tester = dqi.GetDataInRange(bins, begin, end, locations, primitive, "segment_tree")
+    # kdt_tester = dqi.GetDataInRange(bins, begin, end, locations, primitive, "kd_tree")
+    # sgt_tester = dqi.GetDataInRange(bins, begin, end, locations, primitive, "segment_tree")
     
     if primitive is not None:
         if primitive not in db[datasetId]['sparseUtilizationList']['primitives']:
@@ -117,12 +117,6 @@ def get_utilization_histogram(datasetId: str,
             ret['locations'] = {}
             for location in locations:
                 ret['locations'][location] = utilObject.calcUtilizationForLocation(bins, begin, end, location)
-        print("summed area data")
-        print(ret['locations'])
-        print("kdt data")
-        print(kdt_tester)
-        print("sgt data")
-        print(sgt_tester)
     else:
         ret['data'] = utilObject.calcUtilizationHistogram(bins, begin, end)
 

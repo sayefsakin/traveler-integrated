@@ -1,8 +1,6 @@
 #include "optimized_binned_kdt.h"
 #include <cmath>
 
-using namespace std;
-
 int point_with_info_testing()
 {
   const unsigned int K = 5;
@@ -97,8 +95,8 @@ void BinnedKDT::insertDataIntoTree(double enter_time, double enter_loc,
   if(interval_length > max_interval_length) max_interval_length = interval_length + 1;
 }
 
-LocDict BinnedKDT::binnedRangeQuery(uint64_t time_begin, 
-                            uint64_t time_end, 
+LocDict BinnedKDT::binnedRangeQuery(int64_t time_begin, 
+                            int64_t time_end, 
                             uint64_t location_begin, 
                             uint64_t location_end, 
                             uint64_t bins) {
@@ -128,10 +126,10 @@ LocDict BinnedKDT::binnedRangeQuery(uint64_t time_begin,
     // cout << boost::get<0>(*it) << ", ";
     string intervalId = boost::get<1>(*it);
     if(intervalCheck.find(intervalId) != intervalCheck.end()) continue;
-    uint64_t interval_time_start = (boost::get<0>(*it)).x();
+    int64_t interval_time_start = (boost::get<0>(*it)).x();
     uint64_t interval_loc = (boost::get<0>(*it)).y();
     int64_t interval_length = (boost::get<0>(*it)).z();
-    uint64_t interval_time_end = interval_time_start + interval_length;
+    int64_t interval_time_end = interval_time_start + interval_length;
     if(interval_length < 0) swap(interval_time_start, interval_time_end);
 
     if(locDict.find(interval_loc) == locDict.end()) {
@@ -147,11 +145,11 @@ LocDict BinnedKDT::binnedRangeQuery(uint64_t time_begin,
     int64_t endingBin = getBinNumber(time_begin, time_end, bins, interval_time_end);
     if(startingBin < 0 || endingBin < 0) continue;
 
-    for(int64_t bin_it = startingBin+1; bin_it < endingBin; bin_it++)
+    for(int64_t bin_it = startingBin+1; bin_it < endingBin && bin_it < (int64_t)bins; bin_it++)
       locDict[interval_loc][bin_it] = 1.0;
     
-    locDict[interval_loc][startingBin] = (interval_time_start % bin_size)?0.5:1.0;
-    locDict[interval_loc][endingBin] = (interval_time_end % bin_size)?0.5:1.0;
+    if(startingBin < (int64_t)bins) locDict[interval_loc][startingBin] = (interval_time_start % bin_size)?0.5:1.0;
+    if(endingBin < (int64_t)bins) locDict[interval_loc][endingBin] = (interval_time_end % bin_size)?0.5:1.0;
     
     intervalCheck.insert(intervalId);
   }
@@ -163,8 +161,8 @@ LocDict BinnedKDT::binnedRangeQuery(uint64_t time_begin,
     }
     for(uint64_t c_bin = 0; c_bin < bins; c_bin++) {
       if(locDict[c_loc][c_bin] > 0) continue;
-      uint64_t start_time = (c_bin * bin_size) + time_begin;
-      uint64_t end_time = ((c_bin+1) * bin_size) + time_begin;
+      int64_t start_time = (c_bin * bin_size) + time_begin;
+      int64_t end_time = ((c_bin+1) * bin_size) + time_begin;
       p = Point_3(start_time, c_loc, 1);
       q = Point_3(end_time, c_loc, bin_size - 1);
       exact_range = PS_Fuzzy_iso_box(p,q);
@@ -184,5 +182,91 @@ LocDict BinnedKDT::binnedRangeQuery(uint64_t time_begin,
   //     copy (myPair.second.begin(), myPair.second.end(), ostream_iterator<double>(cout,"\n") );
   //     cout << endl;
   // }
+  result.clear();
+  intervalCheck.clear();
   return locDict;
+}
+
+string BinnedKDT::findNearestInterval(int64_t c_time, uint64_t c_location) {
+  string ret_result("");
+
+  Point_3 p(c_time, c_location, 1);
+  Point_3 q(c_time+1, c_location, max_interval_length);
+
+  if(KDT_DEBUG) cout << "doing new event attribute query (" << p.x() << "," << p.y() << ") (" << q.x() << "," << q.y() << ")" << endl;
+  uint64_t two = 1;
+  vector<Point_and_string> leftResult;
+  vector<Point_and_string>::iterator it, left_it, right_it;
+  vector<Point_and_string>::iterator result_it(leftResult.end());
+
+  while(1) {
+      Point_3 npd(p.x()-two, p.y(), max_interval_length * -1);
+      Point_3 nqd(q.x(), q.y(), max_interval_length);
+      PS_Fuzzy_iso_box exact_range(npd,nqd);
+      tree.search( back_inserter( leftResult ), exact_range);
+      if(KDT_DEBUG) cout << "kd tree points are with size: " << leftResult.size() <<  " " << two << endl;
+      if(KDT_DEBUG) {
+        for(it = leftResult.begin(); it != leftResult.end(); it++) {
+          cout << boost::get<0>(*it).x() << " " << boost::get<0>(*it).y() << endl;
+        }
+      }
+      if(leftResult.size()>0 || two > (1<<30)) break;
+      two <<= 1;
+  }
+  if(leftResult.size() > 1) {
+    it = leftResult.begin();
+    left_it = it;
+    int64_t diff = abs(boost::get<0>(*it).x() - p.x());
+    for(; it != leftResult.end(); it++) {
+        if(abs(boost::get<0>(*it).x()  - p.x()) < diff) {
+            diff = abs(boost::get<0>(*it).x()  - p.x());
+            left_it = it;
+        }
+    }
+  }
+
+  if(leftResult.size() > 0) {
+      if(KDT_DEBUG) cout << "nearest neighbor in left " << boost::get<1>(*left_it) << endl;
+
+      vector<Point_and_string> rightResult;
+      while(1) {
+        Point_3 npd(p.x(), p.y(), max_interval_length * -1);
+        Point_3 nqd(q.x()+two, q.y(), max_interval_length);
+        PS_Fuzzy_iso_box exact_range(npd,nqd);
+        tree.search( back_inserter( rightResult ), exact_range);
+        if(KDT_DEBUG) cout << "kd tree points are with size: " << rightResult.size() <<  " " << two << endl;
+        if(KDT_DEBUG) {
+          for(it = rightResult.begin(); it != rightResult.end(); it++) {
+            cout << boost::get<0>(*it).x() << " " << boost::get<0>(*it).y() << endl;
+          }
+        }
+        if(rightResult.size()>0 || two > (1<<30)) break;
+        two <<= 1;
+      }
+      if(rightResult.size() > 0) {
+        right_it = rightResult.begin();
+        if(rightResult.size() > 1) {
+          it = rightResult.begin();
+          int64_t diff = abs(boost::get<0>(*it).x() - p.x());
+          for(; it != rightResult.end(); it++) {
+              if(abs(boost::get<0>(*it).x() - p.x()) < diff) {
+                  diff = abs(boost::get<0>(*it).x() - p.x());
+                  right_it = it;
+              }
+          }
+        }
+        if(KDT_DEBUG) cout << "nearest neighbor in right " << boost::get<1>(*right_it) << endl;
+        if(boost::get<1>(*left_it) == boost::get<1>(*right_it))
+          result_it = left_it;
+        rightResult.clear();
+      }
+  }
+  
+  if(result_it != leftResult.end()) {
+    ret_result = boost::get<1>(*result_it);
+    if(KDT_DEBUG) cout << "actual nearest neighbor " << ret_result << endl;
+  }
+  leftResult.clear();
+
+  return ret_result;
 }

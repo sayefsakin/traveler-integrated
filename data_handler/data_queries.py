@@ -94,6 +94,9 @@ class DataQueriesInterface:
 
         self.sendOverTheSocket(client_socket, dictionary)
         dataDict = self.recvOverTheSocket(client_socket)
+        for loc in dataDict:
+            dataDict[loc] = list(map(float, dataDict[loc]))
+
         ret = dataDict
         # ret = self.postProcessForUtilization(dataDict)
         # print("received data over socket in dict format")

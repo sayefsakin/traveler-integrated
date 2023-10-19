@@ -55,8 +55,9 @@ typedef CGAL::Sliding_midpoint<Traits> MidpointMaxSpreadTraits;
 typedef CGAL::Kd_tree<Traits, MidpointMaxSpreadTraits> Kdtree;
 typedef CGAL::Fuzzy_iso_box<Traits> Fuzzy_iso_box;
 
+typedef boost::tuple<string, string> BString_and_string;
 typedef CGAL::Cartesian<double> Kert;
-typedef CGAL::Segment_tree_map_traits_2<Kert, string> KertTraits;
+typedef CGAL::Segment_tree_map_traits_2<Kert, BString_and_string> KertTraits;
 typedef CGAL::Segment_tree_2<KertTraits > Segment_tree_2_type;
 
 
@@ -81,7 +82,7 @@ Point_pairs getPointIntervalFromPureInterval(Pure_interval pi) {
     return Point_pairs(p,q);
 }
 
-void testSearchQueries(Kdtree *kdtree, Segment_tree_2_type *Segment_tree_2, int minId, int maxId, NNKdtree *nnkdtree, string datasetId) {
+void testSearchQueries(Kdtree *kdtree, Segment_tree_2_type *Segment_tree_2, int minId, int maxId, string datasetId) {
 
     list<Point_d> result;
     Point_2 p(236941312, 2);
@@ -114,7 +115,7 @@ void testSearchQueries(Kdtree *kdtree, Segment_tree_2_type *Segment_tree_2, int 
     std::cout << "KD Tree Splitting" << ", " << datasetId << ", ";
     std::cout << "Fair, " << std::chrono::duration_cast<std::chrono::microseconds>(kdt_end - kdt_begin).count() << std::endl;
 
-    Kd_tree_search search((*nnkdtree), pd, 1);
+    // Kd_tree_search search((*nnkdtree), pd, 1);
     //cout << "nearest neighbor " << (search.end()-1)->first << endl;
     //for(Kd_tree_search::iterator it = search.begin(); it != search.end(); ++it)
     //    std::cout << it->first << " "<< std::sqrt(it->second) << std::endl;
@@ -131,7 +132,10 @@ void testSearchQueries(Kdtree *kdtree, Segment_tree_2_type *Segment_tree_2, int 
     if(DEBUG) cout << "\nwindow_query with segment tree result size: " << OutputList1.size() << endl;;
     while(j!=OutputList1.end()){
         Point_pairs pp = getPointIntervalFromPureInterval((*j).first);
-        if(DEBUG) cout << pp.first << " " << pp.second <<  " id " << (*j).second << endl;
+        if(DEBUG) cout << pp.first << " " << pp.second 
+        <<  " id " << boost::get<0>((*j).second) 
+        <<  " primitive " << boost::get<1>((*j).second) 
+        << endl;
         j++;
     }
 }
@@ -176,83 +180,93 @@ Document rcvOverTheSocket(int new_socket){
     return d;
 }
 
-Document kdTreeGetAttributeQuery(Kdtree *nnkdtree, uint64_t cTime, uint64_t cLocation, uint64_t minId, uint64_t maxId) {
-    vector<Point_d> result;
-    Point_2 p(cTime, cLocation);
-    Point_2 q(cTime+1, cLocation);
+Document kdTreeGetAttributeQuery(BinnedKDT *binnedKDT, Kdtree *nnkdtree, uint64_t cTime, uint64_t cLocation, uint64_t minId, uint64_t maxId) {
+    // vector<Point_d> result;
+    // Point_2 p(cTime, cLocation);
+    // Point_2 q(cTime+1, cLocation);
 
-    Point_d pd(p.x(), p.y(), minId);
-    Point_d qd(q.x(), q.y(), maxId);
+    // Point_d pd(p.x(), p.y(), minId);
+    // Point_d qd(q.x(), q.y(), maxId);
 
-    if(DEBUG) cout << "doing event attribute query (" << p.x() << "," << p.y() << ") (" << q.x() << "," << q.y() << ")" << endl;
-    uint64_t two = 1;
-    vector<Point_d> leftResult;
-    std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
-    while(1) {
-        Point_d npd(p.x()-two, p.y(), minId);
-        Point_d nqd(q.x(), q.y(), maxId);
-        Fuzzy_iso_box exact_range(npd,nqd);
-        nnkdtree->search( back_inserter( leftResult ), exact_range);
-        if(DEBUG) cout << "kd tree points are with size: " << leftResult.size() <<  " " << two << endl;
-        if(DEBUG) copy (leftResult.begin(), leftResult.end(), ostream_iterator<Point_d>(cout,"\n") );
-        if(DEBUG) cout << endl;
-        if(leftResult.size()>0 || two > (1<<30)) break;
-        two <<= 1;
-    }
-    if(leftResult.size() > 1) {
-        int64_t diff = abs(leftResult[0].x() - p.x());
-        int ind = 0;
-        for(unsigned i = 1; i<leftResult.size(); i++) {
-            if(abs(leftResult[i].x() - p.x()) < diff) {
-                diff = abs(leftResult[i].x() - p.x());
-                ind = i;
-            }
-        }
-        leftResult[0] = leftResult[ind];
-    }
+    // if(DEBUG) cout << "doing event attribute query (" << p.x() << "," << p.y() << ") (" << q.x() << "," << q.y() << ")" << endl;
+    // uint64_t two = 1;
+    // vector<Point_d> leftResult;
+    // std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+    // while(1) {
+    //     Point_d npd(p.x()-two, p.y(), minId);
+    //     Point_d nqd(q.x(), q.y(), maxId);
+    //     Fuzzy_iso_box exact_range(npd,nqd);
+    //     nnkdtree->search( back_inserter( leftResult ), exact_range);
+    //     if(DEBUG) cout << "kd tree points are with size: " << leftResult.size() <<  " " << two << endl;
+    //     if(DEBUG) copy (leftResult.begin(), leftResult.end(), ostream_iterator<Point_d>(cout,"\n") );
+    //     if(DEBUG) cout << endl;
+    //     if(leftResult.size()>0 || two > (1<<30)) break;
+    //     two <<= 1;
+    // }
+    // if(leftResult.size() > 1) {
+    //     int64_t diff = abs(leftResult[0].x() - p.x());
+    //     int ind = 0;
+    //     for(unsigned i = 1; i<leftResult.size(); i++) {
+    //         if(abs(leftResult[i].x() - p.x()) < diff) {
+    //             diff = abs(leftResult[i].x() - p.x());
+    //             ind = i;
+    //         }
+    //     }
+    //     leftResult[0] = leftResult[ind];
+    // }
 
-    if(leftResult.size() > 0) {
-        if(DEBUG) cout << "nearest neighbor in left " << leftResult[0].z() << endl;
+    // if(leftResult.size() > 0) {
+    //     if(DEBUG) cout << "nearest neighbor in left " << leftResult[0].z() << endl;
 
-        vector<Point_d> rightResult;
-        while(1) {
-            Point_d npd(p.x(), p.y(), minId);
-            Point_d nqd(q.x()+two, q.y(), maxId);
-            Fuzzy_iso_box exact_range(npd,nqd);
-            nnkdtree->search( back_inserter( rightResult ), exact_range);
-            if(DEBUG) cout << "kd tree points are with size: " << rightResult.size() <<  " " << two << endl;
-            if(DEBUG) copy (rightResult.begin(), rightResult.end(), ostream_iterator<Point_d>(cout,"\n") );
-            if(DEBUG) cout << endl;
-            if(rightResult.size()>0 || two > (1<<30)) break;
-            two <<= 1;
-        }
-        if(rightResult.size() > 1) {
-            int64_t diff = abs(rightResult[0].x() - p.x());
-            int ind = 0;
-            for(unsigned i = 1; i<rightResult.size(); i++) {
-                if(abs(rightResult[i].x() - p.x()) < diff) {
-                    diff = abs(rightResult[i].x() - p.x());
-                    ind = i;
-                }
-            }
-            rightResult[0] = rightResult[ind];
-        }
-        if(DEBUG) cout << "nearest neighbor in right " << rightResult[0].z() << endl;
-        if(leftResult[0].z() == rightResult[0].z())
-            result = leftResult;
-    }
+    //     vector<Point_d> rightResult;
+    //     while(1) {
+    //         Point_d npd(p.x(), p.y(), minId);
+    //         Point_d nqd(q.x()+two, q.y(), maxId);
+    //         Fuzzy_iso_box exact_range(npd,nqd);
+    //         nnkdtree->search( back_inserter( rightResult ), exact_range);
+    //         if(DEBUG) cout << "kd tree points are with size: " << rightResult.size() <<  " " << two << endl;
+    //         if(DEBUG) copy (rightResult.begin(), rightResult.end(), ostream_iterator<Point_d>(cout,"\n") );
+    //         if(DEBUG) cout << endl;
+    //         if(rightResult.size()>0 || two > (1<<30)) break;
+    //         two <<= 1;
+    //     }
+    //     if(rightResult.size() > 1) {
+    //         int64_t diff = abs(rightResult[0].x() - p.x());
+    //         int ind = 0;
+    //         for(unsigned i = 1; i<rightResult.size(); i++) {
+    //             if(abs(rightResult[i].x() - p.x()) < diff) {
+    //                 diff = abs(rightResult[i].x() - p.x());
+    //                 ind = i;
+    //             }
+    //         }
+    //         rightResult[0] = rightResult[ind];
+    //     }
+    //     if(DEBUG) cout << "nearest neighbor in right " << rightResult[0].z() << endl;
+    //     if(leftResult[0].z() == rightResult[0].z())
+    //         result = leftResult;
+    // }
 
-    if(result.size()>0) if(DEBUG) cout << "actual nearest neighbor " << result[0].z() << endl;
-    std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+    // if(result.size()>0) if(DEBUG) cout << "actual nearest neighbor " << result[0].z() << endl;
+    // std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+    // cout << "KDT OLD," << "ds_attribute," << cTime << "," << cLocation << "," << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() <<
+    // endl;
+
+
+    begin = std::chrono::steady_clock::now();
+    string new_result = binnedKDT->findNearestInterval(cTime, cLocation);
+    // string old_result("");
+    // if(result.size()>0) old_result = to_string(int64_t(result[0].z()));
+    // if(new_result != old_result) cout << "mismatched attribute result" << new_result << " ~ " << old_result << endl;
+    end = std::chrono::steady_clock::now();
     cout << "KDT," << "ds_attribute," << cTime << "," << cLocation << "," << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() <<
     endl;
+
     Document document;
     document.SetObject();
     Document::AllocatorType& allocator = document.GetAllocator();
     if(result.size()>0) {
         Value val(kObjectType);
-        //string begin_string = to_string(int64_t(search.begin()->first.z()));
-        string begin_string = to_string(int64_t(result[0].z()));
+        string begin_string = new_result;
         val.SetString(begin_string.c_str(), static_cast<SizeType>(begin_string.length()), allocator);
         document.AddMember("event_id", val, allocator);
     }
@@ -265,35 +279,37 @@ Document convertLocDictToDocument(LocDict locDict) {
     Document::AllocatorType& allocator = document.GetAllocator();
     for ( const auto &myPair : locDict ) {
         Value a(kArrayType);
-        Value val(kObjectType);
         uint64_t bins = myPair.second.size();
         for(uint64_t c_bin = 0; c_bin < bins; c_bin++) {
-            // std::cout << myPair.first << " = ";
-            // copy (myPair.second.begin(), myPair.second.end(), ostream_iterator<double>(cout,"\n") );
-            // cout << endl;
-            a.PushBack(Value().SetDouble(myPair.second[c_bin]), allocator);
+            Value val(kObjectType);
+            string d_string = to_string(myPair.second[c_bin]);
+            val.SetString(d_string.c_str(), static_cast<SizeType>(d_string.length()), allocator);
+            a.PushBack(val, allocator);
         }
-        string time_string = to_string(myPair.first);
-        val.SetString(time_string.c_str(), static_cast<SizeType>(time_string.length()), allocator);
-        document.AddMember(val, a, allocator);
+        Value lval(kObjectType);
+        string loc_string = to_string(myPair.first);
+        lval.SetString(loc_string.c_str(), static_cast<SizeType>(loc_string.length()), allocator);
+        document.AddMember(lval, a, allocator);
     }
     return document;
 }
 
 Document binnedKDTreeSearchQuery( BinnedKDT *tree,
-                        uint64_t time_begin,
-                        uint64_t time_end,
+                        int64_t time_begin,
+                        int64_t time_end,
                         uint64_t location_begin,
                         uint64_t location_end,
                         uint64_t bins) {
 
     LocDict lResults = tree->binnedRangeQuery(time_begin, time_end, location_begin, location_end, bins);
-    return convertLocDictToDocument(lResults);
+    Document d = convertLocDictToDocument(lResults);
+    lResults.clear();
+    return d;
 }
 
 Document kdTreeSearchQuery( Kdtree *kdtree,
-                        uint64_t time_begin,
-                        uint64_t time_end,
+                        int64_t time_begin,
+                        int64_t time_end,
                         uint64_t location_begin,
                         uint64_t location_end,
                         uint64_t minId,
@@ -312,7 +328,7 @@ Document kdTreeSearchQuery( Kdtree *kdtree,
     kdtree->search( back_inserter( result ), exact_range);
     std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
     //std::cout << "KD Tree window query time = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[ms]" << std::endl;
-    cout << "KDT," << "ds_window," << time_begin << "," << time_end << "," << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() <<
+    cout << "KDT OLD," << "ds_window," << time_begin << "," << time_end << "," << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() <<
     endl;
     if(DEBUG) cout << "kd tree points are with size: " << result.size() << endl;
     if(DEBUG) copy (result.begin(), result.end(), ostream_iterator<Point_d>(cout,"\n") );
@@ -380,7 +396,7 @@ Document sgmntTreeGetAttributeQuery(Segment_tree_2_type *Segment_tree_2,
     Point_d q((double)cTime+1, (double)cLocation, maxId);
 
     if(DEBUG) cout << "doing window query with segment tree (" << p.x() << "," << p.y() << ") (" << q.x() << "," << q.y() << ")" << endl;
-    Interval a=Interval(Pure_interval(Key(p.x(),(p.y()*2)-1), Key(q.x(),q.y()*2)),"z");
+    Interval a=Interval(Pure_interval(Key(p.x(),(p.y()*2)-1), Key(q.x(),q.y()*2)), boost::make_tuple("z","a"));
     std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
     Segment_tree_2->window_query(a,std::back_inserter(OutputList1));
     std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
@@ -396,7 +412,7 @@ Document sgmntTreeGetAttributeQuery(Segment_tree_2_type *Segment_tree_2,
     while(j!=OutputList1.end()){
         //Point_pairs pp = getPointIntervalFromPureInterval((*j).first);
         Value val(kObjectType);
-        string begin_string((*j).second);
+        string begin_string(boost::get<0>((*j).second));
         val.SetString(begin_string.c_str(), static_cast<SizeType>(begin_string.length()), allocator);
         document.AddMember("event_id", val, allocator);
         break;
@@ -413,7 +429,7 @@ Document sgmntTreeGetAttributeQuery(Segment_tree_2_type *Segment_tree_2,
     return document;
 }
 
-LocDict convertSegmentTreeResultToBinnedData(vector<Interval> &outputList, uint64_t time_begin, uint64_t time_end, uint64_t bins){
+LocDict convertSegmentTreeResultToBinnedData(vector<Interval> &outputList, int64_t time_begin, int64_t time_end, uint64_t bins){
     uint64_t bin_size(getBinSize(time_begin, time_end, bins));
     LocDict locDict;
     vector<Interval>::iterator j = outputList.begin();
@@ -430,19 +446,19 @@ LocDict convertSegmentTreeResultToBinnedData(vector<Interval> &outputList, uint6
         int64_t endingBin = getBinNumber(time_begin, time_end, bins, interval_time_end);
 
         if(startingBin < 0 || endingBin < 0){j++; continue;}
-        for(int64_t bin_it = startingBin+1; bin_it < endingBin; bin_it++) {
+        for(int64_t bin_it = startingBin+1; bin_it < endingBin && bin_it < (int64_t)bins; bin_it++) {
             if(locDict[interval_loc][bin_it] > 0) continue;
             locDict[interval_loc][bin_it] = 1.0;
         }
-        if(locDict[interval_loc][startingBin] < 0.5) locDict[interval_loc][startingBin] = (interval_time_start % bin_size)?0.5:1.0;
-        if(locDict[interval_loc][endingBin] < 0.5) locDict[interval_loc][endingBin] = (interval_time_end % bin_size)?0.5:1.0;
+        if(startingBin < (int64_t)bins && locDict[interval_loc][startingBin] < 0.5) locDict[interval_loc][startingBin] = (interval_time_start % bin_size)?0.5:1.0;
+        if(endingBin < (int64_t)bins && locDict[interval_loc][endingBin] < 0.5) locDict[interval_loc][endingBin] = (interval_time_end % bin_size)?0.5:1.0;
         j++;
     }
     return locDict;
 }
 Document sgmntTreeSearchQuery(Segment_tree_2_type *Segment_tree_2,
-                        uint64_t time_begin,
-                        uint64_t time_end,
+                        int64_t time_begin,
+                        int64_t time_end,
                         uint64_t location_begin,
                         uint64_t location_end,
                         uint64_t bins) {
@@ -452,17 +468,19 @@ Document sgmntTreeSearchQuery(Segment_tree_2_type *Segment_tree_2,
     Point_d q((double)time_end, (double)location_end, 0);
 
     if(DEBUG) cout << "doing window query with segment tree (" << p.x() << "," << p.y() << ") (" << q.x() << "," << q.y() << ")" << endl;
-    Interval a=Interval(Pure_interval(Key(p.x(),(p.y()*2)-1), Key(q.x(),q.y()*2)),"z");
+    Interval a=Interval(Pure_interval(Key(p.x(),(p.y()*2)-1), Key(q.x(),q.y()*2)), boost::make_tuple("z","a"));
 
     std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
     Segment_tree_2->window_query(a,std::back_inserter(OutputList1));
+    
+    LocDict locDict = convertSegmentTreeResultToBinnedData(OutputList1, time_begin, time_end, bins);
     std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
     cout << "SGT," << "ds_window," << time_begin << "," << time_end << "," << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() <<
     endl;
-    if(DEBUG) std::cout << "Segment Tree window query time = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[ms]" << std::endl;
-
-    LocDict locDict = convertSegmentTreeResultToBinnedData(OutputList1, time_begin, time_end, bins);
-    return convertLocDictToDocument(locDict);
+    Document d = convertLocDictToDocument(locDict);
+    locDict.clear();
+    if(DEBUG) cout << "loc dict cleared" << endl;
+    return d;
     // vector<Interval>::iterator j = OutputList1.begin();
     // if(DEBUG) cout << "\nwindow_query with segment tree result size: " << OutputList1.size() << endl;;
 
@@ -562,8 +580,8 @@ Document processReceivedRequest(BinnedKDT *binnedKDT,
 
     if(qCommand == GETDATAINRANGE) {
 
-        uint64_t time_begin = stol(((*d)["begin"].GetString())) < 0 ? 0 : stoul(((*d)["begin"].GetString()));
-        uint64_t time_end = stol(((*d)["end"].GetString())) < 0 ? 0 : stoul(((*d)["end"].GetString()));
+        int64_t time_begin = stol(((*d)["begin"].GetString()));
+        int64_t time_end = stol(((*d)["end"].GetString()));
 
         uint64_t location_begin = minLocation;
         uint64_t location_end = maxLocation;
@@ -587,7 +605,7 @@ Document processReceivedRequest(BinnedKDT *binnedKDT,
 
         if(ds_request == KDTREE) {
             if(DEBUG) cout << "got KD Tree request" << endl;
-            // return kdTreeSearchQuery(kdtree, time_begin, time_end, location_begin, location_end, minId, maxId);
+            // Document d = kdTreesSearchQuery(kdtree, time_begin, time_end, location_begin, location_end, minId, maxId);
             return binnedKDTreeSearchQuery(binnedKDT, time_begin, time_end, location_begin, location_end, bins);
         } else if(ds_request == SGTREE) {
             if(DEBUG) cout << "got Segment Tree request" << endl;
@@ -603,7 +621,7 @@ Document processReceivedRequest(BinnedKDT *binnedKDT,
 
         if(ds_request == KDTREE) {
             if(DEBUG) cout << "got KD Tree request" << endl;
-            return kdTreeGetAttributeQuery(kdtree, cTime, cLocation, minId, maxId);
+            return kdTreeGetAttributeQuery(binnedKDT, kdtree, cTime, cLocation, minId, maxId);
         } else if(ds_request == SGTREE) {
             if(DEBUG) cout << "got Segment Tree request" << endl;
             return sgmntTreeGetAttributeQuery(Segment_tree_2, cTime, cLocation, minId, maxId);
@@ -616,7 +634,6 @@ Document processReceivedRequest(BinnedKDT *binnedKDT,
 
 void startServerListening(BinnedKDT *binnedKDT,
                         Kdtree *kdtree,
-                        NNKdtree *nkdtree,
                         Segment_tree_2_type *Segment_tree_2,
                         uint64_t minId, uint64_t maxId,
                         uint64_t minLocation, uint64_t maxLocation) {
@@ -674,7 +691,7 @@ void startServerListening(BinnedKDT *binnedKDT,
 
         Document d = rcvOverTheSocket(new_socket);
         Document queryResults = processReceivedRequest(binnedKDT, kdtree, Segment_tree_2, &d, minId, maxId, minLocation, maxLocation);
-
+        if(DEBUG) cout << "received request processing done" << endl;
         StringBuffer qbuffer;
         Writer<StringBuffer> qwriter(qbuffer);
         queryResults.Accept(qwriter);
@@ -762,7 +779,10 @@ int main(int argc, char *argv[])
                                     interval_end.x(), interval_end.y(), 
                                     v.GetObject()["intervalId"].GetString(), cPrimitive);
 
-        InputList.emplace_back(Interval(getPurIntervalFromPoint(interval_enter, interval_end), v.GetObject()["intervalId"].GetString()));
+        InputList.emplace_back(Interval(
+                getPurIntervalFromPoint(interval_enter, interval_end), 
+                boost::make_tuple(v.GetObject()["intervalId"].GetString(), cPrimitive)
+        ));
         totalIntervals++;
         if(totalIntervals % 2500 == 0)
             cout << ".";
@@ -775,11 +795,7 @@ int main(int argc, char *argv[])
     std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
     binnedKDT.tree.build(); // explicitely call build, so that the first query wount spend time in building
     std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
-
     std::cout << "KD Tree build time = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[microseconds]" << std::endl;
-
-    NNKdtree nnkdtree(nnpoints.begin(), nnpoints.end());
-    nnkdtree.build();
 
     begin = std::chrono::steady_clock::now();
     kdtree.build();
@@ -791,9 +807,9 @@ int main(int argc, char *argv[])
     end = std::chrono::steady_clock::now();
     std::cout << "Segment Tree build time = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[microseconds]" << std::endl;
     cout << "kd tree and segment tree build done" << endl << "Total interval count: " << totalIntervals <<  ", Primitive count: " << cPrimitiveNumber << endl;
-    // testSearchQueries(&kdtree, &Segment_tree_2, minId, maxId, &nnkdtree, urlparser.datasetId);
+    // testSearchQueries(&kdtree, &Segment_tree_2, minId, maxId, urlparser.datasetId);
     // point_with_info_testing();
 
-    startServerListening(&binnedKDT, &kdtree, &nnkdtree, &Segment_tree_2, minId, maxId, minLocation, maxLocation);
+    startServerListening(&binnedKDT, &kdtree, &Segment_tree_2, minId, maxId, minLocation, maxLocation);
     return EXIT_SUCCESS;
 }

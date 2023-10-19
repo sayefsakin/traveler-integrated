@@ -13,6 +13,8 @@
 #include <utility>
 #include <string>
 
+using namespace std;
+
 typedef CGAL::Exact_predicates_inexact_constructions_kernel EPICKernel;
 typedef EPICKernel::Point_3                                 Point_3; // time, location, length
 typedef boost::tuple<Point_3,int>                           Point_and_int;
@@ -31,6 +33,8 @@ typedef K_neighbor_search::iterator                         NN_iterator;
 
 typedef std::map<uint64_t, std::vector<double>>             LocDict;
 
+#define KDT_DEBUG 0
+
 // A functor that returns true, iff the x-coordinate of a dD point is not positive
 struct X_not_positive {
   bool operator()(const NN_iterator& it) { return boost::get<2>((*it).first) != "1";  }
@@ -40,11 +44,11 @@ typedef CGAL::Filter_iterator<NN_iterator, X_not_positive> NN_positive_x_iterato
 
 int point_with_info_testing();
 
-inline uint64_t getBinSize(uint64_t time_begin, uint64_t time_end, uint64_t bins){
+inline uint64_t getBinSize(int64_t time_begin, int64_t time_end, uint64_t bins){
   return (uint64_t)floor((double)(time_end - time_begin) / (double)bins);
 }
 
-inline int getBinNumber(uint64_t time_begin, uint64_t time_end, uint64_t bins, uint64_t ctime) {
+inline int getBinNumber(int64_t time_begin, int64_t time_end, uint64_t bins, int64_t ctime) {
   uint64_t bin_size = getBinSize(time_begin, time_end, bins);
   if(ctime < time_begin || ctime > time_end) return -1;
   return (int)floor((double)(ctime - time_begin) / (double)bin_size);
@@ -58,11 +62,12 @@ public:
   void insertDataIntoTree(double enter_time, double enter_loc,
                           double end_time, double end_loc,
                           std::string interval_id, std::string primitive_name);
-  LocDict binnedRangeQuery(uint64_t time_begin, 
-                            uint64_t time_end, 
+  LocDict binnedRangeQuery(int64_t time_begin, 
+                            int64_t time_end, 
                             uint64_t location_begin, 
                             uint64_t location_end, 
                             uint64_t bins);
+  string findNearestInterval(int64_t c_time, uint64_t c_location);
 };
 
 #endif
