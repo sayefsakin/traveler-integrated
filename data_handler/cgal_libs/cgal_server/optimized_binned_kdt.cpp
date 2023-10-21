@@ -3,66 +3,66 @@
 
 int point_with_info_testing()
 {
-  const unsigned int K = 5;
-  // generator for random data points in the cube ( (-1,-1,-1), (1,1,1) )
-  Random_points_iterator rpit( 1.0);
-  std::vector<Point_3> points;
-  std::vector<std::string>     indices;
-  std::vector<std::string>     primates;
+  // const unsigned int K = 5;
+  // // generator for random data points in the cube ( (-1,-1,-1), (1,1,1) )
+  // Random_points_iterator rpit( 1.0);
+  // std::vector<Point_3> points;
+  // std::vector<std::string>     indices;
+  // std::vector<std::string>     primates;
   
-  // points.push_back(Point_3(*rpit++));
-  // points.push_back(Point_3(*rpit++));
-  // points.push_back(Point_3(*rpit++));
-  // points.push_back(Point_3(*rpit++));
-  // points.push_back(Point_3(*rpit++));
-  // points.push_back(Point_3(*rpit++));
-  // points.push_back(Point_3(*rpit++));
+  // // points.push_back(Point_3(*rpit++));
+  // // points.push_back(Point_3(*rpit++));
+  // // points.push_back(Point_3(*rpit++));
+  // // points.push_back(Point_3(*rpit++));
+  // // points.push_back(Point_3(*rpit++));
+  // // points.push_back(Point_3(*rpit++));
+  // // points.push_back(Point_3(*rpit++));
 
-  points.push_back(Point_3(0.358341, 0.735557, -0.0831224));
-  points.push_back(Point_3(0.791051, -0.326561, -0.0805253));
-  points.push_back(Point_3(-0.695843, 0.592749, -0.630712));
-  points.push_back(Point_3(-0.144725, 0.0143613, -0.509173));
-  points.push_back(Point_3(-0.725944, 0.144757, 0.84278));
-  points.push_back(Point_3(0.855758, 0.624467, 0.0655862));
-  points.push_back(Point_3(-0.335131, 0.0407417, -0.52731));
-  // for(int i=0;i<points.size();i++){
-  //   std::cout << points[i] << std::endl;
+  // points.push_back(Point_3(0.358341, 0.735557, -0.0831224));
+  // points.push_back(Point_3(0.791051, -0.326561, -0.0805253));
+  // points.push_back(Point_3(-0.695843, 0.592749, -0.630712));
+  // points.push_back(Point_3(-0.144725, 0.0143613, -0.509173));
+  // points.push_back(Point_3(-0.725944, 0.144757, 0.84278));
+  // points.push_back(Point_3(0.855758, 0.624467, 0.0655862));
+  // points.push_back(Point_3(-0.335131, 0.0407417, -0.52731));
+  // // for(int i=0;i<points.size();i++){
+  // //   std::cout << points[i] << std::endl;
+  // // }
+  // indices.push_back("hello");
+  // indices.push_back("honey");
+  // indices.push_back("honey");
+  // indices.push_back("honey");
+  // indices.push_back("faint");
+  // indices.push_back("lpthing");
+  // indices.push_back("vuaa");
+
+  // primates.push_back("0");
+  // primates.push_back("1");
+  // primates.push_back("1");
+  // primates.push_back("1");
+  // primates.push_back("1");
+  // primates.push_back("5");
+  // primates.push_back("6");
+
+  
+  // // Insert number_of_data_points in the tree
+  // KNSKDTree tree(boost::make_zip_iterator(boost::make_tuple( points.begin(),indices.begin(), primates.begin())),
+  //           boost::make_zip_iterator(boost::make_tuple( points.end(),indices.end(), primates.end())));
+
+  // // search K nearest neighbors
+  // Point_3 query(0.0, 0.0, 0.0);
+  // Distance tr_dist;
+  // K_neighbor_search search(tree, query, K);
+
+  // NN_positive_x_iterator it(search.end(), X_not_positive(), search.begin()), end(search.end(), X_not_positive());
+
+  // for (int j=0; (j < 5)&&(it!=end); ++j,++it){
+  //   std::cout << " d(q, nearest neighbor)=  "
+  //             << tr_dist.inverse_of_transformed_distance((*it).second) << " , "
+  //             << boost::get<0>((*it).first)<< " - " << boost::get<1>((*it).first)
+  //             << " = " << boost::get<2>((*it).first)
+  //             << std::endl;
   // }
-  indices.push_back("hello");
-  indices.push_back("honey");
-  indices.push_back("honey");
-  indices.push_back("honey");
-  indices.push_back("faint");
-  indices.push_back("lpthing");
-  indices.push_back("vuaa");
-
-  primates.push_back("0");
-  primates.push_back("1");
-  primates.push_back("1");
-  primates.push_back("1");
-  primates.push_back("1");
-  primates.push_back("5");
-  primates.push_back("6");
-
-  
-  // Insert number_of_data_points in the tree
-  KNSKDTree tree(boost::make_zip_iterator(boost::make_tuple( points.begin(),indices.begin(), primates.begin())),
-            boost::make_zip_iterator(boost::make_tuple( points.end(),indices.end(), primates.end())));
-
-  // search K nearest neighbors
-  Point_3 query(0.0, 0.0, 0.0);
-  Distance tr_dist;
-  K_neighbor_search search(tree, query, K);
-
-  NN_positive_x_iterator it(search.end(), X_not_positive(), search.begin()), end(search.end(), X_not_positive());
-
-  for (int j=0; (j < 5)&&(it!=end); ++j,++it){
-    std::cout << " d(q, nearest neighbor)=  "
-              << tr_dist.inverse_of_transformed_distance((*it).second) << " , "
-              << boost::get<0>((*it).first)<< " - " << boost::get<1>((*it).first)
-              << " = " << boost::get<2>((*it).first)
-              << std::endl;
-  }
 
   return 0;
 }
@@ -77,19 +77,21 @@ int point_with_info_testing()
 void BinnedKDT::insertDataIntoTree(double enter_time, double enter_loc,
                           double end_time, double end_loc,
                           std::string interval_id, std::string primitive_name){
-  uint64_t interval_length = end_time - enter_time;
+  int64_t interval_length = end_time - enter_time;
   tree.insert(
     boost::make_tuple(
       Point_3(enter_time, enter_loc, interval_length), 
       interval_id, 
-      primitive_name
+      primitive_name,
+      false
     )
   );
   tree.insert(
     boost::make_tuple(
-      Point_3(end_time, end_loc, interval_length * -1),
+      Point_3(end_time, end_loc, interval_length),
       interval_id,
-      primitive_name
+      primitive_name, 
+      true
     )
   );
   if(interval_length > max_interval_length) max_interval_length = interval_length + 1;
@@ -105,7 +107,7 @@ LocDict BinnedKDT::binnedRangeQuery(int64_t time_begin,
   uint64_t bin_size(getBinSize(time_begin, time_end, bins));
 
   vector<Point_and_string> result;
-  Point_3 p(time_begin, location_begin, bin_size);
+  Point_3 p(time_begin, location_begin, 1);
   Point_3 q(time_end, location_end, max_interval_length);
 
   // cout << "doing window query (" << p.x() << "," << p.y() << ") (" << q.x() << "," << q.y() << ")" << endl;
@@ -120,15 +122,14 @@ LocDict BinnedKDT::binnedRangeQuery(int64_t time_begin,
   // endl;
   // cout << "kd tree points are with size: " << result.size() << endl;
   vector<Point_and_string>::iterator it;
-  set<string> intervalCheck;
 
   for(it = result.begin(); it != result.end(); it++) {
     // cout << boost::get<0>(*it) << ", ";
     string intervalId = boost::get<1>(*it);
-    if(intervalCheck.find(intervalId) != intervalCheck.end()) continue;
     int64_t interval_time_start = (boost::get<0>(*it)).x();
     uint64_t interval_loc = (boost::get<0>(*it)).y();
     int64_t interval_length = (boost::get<0>(*it)).z();
+    if(boost::get<3>(*it)) interval_length *= -1;
     int64_t interval_time_end = interval_time_start + interval_length;
     if(interval_length < 0) swap(interval_time_start, interval_time_end);
 
@@ -145,33 +146,37 @@ LocDict BinnedKDT::binnedRangeQuery(int64_t time_begin,
     int64_t endingBin = getBinNumber(time_begin, time_end, bins, interval_time_end);
     if(startingBin < 0 || endingBin < 0) continue;
 
-    for(int64_t bin_it = startingBin+1; bin_it < endingBin && bin_it < (int64_t)bins; bin_it++)
+    for(int64_t bin_it = startingBin+1;
+     bin_it < endingBin && bin_it < (int64_t)bins && locDict[interval_loc][bin_it] < 0.5; 
+     bin_it++)
       locDict[interval_loc][bin_it] = 1.0;
     
-    if(startingBin < (int64_t)bins) locDict[interval_loc][startingBin] = (interval_time_start % bin_size)?0.5:1.0;
-    if(endingBin < (int64_t)bins) locDict[interval_loc][endingBin] = (interval_time_end % bin_size)?0.5:1.0;
-    
-    intervalCheck.insert(intervalId);
+    if(startingBin < (int64_t)bins && locDict[interval_loc][startingBin] < 0.5) 
+      locDict[interval_loc][startingBin] = (interval_time_start % bin_size)?0.5:1.0;
+    if(endingBin < (int64_t)bins && locDict[interval_loc][endingBin] < 0.5)
+      locDict[interval_loc][endingBin] = (interval_time_end % bin_size)?0.5:1.0;
   }
   
-  for ( uint64_t c_loc = location_begin; c_loc <= location_end; c_loc++ ) {
-    if(locDict.find(c_loc) == locDict.end()) {
-      vector<double> vd(bins);
-      locDict[c_loc] = vd;
-    }
-    for(uint64_t c_bin = 0; c_bin < bins; c_bin++) {
-      if(locDict[c_loc][c_bin] > 0) continue;
-      int64_t start_time = (c_bin * bin_size) + time_begin;
-      int64_t end_time = ((c_bin+1) * bin_size) + time_begin;
-      p = Point_3(start_time, c_loc, 1);
-      q = Point_3(end_time, c_loc, bin_size - 1);
-      exact_range = PS_Fuzzy_iso_box(p,q);
-      result.clear();
-      boost::optional<Point_and_string> any_point = tree.search_any_point(exact_range);
-      if(any_point)
-        locDict[c_loc][c_bin] = 0.5;
-    }
-  }
+  // for ( uint64_t c_loc = location_begin; c_loc <= location_end; c_loc++ ) {
+  //   if(locDict.find(c_loc) == locDict.end()) {
+  //     vector<double> vd(bins);
+  //     locDict[c_loc] = vd;
+  //   }
+  //   for(uint64_t c_bin = 0; c_bin < bins; c_bin++) {
+  //     if(locDict[c_loc][c_bin] > 0) continue;
+  //     int64_t start_time = (c_bin * bin_size) + time_begin;
+  //     int64_t end_time = ((c_bin+1) * bin_size) + time_begin;
+  //     p = Point_3(start_time, c_loc, 1);
+  //     q = Point_3(end_time, c_loc, bin_size - 1);
+  //     exact_range = PS_Fuzzy_iso_box(p,q);
+  //     // boost::optional<Point_and_string> any_point = tree.search_any_point(exact_range);
+  //     result.clear();
+  //     tree.search( back_inserter( result ), exact_range);
+  //     // if(any_point)
+  //     if(result.size() > 0)
+  //       locDict[c_loc][c_bin] = 0.5;
+  //   }
+  // }
 
   std::chrono::steady_clock::time_point clock_end = std::chrono::steady_clock::now();
   cout << "KDT," << "ds_window," << time_begin << "," << time_end << "," << std::chrono::duration_cast<std::chrono::microseconds>(clock_end - clock_begin).count() <<
@@ -183,7 +188,6 @@ LocDict BinnedKDT::binnedRangeQuery(int64_t time_begin,
   //     cout << endl;
   // }
   result.clear();
-  intervalCheck.clear();
   return locDict;
 }
 
@@ -197,25 +201,24 @@ string BinnedKDT::findNearestInterval(int64_t c_time, uint64_t c_location) {
   uint64_t two = 1;
   vector<Point_and_string> leftResult;
   vector<Point_and_string>::iterator it, left_it, right_it;
-  vector<Point_and_string>::iterator result_it(leftResult.end());
 
   while(1) {
-      Point_3 npd(p.x()-two, p.y(), max_interval_length * -1);
-      Point_3 nqd(q.x(), q.y(), max_interval_length);
-      PS_Fuzzy_iso_box exact_range(npd,nqd);
-      tree.search( back_inserter( leftResult ), exact_range);
-      if(KDT_DEBUG) cout << "kd tree points are with size: " << leftResult.size() <<  " " << two << endl;
-      if(KDT_DEBUG) {
-        for(it = leftResult.begin(); it != leftResult.end(); it++) {
-          cout << boost::get<0>(*it).x() << " " << boost::get<0>(*it).y() << endl;
-        }
+    Point_3 npd(p.x()-two, p.y(), 1);
+    Point_3 nqd(q.x(), q.y(), max_interval_length);
+    PS_Fuzzy_iso_box exact_range(npd,nqd);
+    tree.search( back_inserter( leftResult ), exact_range);
+    if(KDT_DEBUG) cout << "kd tree points are with size: " << leftResult.size() <<  " " << two << endl;
+    if(KDT_DEBUG) {
+      for(it = leftResult.begin(); it != leftResult.end(); it++) {
+        cout << boost::get<0>(*it).x() << " " << boost::get<0>(*it).y() << endl;
       }
-      if(leftResult.size()>0 || two > (1<<30)) break;
-      two <<= 1;
+    }
+    if(leftResult.size()>0 || two > (1<<30)) break;
+    two <<= 1;
   }
+  if(leftResult.size() > 0) left_it = leftResult.begin();
   if(leftResult.size() > 1) {
     it = leftResult.begin();
-    left_it = it;
     int64_t diff = abs(boost::get<0>(*it).x() - p.x());
     for(; it != leftResult.end(); it++) {
         if(abs(boost::get<0>(*it).x()  - p.x()) < diff) {
@@ -226,47 +229,44 @@ string BinnedKDT::findNearestInterval(int64_t c_time, uint64_t c_location) {
   }
 
   if(leftResult.size() > 0) {
-      if(KDT_DEBUG) cout << "nearest neighbor in left " << boost::get<1>(*left_it) << endl;
+    if(KDT_DEBUG) cout << "nearest neighbor in left " << boost::get<1>(*left_it) << endl;
 
-      vector<Point_and_string> rightResult;
-      while(1) {
-        Point_3 npd(p.x(), p.y(), max_interval_length * -1);
-        Point_3 nqd(q.x()+two, q.y(), max_interval_length);
-        PS_Fuzzy_iso_box exact_range(npd,nqd);
-        tree.search( back_inserter( rightResult ), exact_range);
-        if(KDT_DEBUG) cout << "kd tree points are with size: " << rightResult.size() <<  " " << two << endl;
-        if(KDT_DEBUG) {
-          for(it = rightResult.begin(); it != rightResult.end(); it++) {
-            cout << boost::get<0>(*it).x() << " " << boost::get<0>(*it).y() << endl;
-          }
+    vector<Point_and_string> rightResult;
+    while(1) {
+      Point_3 npd(p.x(), p.y(), 1);
+      Point_3 nqd(q.x()+two, q.y(), max_interval_length);
+      PS_Fuzzy_iso_box exact_range(npd,nqd);
+      tree.search( back_inserter( rightResult ), exact_range);
+      if(KDT_DEBUG) cout << "kd tree points are with size: " << rightResult.size() <<  " " << two << endl;
+      if(KDT_DEBUG) {
+        for(it = rightResult.begin(); it != rightResult.end(); it++) {
+          cout << boost::get<0>(*it).x() << " " << boost::get<0>(*it).y() << endl;
         }
-        if(rightResult.size()>0 || two > (1<<30)) break;
-        two <<= 1;
       }
-      if(rightResult.size() > 0) {
-        right_it = rightResult.begin();
-        if(rightResult.size() > 1) {
-          it = rightResult.begin();
-          int64_t diff = abs(boost::get<0>(*it).x() - p.x());
-          for(; it != rightResult.end(); it++) {
-              if(abs(boost::get<0>(*it).x() - p.x()) < diff) {
-                  diff = abs(boost::get<0>(*it).x() - p.x());
-                  right_it = it;
-              }
-          }
+      if(rightResult.size()>0 || two > (1<<30)) break;
+      two <<= 1;
+    }
+    if(rightResult.size() > 0) {
+      right_it = rightResult.begin();
+      if(rightResult.size() > 1) {
+        it = rightResult.begin();
+        int64_t diff = abs(boost::get<0>(*it).x() - p.x());
+        for(; it != rightResult.end(); it++) {
+            if(abs(boost::get<0>(*it).x() - p.x()) < diff) {
+                diff = abs(boost::get<0>(*it).x() - p.x());
+                right_it = it;
+            }
         }
-        if(KDT_DEBUG) cout << "nearest neighbor in right " << boost::get<1>(*right_it) << endl;
-        if(boost::get<1>(*left_it) == boost::get<1>(*right_it))
-          result_it = left_it;
-        rightResult.clear();
       }
+      if(KDT_DEBUG) cout << "nearest neighbor in right " << boost::get<1>(*right_it) << endl;
+      if(boost::get<1>(*left_it) == boost::get<1>(*right_it)) {
+        ret_result = boost::get<1>(*left_it);
+        if(KDT_DEBUG) cout << "actual nearest neighbor " << ret_result << endl;
+      }
+      rightResult.clear();
+    }
+    leftResult.clear();
   }
   
-  if(result_it != leftResult.end()) {
-    ret_result = boost::get<1>(*result_it);
-    if(KDT_DEBUG) cout << "actual nearest neighbor " << ret_result << endl;
-  }
-  leftResult.clear();
-
   return ret_result;
 }

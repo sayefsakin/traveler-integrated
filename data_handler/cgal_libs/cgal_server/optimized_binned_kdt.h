@@ -15,10 +15,12 @@
 
 using namespace std;
 
-typedef CGAL::Exact_predicates_inexact_constructions_kernel EPICKernel;
+typedef CGAL::Simple_cartesian<double>                      EPICKernel;
+// typedef CGAL::Exact_predicates_inexact_constructions_kernel EPICKernel;
 typedef EPICKernel::Point_3                                 Point_3; // time, location, length
 typedef boost::tuple<Point_3,int>                           Point_and_int;
-typedef boost::tuple<Point_3, std::string, std::string>     Point_and_string; //3d point, interval id, primitive name
+//3d point, interval id, primitive name, enter(0) or leave(10)
+typedef boost::tuple<Point_3, std::string, std::string, bool>     Point_and_string;
 typedef CGAL::Random_points_in_cube_3<Point_3>              Random_points_iterator;
 typedef CGAL::Search_traits_3<EPICKernel>                   Traits_base;
 typedef CGAL::Search_traits_adapter<Point_and_string,
@@ -55,7 +57,7 @@ inline int getBinNumber(int64_t time_begin, int64_t time_end, uint64_t bins, int
 }
 
 class BinnedKDT {
-  uint64_t max_interval_length;
+  int64_t max_interval_length;
 public:
   KNSKDTree tree;
   BinnedKDT(){max_interval_length=1;}

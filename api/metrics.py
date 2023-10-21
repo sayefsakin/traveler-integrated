@@ -99,9 +99,10 @@ def get_utilization_histogram(datasetId: str,
     fetchTimer = round(time.time() * 1000000)
 
     # kdt_tester = dqi.GetDataInRange(bins, begin, end, locations, primitive, "kd_tree")
-    # sgt_tester = dqi.GetDataInRange(bins, begin, end, locations, primitive, "segment_tree")
+    sgt_tester = dqi.GetDataInRange(bins, begin, end, locations, primitive, "segment_tree")
     
     if primitive is not None:
+        print('Primitive is not none')
         if primitive not in db[datasetId]['sparseUtilizationList']['primitives']:
             raise HTTPException(status_code=404, detail='No utilization data for primitive: %s' % primitive)
         if locations:

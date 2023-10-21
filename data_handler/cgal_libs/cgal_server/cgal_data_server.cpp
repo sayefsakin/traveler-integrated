@@ -252,22 +252,21 @@ Document kdTreeGetAttributeQuery(BinnedKDT *binnedKDT, Kdtree *nnkdtree, uint64_
     // endl;
 
 
-    begin = std::chrono::steady_clock::now();
+    std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
     string new_result = binnedKDT->findNearestInterval(cTime, cLocation);
     // string old_result("");
     // if(result.size()>0) old_result = to_string(int64_t(result[0].z()));
     // if(new_result != old_result) cout << "mismatched attribute result" << new_result << " ~ " << old_result << endl;
-    end = std::chrono::steady_clock::now();
+    std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
     cout << "KDT," << "ds_attribute," << cTime << "," << cLocation << "," << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() <<
     endl;
 
     Document document;
     document.SetObject();
     Document::AllocatorType& allocator = document.GetAllocator();
-    if(result.size()>0) {
+    if(new_result.length()>0) {
         Value val(kObjectType);
-        string begin_string = new_result;
-        val.SetString(begin_string.c_str(), static_cast<SizeType>(begin_string.length()), allocator);
+        val.SetString(new_result.c_str(), static_cast<SizeType>(new_result.length()), allocator);
         document.AddMember("event_id", val, allocator);
     }
     return document;
