@@ -101,7 +101,8 @@ LocDict BinnedKDT::binnedRangeQuery(int64_t time_begin,
                             int64_t time_end, 
                             uint64_t location_begin, 
                             uint64_t location_end, 
-                            uint64_t bins) {
+                            uint64_t bins,
+                            std::string primitive) {
   // cout << "hello from binned KDT search" << endl;
   LocDict locDict;
   uint64_t bin_size(getBinSize(time_begin, time_end, bins));
@@ -125,6 +126,8 @@ LocDict BinnedKDT::binnedRangeQuery(int64_t time_begin,
 
   for(it = result.begin(); it != result.end(); it++) {
     // cout << boost::get<0>(*it) << ", ";
+    string cPrimitive = boost::get<2>(*it);
+    if(primitive != "" && primitive != cPrimitive) continue;
     string intervalId = boost::get<1>(*it);
     int64_t interval_time_start = (boost::get<0>(*it)).x();
     uint64_t interval_loc = (boost::get<0>(*it)).y();
@@ -179,7 +182,9 @@ LocDict BinnedKDT::binnedRangeQuery(int64_t time_begin,
   // }
 
   std::chrono::steady_clock::time_point clock_end = std::chrono::steady_clock::now();
-  cout << "KDT," << "ds_window," << time_begin << "," << time_end << "," << std::chrono::duration_cast<std::chrono::microseconds>(clock_end - clock_begin).count() <<
+  cout << "KDT," << "ds_window";
+  if(primitive != "") cout << "_cond";
+  cout << "," << time_begin << "," << time_end << "," << std::chrono::duration_cast<std::chrono::microseconds>(clock_end - clock_begin).count() <<
     endl;
   // std::cout << "KD Tree window query time = " << std::chrono::duration_cast<std::chrono::microseconds>(clock_end - clock_begin).count() << "[ms]" << std::endl;
   // for ( const auto &myPair : locDict ) {

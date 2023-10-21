@@ -68,7 +68,8 @@ public:
                             int64_t time_end, 
                             uint64_t location_begin, 
                             uint64_t location_end, 
-                            uint64_t bins);
+                            uint64_t bins,
+                            std::string primitive);
   string findNearestInterval(int64_t c_time, uint64_t c_location);
 };
 

@@ -298,9 +298,10 @@ Document binnedKDTreeSearchQuery( BinnedKDT *tree,
                         int64_t time_end,
                         uint64_t location_begin,
                         uint64_t location_end,
-                        uint64_t bins) {
+                        uint64_t bins,
+                        string primitive) {
 
-    LocDict lResults = tree->binnedRangeQuery(time_begin, time_end, location_begin, location_end, bins);
+    LocDict lResults = tree->binnedRangeQuery(time_begin, time_end, location_begin, location_end, bins, primitive);
     Document d = convertLocDictToDocument(lResults);
     lResults.clear();
     return d;
@@ -428,11 +429,13 @@ Document sgmntTreeGetAttributeQuery(Segment_tree_2_type *Segment_tree_2,
     return document;
 }
 
-LocDict convertSegmentTreeResultToBinnedData(vector<Interval> &outputList, int64_t time_begin, int64_t time_end, uint64_t bins){
+LocDict convertSegmentTreeResultToBinnedData(vector<Interval> &outputList, int64_t time_begin, int64_t time_end, uint64_t bins, string primitive){
     uint64_t bin_size(getBinSize(time_begin, time_end, bins));
     LocDict locDict;
     vector<Interval>::iterator j = outputList.begin();
     while(j!=outputList.end()){
+        string cPrimitive(boost::get<1>((*j).second));
+        if(primitive != "" && primitive != cPrimitive){j++; continue;}
         Point_pairs pp = getPointIntervalFromPureInterval((*j).first);
         uint64_t interval_time_start = (uint64_t)pp.first.x();
         uint64_t interval_loc = (uint64_t)pp.first.y();
@@ -460,7 +463,8 @@ Document sgmntTreeSearchQuery(Segment_tree_2_type *Segment_tree_2,
                         int64_t time_end,
                         uint64_t location_begin,
                         uint64_t location_end,
-                        uint64_t bins) {
+                        uint64_t bins,
+                        string primitive) {
 
     vector<Interval> OutputList1;
     Point_d p((double)time_begin, (double)location_begin, 0);
@@ -472,9 +476,11 @@ Document sgmntTreeSearchQuery(Segment_tree_2_type *Segment_tree_2,
     std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
     Segment_tree_2->window_query(a,std::back_inserter(OutputList1));
     
-    LocDict locDict = convertSegmentTreeResultToBinnedData(OutputList1, time_begin, time_end, bins);
+    LocDict locDict = convertSegmentTreeResultToBinnedData(OutputList1, time_begin, time_end, bins, primitive);
     std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
-    cout << "SGT," << "ds_window," << time_begin << "," << time_end << "," << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() <<
+    cout << "SGT," << "ds_window";
+    if(primitive != "") cout << "_cond";
+    cout << "," << time_begin << "," << time_end << "," << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() <<
     endl;
     Document d = convertLocDictToDocument(locDict);
     locDict.clear();
@@ -586,6 +592,7 @@ Document processReceivedRequest(BinnedKDT *binnedKDT,
         uint64_t location_end = maxLocation;
         uint64_t bins = 1;
         vector<uint64_t> locationsList;
+        string primitive("");
         if((*d).HasMember("locations")) {
             for (SizeType i = 0; i < (*d)["locations"].Size(); i++){
                 locationsList.push_back(stol((*d)["locations"][i].GetString()));
@@ -601,14 +608,17 @@ Document processReceivedRequest(BinnedKDT *binnedKDT,
         if((*d).HasMember("bins")) {
             bins = stoul(((*d)["bins"].GetString()));
         }
+        if((*d).HasMember("primitive")) {
+            primitive = ((*d)["primitive"].GetString());
+        }
 
         if(ds_request == KDTREE) {
             if(DEBUG) cout << "got KD Tree request" << endl;
             // Document d = kdTreesSearchQuery(kdtree, time_begin, time_end, location_begin, location_end, minId, maxId);
-            return binnedKDTreeSearchQuery(binnedKDT, time_begin, time_end, location_begin, location_end, bins);
+            return binnedKDTreeSearchQuery(binnedKDT, time_begin, time_end, location_begin, location_end, bins, primitive);
         } else if(ds_request == SGTREE) {
             if(DEBUG) cout << "got Segment Tree request" << endl;
-            return sgmntTreeSearchQuery(Segment_tree_2, time_begin, time_end, location_begin, location_end, bins);
+            return sgmntTreeSearchQuery(Segment_tree_2, time_begin, time_end, location_begin, location_end, bins, primitive);
         } else {
             if(DEBUG) cout << "invalid ds request" << endl;
         }

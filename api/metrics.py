@@ -94,24 +94,16 @@ def get_utilization_histogram(datasetId: str,
     # if dsp.profiled_ds == dsp.KDT or dsp.profiled_ds == dsp.SGT:
     #     utilObject = dqi.GetDataInRange(bins, begin, end, locations, primitive, dsp.profiled_ds)
     if primitive is not None:
+        if primitive not in db[datasetId]['sparseUtilizationList']['primitives']:
+            raise HTTPException(status_code=404, detail='No utilization data for primitive: %s' % primitive)
         utilObject = db[datasetId]['sparseUtilizationList']['primitives'][primitive]
 
     fetchTimer = round(time.time() * 1000000)
 
     # kdt_tester = dqi.GetDataInRange(bins, begin, end, locations, primitive, "kd_tree")
-    sgt_tester = dqi.GetDataInRange(bins, begin, end, locations, primitive, "segment_tree")
+    # sgt_tester = dqi.GetDataInRange(bins, begin, end, locations, primitive, "segment_tree")
     
-    if primitive is not None:
-        print('Primitive is not none')
-        if primitive not in db[datasetId]['sparseUtilizationList']['primitives']:
-            raise HTTPException(status_code=404, detail='No utilization data for primitive: %s' % primitive)
-        if locations:
-            ret['locations'] = {}
-            for location in locations:
-                ret['locations'][location] = utilObject.calcUtilizationForLocation(bins, begin, end, location)
-        else:
-            ret['data'] = utilObject.calcUtilizationHistogram(bins, begin, end)
-    elif locations:
+    if locations:
         if dsp.profiled_ds == dsp.KDT or dsp.profiled_ds == dsp.SGT:
             ret['locations'] = dqi.GetDataInRange(bins, begin, end, locations, primitive, dsp.profiled_ds)
         else:

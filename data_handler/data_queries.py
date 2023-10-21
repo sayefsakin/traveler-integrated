@@ -87,6 +87,8 @@ class DataQueriesInterface:
         }
         if locations:
             dictionary["locations"] = locations
+        if primitive:
+            dictionary["primitive"] = primitive
         # print(dictionary)
 
         client_socket = socket.socket()
