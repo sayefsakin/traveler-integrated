@@ -180,83 +180,9 @@ Document rcvOverTheSocket(int new_socket){
     return d;
 }
 
-Document kdTreeGetAttributeQuery(BinnedKDT *binnedKDT, Kdtree *nnkdtree, uint64_t cTime, uint64_t cLocation, uint64_t minId, uint64_t maxId) {
-    // vector<Point_d> result;
-    // Point_2 p(cTime, cLocation);
-    // Point_2 q(cTime+1, cLocation);
-
-    // Point_d pd(p.x(), p.y(), minId);
-    // Point_d qd(q.x(), q.y(), maxId);
-
-    // if(DEBUG) cout << "doing event attribute query (" << p.x() << "," << p.y() << ") (" << q.x() << "," << q.y() << ")" << endl;
-    // uint64_t two = 1;
-    // vector<Point_d> leftResult;
-    // std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
-    // while(1) {
-    //     Point_d npd(p.x()-two, p.y(), minId);
-    //     Point_d nqd(q.x(), q.y(), maxId);
-    //     Fuzzy_iso_box exact_range(npd,nqd);
-    //     nnkdtree->search( back_inserter( leftResult ), exact_range);
-    //     if(DEBUG) cout << "kd tree points are with size: " << leftResult.size() <<  " " << two << endl;
-    //     if(DEBUG) copy (leftResult.begin(), leftResult.end(), ostream_iterator<Point_d>(cout,"\n") );
-    //     if(DEBUG) cout << endl;
-    //     if(leftResult.size()>0 || two > (1<<30)) break;
-    //     two <<= 1;
-    // }
-    // if(leftResult.size() > 1) {
-    //     int64_t diff = abs(leftResult[0].x() - p.x());
-    //     int ind = 0;
-    //     for(unsigned i = 1; i<leftResult.size(); i++) {
-    //         if(abs(leftResult[i].x() - p.x()) < diff) {
-    //             diff = abs(leftResult[i].x() - p.x());
-    //             ind = i;
-    //         }
-    //     }
-    //     leftResult[0] = leftResult[ind];
-    // }
-
-    // if(leftResult.size() > 0) {
-    //     if(DEBUG) cout << "nearest neighbor in left " << leftResult[0].z() << endl;
-
-    //     vector<Point_d> rightResult;
-    //     while(1) {
-    //         Point_d npd(p.x(), p.y(), minId);
-    //         Point_d nqd(q.x()+two, q.y(), maxId);
-    //         Fuzzy_iso_box exact_range(npd,nqd);
-    //         nnkdtree->search( back_inserter( rightResult ), exact_range);
-    //         if(DEBUG) cout << "kd tree points are with size: " << rightResult.size() <<  " " << two << endl;
-    //         if(DEBUG) copy (rightResult.begin(), rightResult.end(), ostream_iterator<Point_d>(cout,"\n") );
-    //         if(DEBUG) cout << endl;
-    //         if(rightResult.size()>0 || two > (1<<30)) break;
-    //         two <<= 1;
-    //     }
-    //     if(rightResult.size() > 1) {
-    //         int64_t diff = abs(rightResult[0].x() - p.x());
-    //         int ind = 0;
-    //         for(unsigned i = 1; i<rightResult.size(); i++) {
-    //             if(abs(rightResult[i].x() - p.x()) < diff) {
-    //                 diff = abs(rightResult[i].x() - p.x());
-    //                 ind = i;
-    //             }
-    //         }
-    //         rightResult[0] = rightResult[ind];
-    //     }
-    //     if(DEBUG) cout << "nearest neighbor in right " << rightResult[0].z() << endl;
-    //     if(leftResult[0].z() == rightResult[0].z())
-    //         result = leftResult;
-    // }
-
-    // if(result.size()>0) if(DEBUG) cout << "actual nearest neighbor " << result[0].z() << endl;
-    // std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
-    // cout << "KDT OLD," << "ds_attribute," << cTime << "," << cLocation << "," << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() <<
-    // endl;
-
-
+Document kdTreeGetAttributeQuery(BinnedKDT *binnedKDT, uint64_t cTime, uint64_t cLocation, uint64_t minId, uint64_t maxId) {
     std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
     string new_result = binnedKDT->findNearestInterval(cTime, cLocation);
-    // string old_result("");
-    // if(result.size()>0) old_result = to_string(int64_t(result[0].z()));
-    // if(new_result != old_result) cout << "mismatched attribute result" << new_result << " ~ " << old_result << endl;
     std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
     cout << "KDT," << "ds_attribute," << cTime << "," << cLocation << "," << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() <<
     endl;
@@ -560,7 +486,6 @@ Document sgmntTreeSearchQuery(Segment_tree_2_type *Segment_tree_2,
 }
 
 Document processReceivedRequest(BinnedKDT *binnedKDT,
-                                Kdtree *kdtree,
                                 Segment_tree_2_type *Segment_tree_2,
                                 Document *d,
                                 uint64_t minId, uint64_t maxId,
@@ -614,7 +539,6 @@ Document processReceivedRequest(BinnedKDT *binnedKDT,
 
         if(ds_request == KDTREE) {
             if(DEBUG) cout << "got KD Tree request" << endl;
-            // Document d = kdTreesSearchQuery(kdtree, time_begin, time_end, location_begin, location_end, minId, maxId);
             return binnedKDTreeSearchQuery(binnedKDT, time_begin, time_end, location_begin, location_end, bins, primitive);
         } else if(ds_request == SGTREE) {
             if(DEBUG) cout << "got Segment Tree request" << endl;
@@ -630,7 +554,7 @@ Document processReceivedRequest(BinnedKDT *binnedKDT,
 
         if(ds_request == KDTREE) {
             if(DEBUG) cout << "got KD Tree request" << endl;
-            return kdTreeGetAttributeQuery(binnedKDT, kdtree, cTime, cLocation, minId, maxId);
+            return kdTreeGetAttributeQuery(binnedKDT, cTime, cLocation, minId, maxId);
         } else if(ds_request == SGTREE) {
             if(DEBUG) cout << "got Segment Tree request" << endl;
             return sgmntTreeGetAttributeQuery(Segment_tree_2, cTime, cLocation, minId, maxId);
@@ -642,7 +566,6 @@ Document processReceivedRequest(BinnedKDT *binnedKDT,
 }
 
 void startServerListening(BinnedKDT *binnedKDT,
-                        Kdtree *kdtree,
                         Segment_tree_2_type *Segment_tree_2,
                         uint64_t minId, uint64_t maxId,
                         uint64_t minLocation, uint64_t maxLocation) {
@@ -699,7 +622,7 @@ void startServerListening(BinnedKDT *binnedKDT,
             }
 
         Document d = rcvOverTheSocket(new_socket);
-        Document queryResults = processReceivedRequest(binnedKDT, kdtree, Segment_tree_2, &d, minId, maxId, minLocation, maxLocation);
+        Document queryResults = processReceivedRequest(binnedKDT, Segment_tree_2, &d, minId, maxId, minLocation, maxLocation);
         if(DEBUG) cout << "received request processing done" << endl;
         StringBuffer qbuffer;
         Writer<StringBuffer> qwriter(qbuffer);
@@ -742,7 +665,7 @@ int main(int argc, char *argv[])
     vector<Interval> InputList;
     //int numberOfEvents = 1000;
     int totalIntervals = 0;
-    Kdtree kdtree;
+    // Kdtree kdtree;
     Primtive_mapping primitiveMapping;
     string cPrimitive;
     int totalPrimitives = 0;
@@ -778,8 +701,8 @@ int main(int argc, char *argv[])
         minId = min(minId, intervalId);
         maxId = max(maxId, intervalId);
 
-        kdtree.insert(Point_d(interval_enter.x(), interval_enter.y(), intervalId));
-        kdtree.insert(Point_d(interval_end.x(), interval_end.y(), intervalId));
+        // kdtree.insert(Point_d(interval_enter.x(), interval_enter.y(), intervalId));
+        // kdtree.insert(Point_d(interval_end.x(), interval_end.y(), intervalId));
 
         nnpoints.push_back(Point_d(interval_enter.x(), interval_enter.y(), intervalId));
         nnpoints.push_back(Point_d(interval_end.x(), interval_end.y(), intervalId));
@@ -806,10 +729,10 @@ int main(int argc, char *argv[])
     std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
     std::cout << "KD Tree build time = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[microseconds]" << std::endl;
 
-    begin = std::chrono::steady_clock::now();
-    kdtree.build();
-    end = std::chrono::steady_clock::now();
-    std::cout << "Old KD Tree build time = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[microseconds]" << std::endl;
+    // begin = std::chrono::steady_clock::now();
+    // kdtree.build();
+    // end = std::chrono::steady_clock::now();
+    // std::cout << "Old KD Tree build time = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[microseconds]" << std::endl;
 
     begin = std::chrono::steady_clock::now();
     Segment_tree_2_type Segment_tree_2(InputList.begin(),InputList.end());
@@ -819,6 +742,6 @@ int main(int argc, char *argv[])
     // testSearchQueries(&kdtree, &Segment_tree_2, minId, maxId, urlparser.datasetId);
     // point_with_info_testing();
 
-    startServerListening(&binnedKDT, &kdtree, &Segment_tree_2, minId, maxId, minLocation, maxLocation);
+    startServerListening(&binnedKDT, &Segment_tree_2, minId, maxId, minLocation, maxLocation);
     return EXIT_SUCCESS;
 }
