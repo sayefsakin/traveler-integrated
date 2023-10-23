@@ -60,8 +60,17 @@ class BinnedKDT {
   int64_t max_interval_length;
   int64_t max_primitive_number;
 public:
+  int64_t min_time, max_time;
+  int64_t min_location, max_location;
   KNSKDTree tree;
-  BinnedKDT(){max_interval_length=1;max_primitive_number=0;}
+  BinnedKDT(){
+    max_interval_length=1;
+    max_primitive_number=0;
+    min_time = 0;
+    max_time = 0;
+    min_location = 0;
+    max_location = 0;
+  }
   void insertDataIntoTree(double enter_time, double enter_loc,
                           double end_time, double end_loc,
                           std::string interval_id, int64_t primitive_number);
@@ -72,6 +81,7 @@ public:
                             uint64_t bins,
                             int64_t primitive);
   string findNearestInterval(int64_t c_time, uint64_t c_location);
+  void getNeighborQuery(int64_t parent_id);
 };
 
 #endif

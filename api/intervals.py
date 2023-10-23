@@ -31,6 +31,7 @@ def get_intervals(datasetId: str, \
 
     def intervalGenerator():
         timerStart = round(time.time() * 1000000)
+        intervalIdCheck = None
         yield '['
         if location is not None and dsp.profiled_ds != dsp.SAT:
             dqi = DataQueriesInterface()
@@ -44,6 +45,7 @@ def get_intervals(datasetId: str, \
                 # print("received event id: ", eid)
                 intervalObj = db[datasetId]['intervals'][eid]
                 yield json.dumps(intervalObj)
+                intervalIdCheck = eid
             postProcessTimer = round(time.time() * 1000000)
         else:
             firstItem = True
@@ -76,10 +78,17 @@ def get_intervals(datasetId: str, \
                     yield ','
                 yield json.dumps(intervalObj)
                 firstItem = False
+                intervalIdCheck = i.data
             postProcessTimer = round(time.time() * 1000000)
         yield ']'
         if location is not None:
             print(datasetId, str(begin), str(end), str(location), str(fetchTimer - timerStart), str(postProcessTimer - fetchTimer), "attribute", sep=",")
+            if intervalIdCheck is not None:
+                timerStart = round(time.time() * 1000000)
+                childList = db[datasetId]['intervals'][intervalIdCheck]['children']
+                timerEnd = round(time.time() * 1000000)
+                print(datasetId, str(begin), str(end), intervalIdCheck, str(0), str(timerEnd - timerStart), 'neighbor', sep=",")
+
 
     return StreamingResponse(intervalGenerator(), media_type='application/json')
 

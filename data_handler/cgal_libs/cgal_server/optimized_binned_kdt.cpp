@@ -1,5 +1,6 @@
 #include "optimized_binned_kdt.h"
 #include <cmath>
+#include <algorithm>
 
 int point_with_info_testing()
 {
@@ -96,6 +97,8 @@ void BinnedKDT::insertDataIntoTree(double enter_time, double enter_loc,
   );
   if(interval_length > max_interval_length) max_interval_length = interval_length + 1;
   if(primitive_number > max_primitive_number) max_primitive_number = primitive_number;
+  max_time = max(max_time, max((int64_t)enter_time, (int64_t)end_time));
+  max_location = max((int64_t)enter_loc, max((int64_t)end_loc, max_location));
 }
 
 LocDict BinnedKDT::binnedRangeQuery(int64_t time_begin, 
@@ -283,4 +286,28 @@ string BinnedKDT::findNearestInterval(int64_t c_time, uint64_t c_location) {
   }
   
   return ret_result;
+}
+
+void BinnedKDT::getNeighborQuery(int64_t parent_id) {
+  // cout << "hello from get neighbor KDT of parent: " << parent_id << endl;
+
+  vector<Point_and_string> result;
+  Point_3 p(min_time, min_location, parent_id);
+  Point_3 q(max_time, max_location, parent_id);
+
+  PS_Fuzzy_iso_box exact_range(p,q);
+
+  std::chrono::steady_clock::time_point clock_begin = std::chrono::steady_clock::now();
+  tree.search( back_inserter( result ), exact_range);
+  std::chrono::steady_clock::time_point clock_end = std::chrono::steady_clock::now();
+  vector<Point_and_string>::iterator it;
+  // cout << "Children: ";
+  // for(it = result.begin(); it != result.end(); it++) {
+  //   if(boost::get<3>(*it)) continue;
+  //   string intervalId = boost::get<1>(*it);
+  //   cout << ", " << intervalId;
+  // }
+  // cout << endl;
+  cout << "0,KDT," << "ds_neighbor," << parent_id << "," << result.size()/2 << "," << std::chrono::duration_cast<std::chrono::microseconds>(clock_end - clock_begin).count() <<
+    endl;
 }
