@@ -67,11 +67,16 @@ typedef KertTraits::Key Key;
 typedef pair<Point_2, Point_2> Point_pairs;
 
 
-typedef map<string, int> Primtive_mapping;
+typedef map<string, int64_t> Primtive_mapping;
 typedef vector<string> Primitive_reverse_mapping;
 
 typedef CGAL::Orthogonal_k_neighbor_search<Traits> Kd_tree_search;
 typedef Kd_tree_search::Tree NNKdtree;
+
+string KDTREE("kd_tree");
+string SGTREE("segment_tree");
+string GETDATAINRANGE("GetDataInRange");
+string GETEVENTATTRIBUTE("GetEventAttribute");
 
 Pure_interval getPurIntervalFromPoint(Point_2 p, Point_2 q) {
     return Pure_interval(Key(p.x(),(p.y()*2)-1), Key(q.x(),q.y()*2));
@@ -225,7 +230,7 @@ Document binnedKDTreeSearchQuery( BinnedKDT *tree,
                         uint64_t location_begin,
                         uint64_t location_end,
                         uint64_t bins,
-                        string primitive) {
+                        int64_t primitive) {
 
     LocDict lResults = tree->binnedRangeQuery(time_begin, time_end, location_begin, location_end, bins, primitive);
     Document d = convertLocDictToDocument(lResults);
@@ -374,8 +379,9 @@ LocDict convertSegmentTreeResultToBinnedData(vector<Interval> &outputList, int64
         int64_t endingBin = getBinNumber(time_begin, time_end, bins, interval_time_end);
 
         if(startingBin < 0 || endingBin < 0){j++; continue;}
-        for(int64_t bin_it = startingBin+1; bin_it < endingBin && bin_it < (int64_t)bins; bin_it++) {
-            if(locDict[interval_loc][bin_it] > 0) continue;
+        for(int64_t bin_it = startingBin+1; 
+            bin_it < endingBin && bin_it < (int64_t)bins && locDict[interval_loc][bin_it] < 0.5;
+            bin_it++) {
             locDict[interval_loc][bin_it] = 1.0;
         }
         if(startingBin < (int64_t)bins && locDict[interval_loc][startingBin] < 0.5) locDict[interval_loc][startingBin] = (interval_time_start % bin_size)?0.5:1.0;
@@ -401,9 +407,9 @@ Document sgmntTreeSearchQuery(Segment_tree_2_type *Segment_tree_2,
 
     std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
     Segment_tree_2->window_query(a,std::back_inserter(OutputList1));
-    
     LocDict locDict = convertSegmentTreeResultToBinnedData(OutputList1, time_begin, time_end, bins, primitive);
     std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+
     cout << "SGT," << "ds_window";
     if(primitive != "") cout << "_cond";
     cout << "," << time_begin << "," << time_end << "," << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() <<
@@ -412,84 +418,14 @@ Document sgmntTreeSearchQuery(Segment_tree_2_type *Segment_tree_2,
     locDict.clear();
     if(DEBUG) cout << "loc dict cleared" << endl;
     return d;
-    // vector<Interval>::iterator j = OutputList1.begin();
-    // if(DEBUG) cout << "\nwindow_query with segment tree result size: " << OutputList1.size() << endl;;
-
-    // Document document;
-    // document.SetObject();
-    // Value a1(kArrayType);
-    // Document::AllocatorType& allocator = document.GetAllocator();
-
-    // while(j!=OutputList1.end()){
-    //     Point_pairs pp = getPointIntervalFromPureInterval((*j).first);
-
-    //     Value obj(kObjectType);
-    //     Value val(kObjectType);
-
-    //     string time_string = to_string(pp.first.x());
-    //     val.SetString(time_string.c_str(), static_cast<SizeType>(time_string.length()), allocator);
-    //     obj.AddMember("time", val, allocator);
-
-    //     string location_string = to_string(pp.first.y());
-    //     val.SetString(location_string.c_str(), static_cast<SizeType>(location_string.length()), allocator);
-    //     obj.AddMember("location", val, allocator);
-
-    //     string iid_string((*j).second);
-    //     val.SetString(iid_string.c_str(), static_cast<SizeType>(iid_string.length()), allocator);
-    //     obj.AddMember("interval_id", val, allocator);
-
-    //     a1.PushBack(obj, allocator);
-
-
-    //     Value obj1(kObjectType);
-    //     Value val1(kObjectType);
-
-    //     string time_string1 = to_string(pp.second.x());
-    //     val1.SetString(time_string1.c_str(), static_cast<SizeType>(time_string1.length()), allocator);
-    //     obj1.AddMember("time", val1, allocator);
-
-    //     string location_string1 = to_string(pp.second.y());
-    //     val1.SetString(location_string1.c_str(), static_cast<SizeType>(location_string1.length()), allocator);
-    //     obj1.AddMember("location", val1, allocator);
-
-    //     string iid_string1((*j).second);
-    //     val1.SetString(iid_string1.c_str(), static_cast<SizeType>(iid_string1.length()), allocator);
-    //     obj1.AddMember("interval_id", val1, allocator);
-
-    //     a1.PushBack(obj1, allocator);
-
-    //     j++;
-    // }
-
-    // document.AddMember("data", a1, allocator);
-    // Value obj2(kObjectType);
-    // Value val(kObjectType);
-
-    // string begin_string = to_string(time_begin);
-    // val.SetString(begin_string.c_str(), static_cast<SizeType>(begin_string.length()), allocator);
-    // obj2.AddMember("begin", val, allocator);
-
-    // string end_string = to_string(time_end);
-    // val.SetString(end_string.c_str(), static_cast<SizeType>(end_string.length()), allocator);
-    // obj2.AddMember("end", val, allocator);
-
-    // document.AddMember("metadata", obj2, allocator);
-/*
-    rapidjson::StringBuffer strbuf;
-    rapidjson::Writer<rapidjson::StringBuffer> writer(strbuf);
-    document.Accept(writer);
-
-    const char *jsonString = strbuf.GetString();
-    if(DEBUG) cout << jsonString << endl;
-*/
-    // return document;
 }
 
 Document processReceivedRequest(BinnedKDT *binnedKDT,
                                 Segment_tree_2_type *Segment_tree_2,
                                 Document *d,
                                 uint64_t minId, uint64_t maxId,
-                                uint64_t minLocation, uint64_t maxLocation) {
+                                uint64_t minLocation, uint64_t maxLocation,
+                                Primtive_mapping pm) {
     Document queryResults;
     if(!(*d).HasMember("db_store")) {
         if(DEBUG) cout << "please provide db_store for ds request" << endl;
@@ -502,11 +438,6 @@ Document processReceivedRequest(BinnedKDT *binnedKDT,
         return queryResults;
     }
     string qCommand((*d)["command"].GetString());
-
-    string GETDATAINRANGE("GetDataInRange");
-    string GETEVENTATTRIBUTE("GetEventAttribute");
-    string KDTREE("kd_tree");
-    string SGTREE("segment_tree");
 
     if(qCommand == GETDATAINRANGE) {
 
@@ -539,7 +470,7 @@ Document processReceivedRequest(BinnedKDT *binnedKDT,
 
         if(ds_request == KDTREE) {
             if(DEBUG) cout << "got KD Tree request" << endl;
-            return binnedKDTreeSearchQuery(binnedKDT, time_begin, time_end, location_begin, location_end, bins, primitive);
+            return binnedKDTreeSearchQuery(binnedKDT, time_begin, time_end, location_begin, location_end, bins, pm[primitive]);
         } else if(ds_request == SGTREE) {
             if(DEBUG) cout << "got Segment Tree request" << endl;
             return sgmntTreeSearchQuery(Segment_tree_2, time_begin, time_end, location_begin, location_end, bins, primitive);
@@ -567,8 +498,10 @@ Document processReceivedRequest(BinnedKDT *binnedKDT,
 
 void startServerListening(BinnedKDT *binnedKDT,
                         Segment_tree_2_type *Segment_tree_2,
+                        uint64_t tree_build_time,
                         uint64_t minId, uint64_t maxId,
-                        uint64_t minLocation, uint64_t maxLocation) {
+                        uint64_t minLocation, uint64_t maxLocation,
+                        Primtive_mapping pm) {
     int PORT = 8080;
     int server_fd, new_socket;
     struct sockaddr_in address;
@@ -605,7 +538,7 @@ void startServerListening(BinnedKDT *binnedKDT,
     }
 
     cout << "Server is now listening" << endl;
-    cout << "ds type,ds query type,ds query begin,ds query end,ds query time (micros)" << endl;
+    cout << "tree build time (micros),ds type,ds query type,ds query begin,ds query end,ds query time (micros)" << endl;
     ofstream myfile ("cgal_server_check");
     if (myfile.is_open())
     {
@@ -620,9 +553,10 @@ void startServerListening(BinnedKDT *binnedKDT,
                 perror("accept");
                 exit(EXIT_FAILURE);
             }
-
+        
+        cout << tree_build_time << ",";
         Document d = rcvOverTheSocket(new_socket);
-        Document queryResults = processReceivedRequest(binnedKDT, Segment_tree_2, &d, minId, maxId, minLocation, maxLocation);
+        Document queryResults = processReceivedRequest(binnedKDT, Segment_tree_2, &d, minId, maxId, minLocation, maxLocation, pm);
         if(DEBUG) cout << "received request processing done" << endl;
         StringBuffer qbuffer;
         Writer<StringBuffer> qwriter(qbuffer);
@@ -651,6 +585,9 @@ int main(int argc, char *argv[])
     urlparser.datasetId = "589ca754-ef75-426c-8d51-841cc61dc84a"; // dgemm
     urlparser.travelerApi = "intervals";//"primitives";
     if(argc>1) urlparser.datasetId = argv[1];
+    char *pds = getenv("PROFILED_DS");
+    string profiled_ds = pds == NULL ? string("summed_area_table") : string(pds);
+
 /*
     urlparser.urlParameters.Parse(R""""({
                                       "begin":"813481624",
@@ -668,16 +605,18 @@ int main(int argc, char *argv[])
     // Kdtree kdtree;
     Primtive_mapping primitiveMapping;
     string cPrimitive;
-    int totalPrimitives = 0;
-    int cPrimitiveNumber = -1;
+    int64_t totalPrimitives = 0;
+    int64_t cPrimitiveNumber = -1;
+    primitiveMapping[""] = -1;
 
     BinnedKDT binnedKDT;
+    Segment_tree_2_type Segment_tree_2;
 
     uint64_t minId = 1000000000;
     uint64_t maxId = 0;
     uint64_t minLocation = 1000000000;
     uint64_t maxLocation = 0;
-    vector<Point_d> nnpoints;
+    uint64_t tree_build_time = 0;
     for (auto& v : fetchedData.GetArray()) {
         Point_2 interval_enter((double)v.GetObject()["enter"]["Timestamp"].GetInt64(), stod(v.GetObject()["Location"].GetString()));
         Point_2 interval_end((double)v.GetObject()["leave"]["Timestamp"].GetInt64(), stod(v.GetObject()["Location"].GetString()));
@@ -688,8 +627,8 @@ int main(int argc, char *argv[])
         if(lb != primitiveMapping.end() && !(primitiveMapping.key_comp()(cPrimitive, lb->first))) {
             cPrimitiveNumber = lb->second;
         } else {
-            primitiveMapping.insert(lb, Primtive_mapping::value_type(cPrimitive, ++totalPrimitives));
             cPrimitiveNumber = totalPrimitives;
+            primitiveMapping.insert(lb, Primtive_mapping::value_type(cPrimitive, totalPrimitives++));
         }
 
         //points_2d.emplace_back(interval_enter)
@@ -701,47 +640,47 @@ int main(int argc, char *argv[])
         minId = min(minId, intervalId);
         maxId = max(maxId, intervalId);
 
-        // kdtree.insert(Point_d(interval_enter.x(), interval_enter.y(), intervalId));
-        // kdtree.insert(Point_d(interval_end.x(), interval_end.y(), intervalId));
-
-        nnpoints.push_back(Point_d(interval_enter.x(), interval_enter.y(), intervalId));
-        nnpoints.push_back(Point_d(interval_end.x(), interval_end.y(), intervalId));
-
-        binnedKDT.insertDataIntoTree(interval_enter.x(), interval_enter.y(), 
-                                    interval_end.x(), interval_end.y(), 
-                                    v.GetObject()["intervalId"].GetString(), cPrimitive);
-
-        InputList.emplace_back(Interval(
-                getPurIntervalFromPoint(interval_enter, interval_end), 
-                boost::make_tuple(v.GetObject()["intervalId"].GetString(), cPrimitive)
-        ));
+        if(profiled_ds == KDTREE) {
+            binnedKDT.insertDataIntoTree(interval_enter.x(), interval_enter.y(), 
+                                        interval_end.x(), interval_end.y(), 
+                                        v.GetObject()["intervalId"].GetString(), cPrimitiveNumber);
+        } else if(profiled_ds == SGTREE) {
+            InputList.emplace_back(Interval(
+                    getPurIntervalFromPoint(interval_enter, interval_end), 
+                    boost::make_tuple(v.GetObject()["intervalId"].GetString(), cPrimitive)
+            ));
+        }
         totalIntervals++;
         if(totalIntervals % 2500 == 0)
             cout << ".";
         if(totalIntervals % 100000 == 0)
             cout << " processed " << totalIntervals << " intervals" << endl;
-        //numberOfEvents--;
-        //if(numberOfEvents<=0) break;
     }
+    cout << endl;
 
-    std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
-    binnedKDT.tree.build(); // explicitely call build, so that the first query wount spend time in building
-    std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
-    std::cout << "KD Tree build time = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[microseconds]" << std::endl;
-
+    if(profiled_ds == KDTREE) {
+        std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+        binnedKDT.tree.build(); // explicitely call build, so that the first query wount spend time in building
+        std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+        tree_build_time = std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count();
+        std::cout << "KD Tree build time = " << tree_build_time << "[microseconds]" << std::endl;
+    }
     // begin = std::chrono::steady_clock::now();
     // kdtree.build();
     // end = std::chrono::steady_clock::now();
     // std::cout << "Old KD Tree build time = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[microseconds]" << std::endl;
 
-    begin = std::chrono::steady_clock::now();
-    Segment_tree_2_type Segment_tree_2(InputList.begin(),InputList.end());
-    end = std::chrono::steady_clock::now();
-    std::cout << "Segment Tree build time = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[microseconds]" << std::endl;
+    if(profiled_ds == SGTREE) {
+        std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+        Segment_tree_2.make_tree(InputList.begin(),InputList.end());
+        std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+        tree_build_time = std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count();
+        std::cout << "Segment Tree build time = " << tree_build_time << "[microseconds]" << std::endl;
+    }
     cout << "kd tree and segment tree build done" << endl << "Total interval count: " << totalIntervals <<  ", Primitive count: " << cPrimitiveNumber << endl;
     // testSearchQueries(&kdtree, &Segment_tree_2, minId, maxId, urlparser.datasetId);
     // point_with_info_testing();
 
-    startServerListening(&binnedKDT, &Segment_tree_2, minId, maxId, minLocation, maxLocation);
+    startServerListening(&binnedKDT, &Segment_tree_2, tree_build_time, minId, maxId, minLocation, maxLocation, primitiveMapping);
     return EXIT_SUCCESS;
 }

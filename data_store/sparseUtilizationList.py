@@ -1,5 +1,6 @@
 # Imports
 import copy
+import time
 
 import numpy as np
 import json
@@ -10,6 +11,7 @@ class SparseUtilizationList():
         self.locationDict = dict()
         self.cLocationDict = dict()
         self.isUpdateCounter = isUpdate
+        self.utilLocationEstiamteTimer = 0
 
     def getCLocation(self, loc):
         return self.cLocationDict[loc]
@@ -137,7 +139,12 @@ class SparseUtilizationList():
         location_counter = ffi.cast("long long*", cLocationStruct['counter'].ctypes.data)
         location_util = ffi.cast("double*", cLocationStruct['util'].ctypes.data)
 
+        self.utilLocationEstiamteTimer = 0
+        preTimer = round(time.time() * 1000000)
         lib.calcHistogram(histogram_counter, histogram_length, histogram_index, histogram_util, critical_points, critical_length, location_index, length-1, location_counter, location_util)
+        postTimer = round(time.time() * 1000000)
+        self.utilLocationEstiamteTimer = postTimer - preTimer
+
         histogram[0] = {'integral': 0, 'index': histogram_index[0], 'util': histogram_util[0], 'counter': histogram_counter[0]}
         prev = histogram[0]
         prettyHistogram = []

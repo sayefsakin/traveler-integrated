@@ -76,25 +76,26 @@ int point_with_info_testing()
 
 void BinnedKDT::insertDataIntoTree(double enter_time, double enter_loc,
                           double end_time, double end_loc,
-                          std::string interval_id, std::string primitive_name){
+                          std::string interval_id, int64_t primitive_number){
   int64_t interval_length = end_time - enter_time;
   tree.insert(
     boost::make_tuple(
-      Point_3(enter_time, enter_loc, interval_length), 
+      Point_3(enter_time, enter_loc, primitive_number), 
       interval_id, 
-      primitive_name,
+      interval_length,
       false
     )
   );
   tree.insert(
     boost::make_tuple(
-      Point_3(end_time, end_loc, interval_length),
+      Point_3(end_time, end_loc, primitive_number),
       interval_id,
-      primitive_name, 
+      interval_length, 
       true
     )
   );
   if(interval_length > max_interval_length) max_interval_length = interval_length + 1;
+  if(primitive_number > max_primitive_number) max_primitive_number = primitive_number;
 }
 
 LocDict BinnedKDT::binnedRangeQuery(int64_t time_begin, 
@@ -102,14 +103,16 @@ LocDict BinnedKDT::binnedRangeQuery(int64_t time_begin,
                             uint64_t location_begin, 
                             uint64_t location_end, 
                             uint64_t bins,
-                            std::string primitive) {
+                            int64_t primitive) {
   // cout << "hello from binned KDT search" << endl;
   LocDict locDict;
   uint64_t bin_size(getBinSize(time_begin, time_end, bins));
 
   vector<Point_and_string> result;
-  Point_3 p(time_begin, location_begin, 1);
-  Point_3 q(time_end, location_end, max_interval_length);
+  int64_t l_p_b = primitive < 0 ? 0 : primitive;
+  int64_t u_p_b = primitive < 0 ? max_primitive_number : primitive;
+  Point_3 p(time_begin, location_begin, l_p_b);
+  Point_3 q(time_end, location_end, u_p_b);
 
   // cout << "doing window query (" << p.x() << "," << p.y() << ") (" << q.x() << "," << q.y() << ")" << endl;
   // Searching an exact range
@@ -119,19 +122,16 @@ LocDict BinnedKDT::binnedRangeQuery(int64_t time_begin,
 
   std::chrono::steady_clock::time_point clock_begin = std::chrono::steady_clock::now();
   tree.search( back_inserter( result ), exact_range);
-  // cout << "KDT," << "ds_window," << time_begin << "," << time_end << "," << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() <<
-  // endl;
-  // cout << "kd tree points are with size: " << result.size() << endl;
+  std::chrono::steady_clock::time_point clock_end = std::chrono::steady_clock::now();
   vector<Point_and_string>::iterator it;
-
   for(it = result.begin(); it != result.end(); it++) {
     // cout << boost::get<0>(*it) << ", ";
-    string cPrimitive = boost::get<2>(*it);
-    if(primitive != "" && primitive != cPrimitive) continue;
+    // string cPrimitive = boost::get<2>(*it);
+    // if(primitive != "" && primitive != cPrimitive) continue;
     string intervalId = boost::get<1>(*it);
     int64_t interval_time_start = (boost::get<0>(*it)).x();
     uint64_t interval_loc = (boost::get<0>(*it)).y();
-    int64_t interval_length = (boost::get<0>(*it)).z();
+    int64_t interval_length = boost::get<2>(*it);
     if(boost::get<3>(*it)) interval_length *= -1;
     int64_t interval_time_end = interval_time_start + interval_length;
     if(interval_length < 0) swap(interval_time_start, interval_time_end);
@@ -172,18 +172,27 @@ LocDict BinnedKDT::binnedRangeQuery(int64_t time_begin,
   //     p = Point_3(start_time, c_loc, 1);
   //     q = Point_3(end_time, c_loc, bin_size - 1);
   //     exact_range = PS_Fuzzy_iso_box(p,q);
-  //     // boost::optional<Point_and_string> any_point = tree.search_any_point(exact_range);
-  //     result.clear();
-  //     tree.search( back_inserter( result ), exact_range);
-  //     // if(any_point)
-  //     if(result.size() > 0)
+  //     boost::optional<Point_and_string> any_point = tree.search_any_point(exact_range);
+
+  //     // result.clear();
+  //     // tree.search( back_inserter( result ), exact_range);
+  //     // if(result.size() > 0)
+  //     if(any_point) {
   //       locDict[c_loc][c_bin] = 0.5;
+  //       if(boost::get<3>(*any_point)) continue;
+  //       int64_t interval_time_start = (boost::get<0>(*any_point)).x();
+  //       // uint64_t interval_loc = (boost::get<0>(*any_point)).y();
+  //       int64_t interval_length = (boost::get<0>(*any_point)).z();
+  //       int64_t interval_time_end = interval_time_start + interval_length;
+  //       if(end_time < interval_time_end && c_bin + 1 < bins)
+  //         locDict[c_loc][++c_bin] = 0.5;
+  //     }
   //   }
   // }
+  
 
-  std::chrono::steady_clock::time_point clock_end = std::chrono::steady_clock::now();
   cout << "KDT," << "ds_window";
-  if(primitive != "") cout << "_cond";
+  if(primitive > -1) cout << "_cond";
   cout << "," << time_begin << "," << time_end << "," << std::chrono::duration_cast<std::chrono::microseconds>(clock_end - clock_begin).count() <<
     endl;
   // std::cout << "KD Tree window query time = " << std::chrono::duration_cast<std::chrono::microseconds>(clock_end - clock_begin).count() << "[ms]" << std::endl;
@@ -199,8 +208,8 @@ LocDict BinnedKDT::binnedRangeQuery(int64_t time_begin,
 string BinnedKDT::findNearestInterval(int64_t c_time, uint64_t c_location) {
   string ret_result("");
 
-  Point_3 p(c_time, c_location, 1);
-  Point_3 q(c_time+1, c_location, max_interval_length);
+  Point_3 p(c_time, c_location, 0);
+  Point_3 q(c_time+1, c_location, max_primitive_number);
 
   if(KDT_DEBUG) cout << "doing new event attribute query (" << p.x() << "," << p.y() << ") (" << q.x() << "," << q.y() << ")" << endl;
   uint64_t two = 1;
@@ -208,8 +217,8 @@ string BinnedKDT::findNearestInterval(int64_t c_time, uint64_t c_location) {
   vector<Point_and_string>::iterator it, left_it, right_it;
 
   while(1) {
-    Point_3 npd(p.x()-two, p.y(), 1);
-    Point_3 nqd(q.x(), q.y(), max_interval_length);
+    Point_3 npd(p.x()-two, p.y(), 0);
+    Point_3 nqd(q.x(), q.y(), max_primitive_number);
     PS_Fuzzy_iso_box exact_range(npd,nqd);
     tree.search( back_inserter( leftResult ), exact_range);
     if(KDT_DEBUG) cout << "kd tree points are with size: " << leftResult.size() <<  " " << two << endl;
@@ -238,8 +247,8 @@ string BinnedKDT::findNearestInterval(int64_t c_time, uint64_t c_location) {
 
     vector<Point_and_string> rightResult;
     while(1) {
-      Point_3 npd(p.x(), p.y(), 1);
-      Point_3 nqd(q.x()+two, q.y(), max_interval_length);
+      Point_3 npd(p.x(), p.y(), 0);
+      Point_3 nqd(q.x()+two, q.y(), max_primitive_number);
       PS_Fuzzy_iso_box exact_range(npd,nqd);
       tree.search( back_inserter( rightResult ), exact_range);
       if(KDT_DEBUG) cout << "kd tree points are with size: " << rightResult.size() <<  " " << two << endl;

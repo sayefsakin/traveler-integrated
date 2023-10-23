@@ -89,6 +89,7 @@ def get_utilization_histogram(datasetId: str,
     dqi = DataQueriesInterface()
 
     timerStart = round(time.time() * 1000000)
+    ds_command = "window"
 
     utilObject = db[datasetId]['sparseUtilizationList']['intervals']
     # if dsp.profiled_ds == dsp.KDT or dsp.profiled_ds == dsp.SGT:
@@ -97,12 +98,14 @@ def get_utilization_histogram(datasetId: str,
         if primitive not in db[datasetId]['sparseUtilizationList']['primitives']:
             raise HTTPException(status_code=404, detail='No utilization data for primitive: %s' % primitive)
         utilObject = db[datasetId]['sparseUtilizationList']['primitives'][primitive]
+        ds_command = ds_command + "_cond"
 
     fetchTimer = round(time.time() * 1000000)
 
     # kdt_tester = dqi.GetDataInRange(bins, begin, end, locations, primitive, "kd_tree")
     # sgt_tester = dqi.GetDataInRange(bins, begin, end, locations, primitive, "segment_tree")
     
+    calcHistorgramTimer = 0
     if locations:
         if dsp.profiled_ds == dsp.KDT or dsp.profiled_ds == dsp.SGT:
             ret['locations'] = dqi.GetDataInRange(bins, begin, end, locations, primitive, dsp.profiled_ds)
@@ -110,13 +113,14 @@ def get_utilization_histogram(datasetId: str,
             ret['locations'] = {}
             for location in locations:
                 ret['locations'][location] = utilObject.calcUtilizationForLocation(bins, begin, end, location)
+                calcHistorgramTimer = calcHistorgramTimer + utilObject.utilLocationEstiamteTimer
     else:
         ret['data'] = utilObject.calcUtilizationHistogram(bins, begin, end)
 
     postProcessTimer = round(time.time() * 1000000)
 
     # datasetId, begin, end, bins, fetch time, post process time
-    print(datasetId, str(begin), str(end), str(bins), str(fetchTimer - timerStart), str(postProcessTimer - fetchTimer), "window", sep=",")
+    print(datasetId, str(begin), str(end), str(bins), str(fetchTimer - timerStart + calcHistorgramTimer), str(postProcessTimer - fetchTimer), ds_command, sep=",")
     # if i == 0:
     #     print('SAT ', end='')
     # elif i == 1:
