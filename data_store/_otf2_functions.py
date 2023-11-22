@@ -434,7 +434,7 @@ async def connectIntervals(self, datasetId, log=logToConsole):
 async def buildSparseUtilizationLists(self, datasetId, log=logToConsole):
     # create allSuls obj
     priorBuildTime = round(time.time() * 1000)
-    allSuls = {'intervals': SparseUtilizationList(), 'metrics': dict(), 'primitives': dict(), 'intervalHistograms': dict()}
+    allSuls = {'intervals': SparseUtilizationList(), 'metrics': dict(), 'primitives': dict(), 'intervalHistograms': dict(), 'attribute': SparseUtilizationList()}
     intervalHistograms = dict()
     preMetricValue = dict()
     allLocations = set()
@@ -477,6 +477,11 @@ async def buildSparseUtilizationLists(self, datasetId, log=logToConsole):
         allSuls['primitives'][primitive_name].setIntervalAtLocation({'index': int(intervalObj['enter']['Timestamp']), 'counter': 1, 'util': 0, 'primitive': primitive_name}, loc)
         allSuls['primitives'][primitive_name].setIntervalAtLocation({'index': int(intervalObj['leave']['Timestamp']), 'counter': -1, 'util': 0, 'primitive': primitive_name}, loc)
 
+        allSuls['attribute'].setIntervalAtLocation({'index': int(intervalObj['enter']['Timestamp']), 'counter': 1*int(intervalObj['intervalId']), 'util': 0},
+        loc)
+        allSuls['attribute'].setIntervalAtLocation({'index': int(intervalObj['leave']['Timestamp']), 'counter': (-1)*int(intervalObj['intervalId']),
+                                                    'util': 0}, loc)
+
         # Create / update SparseUtilizationLists for any metrics
         updateSULForInterval(intervalObj['enter'], loc)
         updateSULForInterval(intervalObj['leave'], loc)
@@ -506,7 +511,7 @@ async def buildSparseUtilizationLists(self, datasetId, log=logToConsole):
 
     # Second pass to finish each SparseUtilizationList
     await log('Finalizing indexes')
-    flatSulList = [allSuls['intervals']] + list(allSuls['primitives'].values()) + list(allSuls['metrics'].values())
+    flatSulList = [allSuls['intervals']] + list(allSuls['primitives'].values()) + list(allSuls['metrics'].values()) + [allSuls['attribute']]
     for sul in flatSulList:
         sul.finalize(allLocations)
         await log('.', end='')
