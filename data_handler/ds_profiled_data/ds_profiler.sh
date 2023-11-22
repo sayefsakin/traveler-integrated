@@ -10,16 +10,19 @@ SAT="summed_area_table"
 
 Q_WINDOW='window'
 Q_ATTRIBUTE='attribute'
+Q_CHILDREN='children'
+Q_CONDW='cond'
 
 DGEM_ID="589ca754-ef75-426c-8d51-841cc61dc84a"
 KMEANS_ID="8b3289c9-a740-4091-a56d-e4d55af526b5"
 LULESH_ID="772c7330-d4eb-485b-866a-3b315063f9af"
+KMEANS_LARGE_ID="c3d5e8fe-32df-4f4f-8cbb-4ba6fabd7d3d"
 #DATASET_ID="DATASET_ID="$DGEM_ID
 
-export DATASET_ID=$DGEM_ID
-export TOTAL_SAMPLE=20
-export PROFILED_DS=$KDT
-export QUERY_TYPE=$Q_WINDOW
+export DATASET_ID=$KMEANS_LARGE_ID
+export TOTAL_SAMPLE=30
+export PROFILED_DS=$SAT
+export QUERY_TYPE=$Q_ATTRIBUTE
 
 serve_watch=$profile_directory"/"$PROFILED_DS"_"$QUERY_TYPE"_serve_check"
 echo "Writing Traveler serve output to file: "$serve_watch
@@ -42,6 +45,9 @@ traveler(){
 
 cgal(){
   # run the cgal server
+  if [[ $PROFILED_DS == $SAT ]]; then
+    return 0;
+  fi
   cgal_watch=$profile_directory"/"$PROFILED_DS"_"$QUERY_TYPE"_cgal_check"
   echo "Writing CGAL server output to file: "$cgal_watch
   cd $traveler_base_directory"/data_handler/cgal_libs/cgal_server"
@@ -72,6 +78,14 @@ profile_attribute_query(){
   cd $profile_directory
   export QUERY_TYPE=$Q_ATTRIBUTE
   python3 headless_test.py > $selenium_watch
+}
+
+profile_cond_query(){
+  # selenium_watch=$profile_directory"/"$PROFILED_DS"_"$QUERY_TYPE"_selenium_check"
+  echo "Running the profiler. Please make sure the XMing is running"
+  cd $profile_directory
+  # export QUERY_TYPE=$Q_ATTRIBUTE
+  python3 headless_test.py &
 }
 
 prompt_help(){
@@ -128,33 +142,34 @@ killing_all_processes(){
 }
 
 prepare_and_merge_files(){
+  cd $profile_directory;
+#  rm -rf $DATASET_ID;
+
   # dont merge selenium watch, problem with the get attribute query
   sed -i '/Serving on localhost:8000/d' $serve_watch;
-  linenumber=$(grep -n "Server is now listening" "$cgal_watch" | head -n 1 | cut -d: -f1);
-  sed -i "1,${linenumber}d" "$cgal_watch";
-  if [[ $IS_KILLED == 1 ]]; then
-    sed -i '$d' $cgal_watch;
-  fi
+  
   total_line=$(wc -l < $serve_watch);
   last_line=$(expr $total_line - $TOTAL_SAMPLE);
   sed -i "2,${last_line}d" "$serve_watch";
 
-  total_line=$(wc -l < $cgal_watch);
-  last_line=$(expr $total_line - $TOTAL_SAMPLE);
-  sed -i "2,${last_line}d" "$cgal_watch";
+  mkdir -p $DATASET_ID;
+  cp $serve_watch $DATASET_ID;
+
+  if [[ $PROFILED_DS !=  $SAT ]]; then
+    linenumber=$(grep -n "Server is now listening" "$cgal_watch" | head -n 1 | cut -d: -f1);
+    sed -i "1,${linenumber}d" "$cgal_watch";
+    if [[ $IS_KILLED == 1 ]]; then
+      sed -i '$d' $cgal_watch;
+    fi
+    total_line=$(wc -l < $cgal_watch);
+    last_line=$(expr $total_line - $TOTAL_SAMPLE);
+    sed -i "2,${last_line}d" "$cgal_watch";
+    cp $cgal_watch $DATASET_ID;
+  fi
 
   if [[ $QUERY_TYPE ==  $Q_WINDOW ]]; then
     sed -i '$d' $selenium_watch;
-  fi
-
-  cd $profile_directory;
-#  rm -rf $DATASET_ID;
-  mkdir -p $DATASET_ID;
-  mv $serve_watch $DATASET_ID;
-  mv $cgal_watch $DATASET_ID;
-
-  if [[ $QUERY_TYPE ==  $Q_WINDOW ]]; then
-    mv $selenium_watch $DATASET_ID;
+    cp $selenium_watch $DATASET_ID;
   fi
 
   cd $DATASET_ID;
@@ -187,6 +202,8 @@ while IFS= read -r line; do
     profile_window_query;
   elif [[ $line ==  "attribute" ]]; then
     profile_attribute_query;
+  elif [[ $line ==  "cond" ]]; then
+    profile_cond_query;
   elif [[ $line ==  "kill" ]]; then
     killing_all_processes;
   elif [[ $line ==  "prepare" ]]; then

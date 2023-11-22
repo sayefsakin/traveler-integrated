@@ -16,6 +16,7 @@ OBKDT = optimized_binned_kdt
 DGEM_ID = 589ca754-ef75-426c-8d51-841cc61dc84a
 KMEANS_ID = 8b3289c9-a740-4091-a56d-e4d55af526b5
 LULESH_ID = 772c7330-d4eb-485b-866a-3b315063f9af
+KMENAS_LARGE_ID = c3d5e8fe-32df-4f4f-8cbb-4ba6fabd7d3d
 DATASET_ID ?= $(KMEANS_ID)
 
 all: $(CGAL_SERVER).cpp

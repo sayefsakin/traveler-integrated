@@ -52,7 +52,6 @@ def get_intervals(datasetId: str, \
             fetchTimer = round(time.time() * 1000000)
             for i in db[datasetId]['intervalIndex'].iterOverlap(begin, end):
                 intervalObj = db[datasetId]['intervals'][i.data]
-                fetchTimer = round(time.time() * 1000000)
                 # Filter by location
                 if location is not None and intervalObj['Location'] != location:
                     continue

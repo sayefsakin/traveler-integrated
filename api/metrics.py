@@ -120,16 +120,8 @@ def get_utilization_histogram(datasetId: str,
     postProcessTimer = round(time.time() * 1000000)
 
     # datasetId, begin, end, bins, fetch time, post process time
-    print(datasetId, str(begin), str(end), str(bins), str(fetchTimer - timerStart + calcHistorgramTimer), str(postProcessTimer - fetchTimer), ds_command, sep=",")
-    # if i == 0:
-    #     print('SAT ', end='')
-    # elif i == 1:
-    #     print('KDT ', end='')
-    # elif i == 2:
-    #     print('SGT ', end='')
-    # print('fetch time: ', '{:6d}'.format(fetchTimer - timerStart), end=' ms ')
-    # print('post processing time: ', '{:6d}'.format(postProcessTimer - fetchTimer), ' ms')
-    # print()
+    if locations:
+        print(datasetId, str(begin), str(end), str(bins), str(fetchTimer - timerStart + calcHistorgramTimer), str(postProcessTimer - fetchTimer), ds_command, sep=",")
 
     ret['metadata'] = {'begin': begin, 'end': end, 'bins': bins}
     return ret

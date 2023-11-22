@@ -1,3 +1,4 @@
+import math
 import os
 import random
 import sys
@@ -12,6 +13,8 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.common.exceptions import WebDriverException
+from selenium.common.exceptions import NoSuchElementException
+from selenium.common.exceptions import StaleElementReferenceException
 
 import requests
 
@@ -100,8 +103,42 @@ class UtilizationLoadingVisible():
                     return each_element
         return False
 
+class SelectionEelmentNotStale():
+    def __init__(self):
+        pass
+
+    def __call__(self, web_driver):
+        try:
+            h5_element = driver.find_element(By.XPATH, "//h5")
+            if(h5_element):
+                return h5_element.text
+        except StaleElementReferenceException:
+            return False
+        return False
+
+def checkClickValidity(driver, timeout, p_freq, tx, ty):
+    selection_text = WebDriverWait(driver, timeout=timeout, poll_frequency=p_freq).until(SelectionEelmentNotStale())
+    if selection_text == "Interval Selection:":
+        return True
+    return False
+
+def getNextCircularPoint(tx, ty):
+    if tx == 0 and ty == 0:
+        return 1, 0
+    dx = tx
+    dy = ty
+    angle = math.degrees(math.atan2(float(dy), float(dx)))
+    if angle < 45 and angle > -45:
+        dy = dy - 1
+    elif angle < - 134 or angle > 135:
+        dy = dy + 1
+    elif angle < 136 and angle > 44:
+        dx = dx + 1
+    else:
+        dx = dx - 1
+    return dx, dy
+
 def conductRandomClicking(driver, timeout, p_freq, TOTAL_SAMPLE):
-    domain_window = 30
     # zoom out in the gantt y axis to reveal all locations
     ganttYScroller = driver.find_element(By.CLASS_NAME, "yAxisScrollCapturer")
     wheel_element(ganttYScroller, -150)
@@ -111,13 +148,34 @@ def conductRandomClicking(driver, timeout, p_freq, TOTAL_SAMPLE):
     action = ActionChains(driver)
     random.seed(10)
     click_offset = 5
-    for i in range(TOTAL_SAMPLE):
-        tx = random.randint(0, int(ganttEventCapturerElement.rect['y'])-click_offset)
-        ty = random.randint(-int(ganttEventCapturerElement.rect['x'])+click_offset, int(ganttEventCapturerElement.rect['x'])-click_offset)
-        action.move_to_element_with_offset(ganttEventCapturerElement, tx, ty).click().perform()
-        startTimer = round(time.time() * 1000)
-        WebDriverWait(driver, timeout=timeout, poll_frequency=p_freq).until(GanttLoadingVisible())
-        endTimer = round(time.time() * 1000)
+    x_bounds = [0, int(ganttEventCapturerElement.rect['y'])-click_offset]
+    y_bounds = [-int(ganttEventCapturerElement.rect['x'])+click_offset, int(ganttEventCapturerElement.rect['x'])-click_offset]
+    i = 0
+    while(True):
+        if i >= TOTAL_SAMPLE:
+            break
+        tx = random.randint(x_bounds[0], x_bounds[1])
+        ty = random.randint(y_bounds[0], y_bounds[1])
+        ntx = tx
+        nty = ty
+        while(True):
+            action.move_to_element_with_offset(ganttEventCapturerElement, ntx, nty).click().perform()
+            WebDriverWait(driver, timeout=timeout, poll_frequency=p_freq).until(GanttLoadingVisible())
+            #i = i + 1
+            #break
+            if(checkClickValidity(driver, timeout, p_freq, ntx, nty)):
+                i = i + 1
+                break
+            else:
+                # print("not found", ntx, nty)
+                for ctr in range(8):
+                    rtx, rty = getNextCircularPoint(ntx - tx, nty - ty)
+                    ntx = tx + rtx
+                    nty = ty + rty
+                    if x_bounds[0] <= ntx <= x_bounds[1] and y_bounds[0] <= nty <= y_bounds[1]:
+                        break
+                break
+                    
 
     print("successfully run the profiling on", driver.title)
 
@@ -216,4 +274,5 @@ if __name__ == '__main__':
             conductBrushing(driver, timeout, p_freq, TOTAL_SAMPLE)
         elif QUERY_TYPE == 'attribute':
             conductRandomClicking(driver, timeout, p_freq, TOTAL_SAMPLE)
-
+        elif QUERY_TYPE == 'cond':
+            time.sleep(60)

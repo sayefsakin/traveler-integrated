@@ -644,6 +644,8 @@ int main(int argc, char *argv[])
                                       })"""");
 */
 
+    if(profiled_ds == string("summed_area_table")){ cout << "Summed area table only." << endl; return 0;}
+
     Document fetchedData = urlparser.fetchContentFromURL();
     if(fetchedData.IsNull() || kArrayType != fetchedData.GetType()) { if(DEBUG) cout << "nothing is in the content" << endl; return 0;}
 
