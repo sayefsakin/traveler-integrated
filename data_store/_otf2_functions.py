@@ -36,7 +36,7 @@ addAttrParser = re.compile(r'\(?"([^"]*)" <\d+>; [^;]*; ([^\)]*)')
 metricLineParser = re.compile(r'^METRIC\s+(\d+)\s+(\d+)\s+Metric:[\s\d,]+Values?: \("([^"]*)" <\d+>; [^;]*; ([^\)]*)')
 memInfoMetricParser = re.compile(r'^METRIC\s+(\d+)\s+(\d+)\s+Metric:[\s\d,]+Values?: \("meminfo:([^"]*)" <\d+>; [^;]*; ([^\)]*)')
 
-synthesized_events = True
+synthesized_events = False
 synthesize_vertical_events = 30
 synthesize_horizontal_events = 3
 
@@ -153,8 +153,8 @@ async def processRawTrace(self, datasetId, file, log):
                 # Add to primitive / guid counts
                 newR += counts[0]
                 seenR += counts[1]
-                # if numEvents > 502174: # 8000000:
-                #     break
+                if numEvents > 1000000:# 502174: # 8000000:
+                    break
             currentEvent = {'metrics': {}}
             currentEvent['Event'] = eventLineMatch.group(1)
             currentEvent['Location'] = eventLineMatch.group(2)

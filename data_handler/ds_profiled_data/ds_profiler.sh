@@ -13,16 +13,23 @@ Q_ATTRIBUTE='attribute'
 Q_CHILDREN='children'
 Q_CONDW='cond'
 
+#for window and cond query
 DGEM_ID="589ca754-ef75-426c-8d51-841cc61dc84a"
 KMEANS_ID="8b3289c9-a740-4091-a56d-e4d55af526b5"
 LULESH_ID="772c7330-d4eb-485b-866a-3b315063f9af"
 KMEANS_LARGE_ID="c3d5e8fe-32df-4f4f-8cbb-4ba6fabd7d3d"
+
+#for attribute and child query
+DGEM_ID_N="a9bd20ca-c4f2-4b54-8c49-b968ae7e78be"
+KMEANS_ID_N="00932997-9971-49b9-8154-42ff1d9253a7"
+LULESH_ID_N="0deeca3b-8910-47ca-a3a1-f7bfefe64494"
+KMEANS_LARGE_ID_N="908fc737-2cc7-41d8-8281-7dd9e83155ff"
 #DATASET_ID="DATASET_ID="$DGEM_ID
 
-export DATASET_ID=$KMEANS_LARGE_ID
-export TOTAL_SAMPLE=30
-export PROFILED_DS=$SAT
-export QUERY_TYPE=$Q_ATTRIBUTE
+export DATASET_ID=$DGEM_ID
+export TOTAL_SAMPLE=10
+export PROFILED_DS=$KDT
+export QUERY_TYPE=$Q_WINDOW
 
 serve_watch=$profile_directory"/"$PROFILED_DS"_"$QUERY_TYPE"_serve_check"
 echo "Writing Traveler serve output to file: "$serve_watch
@@ -69,7 +76,7 @@ profile_window_query(){
   echo "Running the profiler. Please make sure the XMing is running"
   cd $profile_directory
   export QUERY_TYPE=$Q_WINDOW
-  python3 headless_test.py > $selenium_watch
+  python3 headless_test.py > $selenium_watch &
 }
 
 profile_attribute_query(){

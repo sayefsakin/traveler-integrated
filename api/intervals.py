@@ -49,13 +49,45 @@ def get_intervals(datasetId: str, \
             postProcessTimer = round(time.time() * 1000000)
         else:
             fetchTimer = round(time.time() * 1000000)
-            utilObject = db[datasetId]['sparseUtilizationList']['attribute']
-            utilList = utilObject.calcUtilizationForLocation(1, begin, end, location)
-            eid = int(utilList[0])
-            if eid > 0:
-                intervalIdCheck = str(eid)
-                intervalObj = db[datasetId]['intervals'][intervalIdCheck]
+            # if location is not None:
+            #     utilObject = db[datasetId]['sparseUtilizationList']['attribute']
+            #     utilList = utilObject.calcUtilizationForLocation(1, begin, end, location)
+            #     eid = int(utilList[0])
+            #     if eid > 0:
+            #         intervalIdCheck = str(eid)
+            #         intervalObj = db[datasetId]['intervals'][intervalIdCheck]
+            #         yield json.dumps(intervalObj)
+            # else:
+            firstItem = True
+            for i in db[datasetId]['intervalIndex'].iterOverlap(begin, end):
+                intervalObj = db[datasetId]['intervals'][i.data]
+                # Filter by location
+                if location is not None and intervalObj['Location'] != location:
+                    continue
+
+                # Filter by primitive
+                if primitive is not None and intervalObj['Primitive'] != primitive:
+                    continue
+
+                # Filter by guid
+                if guid is not None and intervalObj['GUID'] != guid:
+                    continue
+
+                # Filter by interval duration
+                if minDuration is not None or maxDuration is not None:
+                    intervalLength = (intervalObj['leave']['Timestamp'] - intervalObj['enter']['Timestamp'])
+                    if minDuration is not None and intervalLength < minDuration:
+                        continue
+                    if maxDuration is not None and intervalLength > maxDuration:
+                        continue
+
+                # This interval has passed all filters; yield it
+                if not firstItem:
+                    yield ','
                 yield json.dumps(intervalObj)
+                firstItem = False
+                intervalIdCheck = i.data
+
             postProcessTimer = round(time.time() * 1000000)
         yield ']'
         if location is not None:
