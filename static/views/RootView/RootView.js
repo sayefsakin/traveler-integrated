@@ -9,8 +9,10 @@ import LineChartView from '../LineChartView/LineChartView.js';
 import IntervalHistogramView from '../IntervalHistogramView/IntervalHistogramView.js';
 import AggregatedGanttView from "../AggregatedGanttView/AggregatedGanttView.js";
 import DependencyTreeView from "../DependencyTreeView/DependencyTreeView.js";
+import MosaicGanttView from '../MosaicGanttView/MosaicGanttView.js';
 
 const viewClassLookup = {
+  MosaicGanttView,
   SelectionInfoView,
   TreeView,
   CodeView,

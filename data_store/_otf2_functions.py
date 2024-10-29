@@ -76,8 +76,8 @@ async def processOtf2(self, datasetId, file, log=logToConsole):
     await self.connectIntervals(datasetId, log)
     gc.collect()
     await self.buildSparseUtilizationLists(datasetId, log)
-    # gc.collect()
-    # await self.buildDependencyTree(datasetId, log)
+    gc.collect()
+    await self.buildDependencyTree(datasetId, log)
     gc.collect()
     self.finishLoadingSourceFile(datasetId, file.name)
 

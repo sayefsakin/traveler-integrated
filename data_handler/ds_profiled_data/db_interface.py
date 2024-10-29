@@ -24,9 +24,11 @@ class DBInterface:
         self.con.close()
 
     def db_read(self, datasetId):
-        self.db_location = "/tmp/traveler-integrated/" + datasetId + "/intervals.db"
+        # self.db_location = "/tmp/traveler-integrated/" + datasetId + "/intervals.db"
+        self.db_location = "./intervals.db"
         con = duckdb.connect(self.db_location)
-        results = con.execute("SELECT enter.Timestamp, leave.Timestamp FROM intervals.json LIMIT 10").fetchall()
+        results = con.execute("SHOW TABLES").fetchall()
+        # results = con.execute("SELECT enter.Timestamp, leave.Timestamp FROM intervals.json LIMIT 10").fetchall()
         print(results)
         con.close()
 
@@ -108,7 +110,7 @@ if __name__ == '__main__':
     dbi = DBInterface()
     # dbi.db_insert("8b3289c9-a740-4091-a56d-e4d55af526b5")
     #db_insert()
-    # dbi.db_read("8b3289c9-a740-4091-a56d-e4d55af526b5")
+    dbi.db_read("8b3289c9-a740-4091-a56d-e4d55af526b5")
     # dbi.db_agg_test("8b3289c9-a740-4091-a56d-e4d55af526b5", 10, 547966146, 1827283017, ["1"])
-    dbi.db_cli_test("8b3289c9-a740-4091-a56d-e4d55af526b5")
+    # dbi.db_cli_test("8b3289c9-a740-4091-a56d-e4d55af526b5")
     print("input from json done.")

@@ -100,6 +100,7 @@ class LinkedState extends uki.utils.IntrospectableMixin(uki.Model) {
   async getAvailableViews () {
     const views = {
       SelectionInfoView: { status: VIEW_STATUS.AVAILABLE },
+      MosaicGanttView: { status: VIEW_STATUS.AVAILABLE },
       DependencyTreeView: { status: VIEW_STATUS.AVAILABLE },
       TreeView: { status: VIEW_STATUS.UNAVAILABLE },
       CodeView: { status: VIEW_STATUS.UNAVAILABLE, variants: [] }
@@ -136,6 +137,14 @@ class LinkedState extends uki.utils.IntrospectableMixin(uki.Model) {
       layout.content.push({
         type: 'component',
         componentName: 'SelectionInfoView',
+        componentState: { datasetId: this.info.datasetId }
+      });
+    }
+
+    if (availableViews.MosaicGanttView?.status !== VIEW_STATUS.UNAVAILABLE) {
+      layout.content.push({
+        type: 'component',
+        componentName: 'MosaicGanttView',
         componentState: { datasetId: this.info.datasetId }
       });
     }
@@ -308,6 +317,7 @@ class LinkedState extends uki.utils.IntrospectableMixin(uki.Model) {
 
     return [
       this.createViewMenuEntry('Selection Info', 'SelectionInfoView', null, availableViews, openViews),
+      this.createViewMenuEntry('Mosaic Gantt View', 'MosaicGanttView', null, availableViews, openViews),
       // this.createViewMenuEntry('Dependency Tree', 'DependencyTreeView', null, availableViews, openViews),
       // this.createViewMenuEntry('Tree', 'TreeView', null, availableViews, openViews),
       // Submenu for code views
