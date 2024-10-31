@@ -90,6 +90,21 @@ class GanttLoadingVisible():
                     return each_element
         return False
 
+
+class MozSketchLoadingVisible():
+    def __init__(self):
+        pass
+
+    def __call__(self, web_driver):
+        loading_elem = web_driver.find_elements(By.XPATH, "//*[@class='selectionHeader']")
+        for each_element in loading_elem:
+            following_sibling = each_element.find_element(By.XPATH, "preceding-sibling::*")
+            if following_sibling.get_attribute("class") == 'GLView MosaicGanttView':
+                if each_element.is_displayed() is False:
+                    return each_element
+        return False
+
+
 class UtilizationLoadingVisible():
     def __init__(self):
         pass
@@ -245,12 +260,12 @@ if __name__ == '__main__':
     #options.add_argument("--incognito")
 
     DGEM_ID = '589ca754-ef75-426c-8d51-841cc61dc84a'
-    KMEANS_ID = '8b3289c9-a740-4091-a56d-e4d55af526b5'
+    KMEANS_ID = 'faf17535-2f66-4621-995f-49c7dbd84e8b'#'8b3289c9-a740-4091-a56d-e4d55af526b5'
     LULESH_ID = '772c7330-d4eb-485b-866a-3b315063f9af'
 
     base_params = {
-        'dataset': os.getenv('DATASET_ID', DGEM_ID),
-        'baseUrl': "http://localhost:8000",
+        'dataset': os.getenv('DATASET_ID', KMEANS_ID),
+        'baseUrl': "http://lonepeak2:8000",
     }
     TOTAL_SAMPLE = int(os.getenv('TOTAL_SAMPLE', 20))
     QUERY_TYPE = os.getenv('QUERY_TYPE', 'window')
@@ -258,13 +273,24 @@ if __name__ == '__main__':
     timeout = 500  # in seconds
     p_freq = 0.001  # in seconds
 
-    with webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=options) as driver:
+    # Define paths
+    user_home_dir = os.path.expanduser("/uufs/chpc.utah.edu/common/home/u1447409/selenium_testing")
+    chrome_binary_path = os.path.join(user_home_dir, "chrome-linux64", "chrome")
+    chromedriver_path = os.path.join(user_home_dir, "chromedriver-linux64", "chromedriver")
+
+    # Set binary location and service
+    options.binary_location = chrome_binary_path
+    service = ChromeService(chromedriver_path)
+
+    with webdriver.Chrome(service=service, options=options) as driver:
+    #with webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=options) as driver:
         url = generateInterfaceUrl(base_params)
         driver.get(url)
         startTimer = round(time.time() * 1000000)
-        element = WebDriverWait(driver, timeout=timeout, poll_frequency=p_freq).until(GanttLoadingVisible())
+        #element = WebDriverWait(driver, timeout=timeout, poll_frequency=p_freq).until(GanttLoadingVisible())
+        element = WebDriverWait(driver, timeout=timeout, poll_frequency=p_freq).until(MozSketchLoadingVisible())
         endTimer = round(time.time() * 1000000)
-        # print('Initial Gantt Loading Time: ', '{:9d}'.format(endTimer - startTimer), 'micros ')
+        print('Initial Gantt Loading Time: ', '{:9d}'.format(endTimer - startTimer), 'micros ')
 
         # canvas_elem = driver.find_elements(By.XPATH, "//canvas")
         # for parent_element in canvas_elem:
