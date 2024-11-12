@@ -2,6 +2,7 @@
 import LinkedMixin from '../common/LinkedMixin.js';
 import * as vg from "../../node_modules/@uwdata/vgplot/dist/vgplot.js";
 import * as mc from '../../node_modules/@uwdata/mosaic-core/dist/mosaic-core.js';
+// import * as duckdb from '@duckdb/duckdb-wasm';
 
 import { Query, and, count, isBetween } from "../../node_modules/@uwdata/mosaic-sql/dist/mosaic-sql.js";
 
@@ -68,8 +69,8 @@ class MosaicGanttView extends LinkedMixin(uki.ui.GLView) {
 
     
     // this.drawGanttSketch();
-    // this.drawMosaicGraph();
-    this.drawPlotlyGraph();
+    this.drawMosaicGraph();
+    // this.drawPlotlyGraph();
 
     
     
@@ -229,7 +230,28 @@ class MosaicGanttView extends LinkedMixin(uki.ui.GLView) {
     this.d3el.select('.selectionHeader').node().appendChild(gantt_plot);
   }
 
-  drawPlotlyGraph() {
+  async drawPlotlyGraph() {
+
+    // // Initialize DuckDB-Wasm
+    // const worker = await duckdb.createWorker();
+    // const db = new duckdb.DuckDB(worker);
+
+    // // Connect to an in-memory database
+    // await db.connect(":memory:");
+
+    // // Create a table
+    // await db.query("CREATE TABLE IF NOT EXISTS people (id INTEGER, name VARCHAR)");
+
+    // // Insert some data
+    // await db.query("INSERT INTO people VALUES (1, 'Alice'), (2, 'Bob')");
+
+    // // Query the data
+    // const result = await db.query("SELECT * FROM people");
+    // console.log(result.toArray());
+
+    // // Close the connection
+    // await db.disconnect();
+
 
     var data = [{
       type: 'bar',

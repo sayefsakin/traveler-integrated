@@ -249,7 +249,7 @@ def conductBrushing(driver, timeout, p_freq, TOTAL_SAMPLE):
 if __name__ == '__main__':
     url = "https://stackoverflow.com"
     options = webdriver.ChromeOptions()
-    # options.add_argument('--headless')
+    #options.add_argument('--headless')
     options.add_argument("--start-maximized") # open Browser in maximized mode
     #options.add_argument("disable-infobars") # disabling infobars
     # options.add_argument("--disable-extensions") # disabling extensions
@@ -259,13 +259,13 @@ if __name__ == '__main__':
     # options.add_argument("--remote-debugging-port=9222")
     #options.add_argument("--incognito")
 
-    DGEM_ID = '589ca754-ef75-426c-8d51-841cc61dc84a'
-    KMEANS_ID = 'faf17535-2f66-4621-995f-49c7dbd84e8b'#'8b3289c9-a740-4091-a56d-e4d55af526b5'
+    DGEM_ID = 'a9bd20ca-c4f2-4b54-8c49-b968ae7e78be'#'589ca754-ef75-426c-8d51-841cc61dc84a'
+    KMEANS_ID = '8b3289c9-a740-4091-a56d-e4d55af526b5'#'faf17535-2f66-4621-995f-49c7dbd84e8b'
     LULESH_ID = '772c7330-d4eb-485b-866a-3b315063f9af'
 
     base_params = {
-        'dataset': os.getenv('DATASET_ID', KMEANS_ID),
-        'baseUrl': "http://lonepeak2:8000",
+        'dataset': os.getenv('DATASET_ID', DGEM_ID),
+        'baseUrl': "http://localhost:8000",
     }
     TOTAL_SAMPLE = int(os.getenv('TOTAL_SAMPLE', 20))
     QUERY_TYPE = os.getenv('QUERY_TYPE', 'window')
@@ -274,7 +274,7 @@ if __name__ == '__main__':
     p_freq = 0.001  # in seconds
 
     # Define paths
-    user_home_dir = os.path.expanduser("/uufs/chpc.utah.edu/common/home/u1447409/selenium_testing")
+    user_home_dir = os.path.expanduser("/home/sayefsakin/selenium_testing")
     chrome_binary_path = os.path.join(user_home_dir, "chrome-linux64", "chrome")
     chromedriver_path = os.path.join(user_home_dir, "chromedriver-linux64", "chromedriver")
 
@@ -287,8 +287,8 @@ if __name__ == '__main__':
         url = generateInterfaceUrl(base_params)
         driver.get(url)
         startTimer = round(time.time() * 1000000)
-        #element = WebDriverWait(driver, timeout=timeout, poll_frequency=p_freq).until(GanttLoadingVisible())
-        element = WebDriverWait(driver, timeout=timeout, poll_frequency=p_freq).until(MozSketchLoadingVisible())
+        element = WebDriverWait(driver, timeout=timeout, poll_frequency=p_freq).until(GanttLoadingVisible())
+        #element = WebDriverWait(driver, timeout=timeout, poll_frequency=p_freq).until(MozSketchLoadingVisible())
         endTimer = round(time.time() * 1000000)
         print('Initial Gantt Loading Time: ', '{:9d}'.format(endTimer - startTimer), 'micros ')
 
