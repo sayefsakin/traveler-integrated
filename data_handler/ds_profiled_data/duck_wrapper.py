@@ -1,3 +1,4 @@
+import math
 import os
 import duckdb
 
@@ -57,3 +58,88 @@ class DuckWrapper():
         # print(values_only)
         # print(len(values_only))
         return values_only
+    
+    def db_gantt_sketch(self, bins, begin, end, location):
+        elements = "1000000"
+        gs_query = "SELECT enter_timestamp, leave_timestamp, Location FROM intervals" \
+            " WHERE Location = " + str(location) + \
+            " USING SAMPLE reservoir(" + elements + " ROWS) REPEATABLE(100)"
+        results = self.connection.execute(gs_query).fetchall()
+
+
+        def getBinSize(time_begin: int, time_end: int, bins: int) -> int:
+            return int(math.floor((time_end - time_begin) / bins))
+        
+        def getBinNumber(time_begin: int, time_end: int, bins: int, ctime: int) -> int:
+            bin_size = getBinSize(time_begin, time_end, bins)
+            if ctime < time_begin or ctime > time_end:
+                return -1
+            return int(math.floor((ctime - time_begin) / bin_size))
+
+        locDict = [0.0] * bins
+        bin_size = getBinSize(begin, end, bins)
+        
+        for item in results:
+            interval_time_start = int(item[0])
+            interval_time_end = int(item[1])
+            interval_location = int(item[2])
+
+            startingBin = getBinNumber(begin, end, bins, interval_time_start)
+            endingBin = getBinNumber(begin, end, bins, interval_time_end)
+            if startingBin < 0 or endingBin < 0:
+                continue
+
+            for bin_it in range(startingBin + 1, min(endingBin, bins)):
+                if locDict[bin_it] < 0.5:
+                    locDict[bin_it] = 1.0
+
+            if startingBin < bins and locDict[startingBin] < 0.5:
+                locDict[startingBin] = 0.5 if interval_time_start % bin_size else 1.0
+
+            if endingBin < bins and locDict[endingBin] < 0.5:
+                locDict[endingBin] = 0.5 if interval_time_end % bin_size else 1.0
+
+        return locDict
+
+
+    def db_m4_optimization(self, bins, begin, end, location):
+        elements = "1000000"
+        gs_query = "SELECT enter_timestamp, leave_timestamp, Location FROM intervals" \
+            " WHERE Location = " + str(location) + \
+            " USING SAMPLE reservoir(" + elements + " ROWS) REPEATABLE(100)"
+        results = self.connection.execute(gs_query).fetchall()
+
+
+        def getBinSize(time_begin: int, time_end: int, bins: int) -> int:
+            return int(math.floor((time_end - time_begin) / bins))
+        
+        def getBinNumber(time_begin: int, time_end: int, bins: int, ctime: int) -> int:
+            bin_size = getBinSize(time_begin, time_end, bins)
+            if ctime < time_begin or ctime > time_end:
+                return -1
+            return int(math.floor((ctime - time_begin) / bin_size))
+
+        locDict = [0.0] * bins
+        bin_size = getBinSize(begin, end, bins)
+        
+        for item in results:
+            interval_time_start = int(item[0])
+            interval_time_end = int(item[1])
+            interval_location = int(item[2])
+
+            startingBin = getBinNumber(begin, end, bins, interval_time_start)
+            endingBin = getBinNumber(begin, end, bins, interval_time_end)
+            if startingBin < 0 or endingBin < 0:
+                continue
+
+            for bin_it in range(startingBin + 1, min(endingBin, bins)):
+                if locDict[bin_it] < 0.5:
+                    locDict[bin_it] = 1.0
+
+            if startingBin < bins and locDict[startingBin] < 0.5:
+                locDict[startingBin] = 0.5 if interval_time_start % bin_size else 1.0
+
+            if endingBin < bins and locDict[endingBin] < 0.5:
+                locDict[endingBin] = 0.5 if interval_time_end % bin_size else 1.0
+
+        return locDict
