@@ -112,7 +112,10 @@ def get_utilization_histogram(datasetId: str,
         else:
             ret['locations'] = {}
             for location in locations:
-                ret['locations'][location] = utilObject.calcUtilizationForLocation(bins, begin, end, location)
+                if dsp.profiled_ds == dsp.DUCK:
+                    ret['locations'][location] = dsp.db_wrapper.db_agg_test(bins, begin, end, location)
+                else:
+                    ret['locations'][location] = utilObject.calcUtilizationForLocation(bins, begin, end, location)
                 calcHistorgramTimer = calcHistorgramTimer + utilObject.utilLocationEstiamteTimer
     else:
         ret['data'] = utilObject.calcUtilizationHistogram(bins, begin, end)
