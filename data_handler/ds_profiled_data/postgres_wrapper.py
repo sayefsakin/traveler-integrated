@@ -39,6 +39,7 @@ class PostgresWrapper():
                 cur.execute("SELECT count(*) FROM mytr.traveler")
                 exists = cur.fetchone()
                 self.total_data = exists[0]
+                # print(self.db_get_parent_child_trace("184", "253203368", "362625818"))
                 # print("testing min_max")
                 # print(self.db_min_max_test("50", "202591429", "278066359", "5"))
                 # print(self.db_gantt_sketch(50, 202591429, 278066359, "5"))
@@ -200,3 +201,119 @@ class PostgresWrapper():
                     locDict[endingBin] = 0.5 if interval_time_end % bin_size else 1.0
 
         return locDict
+
+    def db_get_attribute_of_event(self, c_time, location):
+        attr_query = "SELECT data->>'intervalId' FROM mytr.traveler WHERE " \
+             + " data->>'Location' = '" + str(location) + "' AND " \
+             + " (data->'enter'->>'Timestamp')::int8 <= " + str(c_time) + " AND " \
+             + " (data->'leave'->>'Timestamp')::int8 >= " + str(c_time)
+        
+        eid = None
+        with self.connection.cursor() as cur:
+            cur.execute(attr_query)
+            result = cur.fetchone()
+            if result is not None:
+                eid = result[0]
+        return eid
+
+    def db_get_parent_child_trace(self, eid, b, e):
+        # print("doing postgres parent child trace")
+        begin = str(b)
+        end = str(e)
+        ancestor_query = f"""
+            WITH RECURSIVE interval_ancestors AS (
+                SELECT 
+                    data->>'intervalId' AS eid,
+                    data->>'parent' AS parent_id,
+                    data->>'Location' AS location,
+                    (data->'enter'->>'Timestamp')::int8 AS enter_timestamp,
+                    (data->'leave'->>'Timestamp')::int8 AS leave_timestamp,
+                    1 AS depth
+                FROM mytr.traveler
+                WHERE data->>'intervalId' = '{eid}'
+
+                UNION ALL
+
+                SELECT 
+                    child.data->>'intervalId' AS eid, 
+                    child.data->>'parent' AS parent_id, 
+                    child.data->>'Location' AS location,
+                    (child.data->'enter'->>'Timestamp')::int8 AS enter_timestamp,
+                    (child.data->'leave'->>'Timestamp')::int8 AS leave_timestamp,
+                    parent.depth + 1 AS depth
+                FROM mytr.traveler AS child
+                JOIN interval_ancestors parent ON child.data->>'intervalId' = parent.parent_id
+            )
+            SELECT * FROM interval_ancestors
+            WHERE leave_timestamp >= {begin} AND enter_timestamp <= {end}
+        """
+        
+        descendant_query = f"""
+            WITH RECURSIVE interval_descendants AS (
+                SELECT
+                            data->>'intervalId' AS eid,
+                            data->>'parent' AS parent_id,
+                            data->>'Location' AS location,
+                            (data->'enter'->>'Timestamp')::int8 AS enter_timestamp,
+                            (data->'leave'->>'Timestamp')::int8 AS leave_timestamp,
+                            1 AS depth
+                FROM mytr.traveler
+                WHERE data->>'parent' = '{eid}'
+
+                UNION ALL
+
+                SELECT
+                            child.data->>'intervalId' AS eid,
+                            child.data->>'parent' AS parent_id,
+                            child.data->>'Location' AS location,
+                            (child.data->'enter'->>'Timestamp')::int8 AS enter_timestamp,
+                            (child.data->'leave'->>'Timestamp')::int8 AS leave_timestamp,
+                            parent.depth + 1 AS depth
+                FROM mytr.traveler AS child
+                JOIN interval_descendants parent ON child.data->>'parent' = parent.eid
+            )
+            SELECT * FROM interval_descendants
+            WHERE leave_timestamp >= {begin} AND enter_timestamp <= {end}
+        """
+
+        ancestor_dict = {}
+        descendent_dict = {}
+        # print(ancestor_query)
+        with self.connection.cursor() as cur:
+            cur.execute(ancestor_query)
+            results = cur.fetchall()
+
+            for item in results:
+                if item[1] is None or item[1] == "":
+                    continue
+                if item[0] == eid:
+                    ancestor_dict[eid] = {
+                        'enter': item[3],
+                        'leave': item[4],
+                        'location': item[2],
+                        'parent': item[1]
+                    }
+                    descendent_dict[eid] = {
+                        'enter': item[3],
+                        'leave': item[4],
+                        'location': item[2],
+                        'parent': item[1]
+                    }
+                ancestor_dict[item[1]] = {
+                    'enter': item[3],
+                    'leave': item[4],
+                    'location': item[2],
+                    'child': item[0]
+                }
+            
+            cur.execute(descendant_query)
+            results = cur.fetchall()
+            
+            for item in results:
+                descendent_dict[item[0]] = {
+                    'enter': item[3],
+                    'leave': item[4],
+                    'location': item[2],
+                    'parent': item[1]
+                }
+        return json.dumps({"ancestors":ancestor_dict, "descendants": descendent_dict})

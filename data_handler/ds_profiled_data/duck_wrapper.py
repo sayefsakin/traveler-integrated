@@ -1,3 +1,4 @@
+import json
 import math
 import os
 import duckdb
@@ -147,3 +148,117 @@ class DuckWrapper():
                 locDict[endingBin] = 0.5 if interval_time_end % bin_size else 1.0
 
         return locDict
+
+    def db_get_attribute_of_event(self, c_time, location):
+        attr_query = "SELECT intervalId FROM intervals WHERE " \
+             + " Location = '" + str(location) + "' AND " \
+             + " enter_timestamp <= " + str(c_time) + " AND " \
+             + " leave_timestamp >= " + str(c_time)
+        
+        eid = None
+        result = self.connection.execute(attr_query).fetchone()
+        if result is not None:
+            eid = result[0]
+        return eid
+    
+    def db_get_parent_child_trace(self, eid, b, e):
+        # print("doing duckdb parent child trace")
+        begin = str(b)
+        end = str(e)
+        ancestor_query = f"""
+            WITH RECURSIVE interval_ancestors AS (
+                SELECT 
+                    intervalId AS eid,
+                    parent AS parent_id,
+                    Location AS location,
+                    enter_timestamp,
+                    leave_timestamp,
+                    1 AS depth
+                FROM intervals
+                WHERE intervalId = '{eid}'
+
+                UNION ALL
+
+                SELECT 
+                    child.intervalId AS eid, 
+                    child.parent AS parent_id, 
+                    child.Location AS location,
+                    child.enter_timestamp AS enter_timestamp,
+                    child.leave_timestamp AS leave_timestamp,
+                    parent.depth + 1 AS depth
+                FROM intervals AS child
+                JOIN interval_ancestors parent ON child.intervalId = parent.parent_id
+            )
+            SELECT * FROM interval_ancestors
+            WHERE leave_timestamp >= {begin} AND enter_timestamp <= {end}
+        """
+        
+        descendant_query = f"""
+            WITH RECURSIVE interval_descendants AS (
+                SELECT
+                            intervalId AS eid,
+                            parent AS parent_id,
+                            Location AS location,
+                            enter_timestamp,
+                            leave_timestamp,
+                            1 AS depth
+                FROM intervals
+                WHERE parent = '{eid}'
+
+                UNION ALL
+
+                SELECT
+                            child.intervalId AS eid,
+                            child.parent AS parent_id,
+                            child.Location AS location,
+                            child.enter_timestamp,
+                            child.leave_timestamp,
+                            parent.depth + 1 AS depth
+                FROM intervals AS child
+                JOIN interval_descendants parent ON child.parent = parent.eid
+            )
+            SELECT * FROM interval_descendants
+            WHERE leave_timestamp >= {begin} AND enter_timestamp <= {end}
+        """
+
+        ancestor_dict = {}
+        descendent_dict = {}
+        # print(ancestor_query)
+        with self.connection.cursor() as cur:
+            cur.execute(ancestor_query)
+            results = cur.fetchall()
+
+            for item in results:
+                if item[1] is None or item[1] == "":
+                    continue
+                if item[0] == eid:
+                    ancestor_dict[eid] = {
+                        'enter': item[3],
+                        'leave': item[4],
+                        'location': item[2],
+                        'parent': item[1]
+                    }
+                    descendent_dict[eid] = {
+                        'enter': item[3],
+                        'leave': item[4],
+                        'location': item[2],
+                        'parent': item[1]
+                    }
+                ancestor_dict[item[1]] = {
+                    'enter': item[3],
+                    'leave': item[4],
+                    'location': item[2],
+                    'child': item[0]
+                }
+            
+            cur.execute(descendant_query)
+            results = cur.fetchall()
+            
+            for item in results:
+                descendent_dict[item[0]] = {
+                    'enter': item[3],
+                    'leave': item[4],
+                    'location': item[2],
+                    'parent': item[1]
+                }
+        return json.dumps({"ancestors":ancestor_dict, "descendants": descendent_dict})
