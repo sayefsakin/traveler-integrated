@@ -97,7 +97,7 @@ class MosaicGanttView extends LinkedMixin(uki.ui.GLView) {
 
     ]);
 
-    const $nrows = 840000;
+    const $nrows = 1000000;
     await vg.coordinator().exec([
       `CREATE TEMP TABLE IF NOT EXISTS sampled_intervals AS SELECT * from intervals`
       + ` WHERE loc BETWEEN 1 AND 40 `

@@ -9,12 +9,13 @@ class DuckWrapper():
         self.connection = duckdb.connect(self.dataset_location + "/" + self.dataset_id + ".db")
         qry = "CREATE TABLE IF NOT EXISTS intervals AS " + \
             "SELECT " \
-            " enter.Timestamp AS enter_timestamp, leave.Timestamp AS leave_timestamp, intervalId, parent, children, 'Parent GUID' AS pg, Location, GUID, Primitive" \
+            " CAST(enter.Timestamp AS BIGINT) AS enter_timestamp, CAST(leave.Timestamp AS BIGINT) AS leave_timestamp, intervalId, parent, children, 'Parent GUID' AS pg, Location, GUID, Primitive" \
             " FROM read_json(\'" + self.dataset_location + "/" + self.dataset_id + \
             ".json\', auto_detect=true, format=\'array\', maximum_depth=-1)"
         self.connection.sql(qry)
-        # self.connection.sql("CREATE INDEX et_idx ON intervals (enter_timestamp)")
-        # self.connection.sql("CREATE INDEX lt_idx ON intervals (leave_timestamp)")
+        print("Fetching data from DuckDB")
+        self.connection.sql("CREATE INDEX IF NOT EXISTS et_idx ON intervals (enter_timestamp)")
+        self.connection.sql("CREATE INDEX IF NOT EXISTS lt_idx ON intervals (leave_timestamp)")
         # print("duckdb database created: " + qry)
         # self.db_agg_test("202591429", "278066359", "5", "50")
 
@@ -41,7 +42,6 @@ class DuckWrapper():
                 " ) AS util " \
                 " ON bin_t.bin <= util.atime " \
                 " GROUP BY bin_t.bin"
-        # cplx_with_ct_sql = "SELECT cp.bn, tst.atime, tst.ct, " \
         cplx_with_ct_sql = "SELECT " \
                 " CASE WHEN tst.ct = 0 AND tst.atime - cp.bn >= " + bin_size  + " THEN 1 " \
                     " WHEN tst.ct = 0 AND tst.atime - cp.bn < " + bin_size  + " THEN 0.5 " \
@@ -59,53 +59,57 @@ class DuckWrapper():
         # print(len(values_only))
         return values_only
     
-    def db_gantt_sketch(self, bins, begin, end, location):
-        elements = "1000000"
-        gs_query = "SELECT enter_timestamp, leave_timestamp, Location FROM intervals" \
-            " WHERE Location = " + str(location) + \
-            " USING SAMPLE reservoir(" + elements + " ROWS) REPEATABLE(100)"
-        results = self.connection.execute(gs_query).fetchall()
+    def db_min_max_test(self, bins, b, e, l):
+        bin_size = int((int(e) - int(b)) / int(bins))
+        begin = str(b)
+        end = str(e)
+        location = str(l)
+        tst_sql = "SELECT enter_timestamp as atime, 1 AS ct FROM intervals WHERE " \
+                " leave_timestamp >= " + begin + " and enter_timestamp <= " + end + " and Location = " + location + "" \
+                " UNION " \
+                " SELECT leave_timestamp as atime, 0 AS ct FROM intervals WHERE " \
+                " leave_timestamp >= " + begin + " and enter_timestamp <= " + end + " and Location = " + location + "" \
+                " ORDER BY atime "
+        with_tst_sql = "WITH Q AS (" + tst_sql + ")"
+        bin_find_sql = "round(" + str(bins) + "*(atime - " + begin + ")/(" + end + " - " + begin + "))"
 
-
-        def getBinSize(time_begin: int, time_end: int, bins: int) -> int:
-            return int(math.floor((time_end - time_begin) / bins))
+        inside_sql =" SELECT " + bin_find_sql + " AS k, min(atime) as min_atime, max(atime) as max_atime, " + \
+                    " FROM Q GROUP BY k"
+                    # " (SELECT ct from Q WHERE atime = min_atime) as min_ct, (SELECT ct from Q WHERE atime = max_atime) as max_ct " + \
+        minmax_sql = with_tst_sql + " SELECT k, atime, Q.ct FROM Q JOIN (" + inside_sql +" ) as QA " + \
+                    " ON k = " + bin_find_sql + " AND (atime = min_atime or atime = max_atime) ORDER BY k, atime"
+        results = self.connection.execute(minmax_sql).fetchall()
         
-        def getBinNumber(time_begin: int, time_end: int, bins: int, ctime: int) -> int:
-            bin_size = getBinSize(time_begin, time_end, bins)
-            if ctime < time_begin or ctime > time_end:
-                return -1
-            return int(math.floor((ctime - time_begin) / bin_size))
+        locDict = [0.0] * (bins+1)
 
-        locDict = [0.0] * bins
-        bin_size = getBinSize(begin, end, bins)
-        
+        pre_bin = -1
         for item in results:
-            interval_time_start = int(item[0])
-            interval_time_end = int(item[1])
-            interval_location = int(item[2])
+            bin_it = int(item[0])
+            interval_time_start = int(item[1])
+            st_en = int(item[2])
 
-            startingBin = getBinNumber(begin, end, bins, interval_time_start)
-            endingBin = getBinNumber(begin, end, bins, interval_time_end)
-            if startingBin < 0 or endingBin < 0:
+            if bin_it < 0 or bins < bin_it:
                 continue
-
-            for bin_it in range(startingBin + 1, min(endingBin, bins)):
-                if locDict[bin_it] < 0.5:
+            locDict[bin_it] = 0.5
+            if st_en == 0 and bin_it != pre_bin:
+                cp_bn = bin_it * bin_size
+                if interval_time_start > cp_bn:
                     locDict[bin_it] = 1.0
-
-            if startingBin < bins and locDict[startingBin] < 0.5:
-                locDict[startingBin] = 0.5 if interval_time_start % bin_size else 1.0
-
-            if endingBin < bins and locDict[endingBin] < 0.5:
-                locDict[endingBin] = 0.5 if interval_time_end % bin_size else 1.0
+                c_bin = bin_it
+                for bit in range(c_bin - 1, 0, -1):
+                    if locDict[bit] > 0:
+                        break
+                    locDict[bit] = 1.0
+            pre_bin = bin_it
 
         return locDict
-
-
-    def db_m4_optimization(self, bins, begin, end, location):
-        elements = "1000000"
+    
+    def db_gantt_sketch(self, bins, begin, end, location):
+        # print("DuckDB gantt sketch")
+        elements = str((int(bins) * 3) + 1)# "1000000"
         gs_query = "SELECT enter_timestamp, leave_timestamp, Location FROM intervals" \
             " WHERE Location = " + str(location) + \
+            " AND leave_timestamp >= " + str(begin) + " AND enter_timestamp <= " + str(end) + \
             " USING SAMPLE reservoir(" + elements + " ROWS) REPEATABLE(100)"
         results = self.connection.execute(gs_query).fetchall()
 
