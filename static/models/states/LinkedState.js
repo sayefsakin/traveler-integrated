@@ -100,7 +100,7 @@ class LinkedState extends uki.utils.IntrospectableMixin(uki.Model) {
   async getAvailableViews () {
     const views = {
       SelectionInfoView: { status: VIEW_STATUS.AVAILABLE },
-      VegaGanttView: { status: VIEW_STATUS.AVAILABLE },
+      VegaGanttView: { status: VIEW_STATUS.UNAVAILABLE },
       MosaicGanttView: { status: VIEW_STATUS.UNAVAILABLE },
       DependencyTreeView: { status: VIEW_STATUS.AVAILABLE },
       TreeView: { status: VIEW_STATUS.UNAVAILABLE },
@@ -133,14 +133,20 @@ class LinkedState extends uki.utils.IntrospectableMixin(uki.Model) {
       content: []
     };
 
-    // Start with the info view
-    if (availableViews.SelectionInfoView?.status !== VIEW_STATUS.UNAVAILABLE) {
-      layout.content.push({
-        type: 'component',
-        componentName: 'SelectionInfoView',
-        componentState: { datasetId: this.info.datasetId }
-      });
-    }
+    layout.content.push({
+      type: 'component',
+      componentName: 'GanttView',
+      componentState: { datasetId: this.info.datasetId }
+    });
+
+    // // Start with the info view
+    // if (availableViews.SelectionInfoView?.status !== VIEW_STATUS.UNAVAILABLE) {
+    //   layout.content.push({
+    //     type: 'component',
+    //     componentName: 'SelectionInfoView',
+    //     componentState: { datasetId: this.info.datasetId }
+    //   });
+    // }
 
     if (availableViews.VegaGanttView?.status !== VIEW_STATUS.UNAVAILABLE) {
       layout.content.push({

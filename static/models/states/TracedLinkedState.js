@@ -180,7 +180,7 @@ class TracedLinkedState extends LinkedState {
     const availableViews = await this.getAvailableViews();
 
     // Starting views are only UtilizationView and GanttView
-    const traceColumnLayout = ['UtilizationView', 'GanttView']
+    const traceColumnLayout = ['UtilizationView', 'SelectionInfoView']
       .filter(componentName => {
         return availableViews?.[componentName]?.status !== VIEW_STATUS.UNAVAILABLE;
       })
@@ -193,9 +193,9 @@ class TracedLinkedState extends LinkedState {
       });
 
     return {
-      type: 'row',
+      type: 'column',
       content: [
-        { type: 'column', content: traceColumnLayout },
+        { type: 'row', content: traceColumnLayout },
         await super.getDefaultLayout()
       ]
     };
