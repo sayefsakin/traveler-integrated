@@ -103,17 +103,22 @@ class PostgresWrapper():
     #     # print(len(values_only))
     #     return values_only
     
-    def db_min_max_test(self, bin, b, e, l):
+    def db_min_max_test(self, bin, b, e, l, primitive):
         bins = int(bin)
         bin_size = int((int(e) - int(b)) / int(bins))
         begin = str(b)
         end = str(e)
         location = str(l)
+        primitive_filter_text = ""
+        if primitive is not None:
+            primitive_filter_text = " AND data->>'Primitive' = '" + primitive + "' "
         tst_sql = "SELECT (data->'enter'->>'Timestamp')::int8 as atime, 1 AS ct FROM mytr.traveler WHERE " \
                 " (data->'leave'->>'Timestamp')::int8 >= " + begin + " and (data->'enter'->>'Timestamp')::int8 <= " + end + " and data->>'Location' = '" + location + "'" \
+                + primitive_filter_text + \
                 " UNION " \
                 " SELECT (data->'leave'->>'Timestamp')::int8 as atime, 0 AS ct FROM mytr.traveler WHERE " \
                 " (data->'leave'->>'Timestamp')::int8 >= " + begin + " and (data->'enter'->>'Timestamp')::int8 <= " + end + " and data->>'Location' = '" + location + "'" \
+                + primitive_filter_text + \
                 " ORDER BY atime "
         with_tst_sql = "WITH Q AS (" + tst_sql + ")"
         bin_find_sql = "round(" + str(bins) + "*(atime - " + begin + ")/(" + end + " - " + begin + "))"
@@ -152,15 +157,17 @@ class PostgresWrapper():
 
         return locDict
     
-    def db_gantt_sketch(self, bins, begin, end, location):
+    def db_gantt_sketch(self, bins, begin, end, location, primitive):
         total_rows = (int(bins) * 3) + 1
         elements = str(int(min(total_rows / self.total_data * 100, 100))) # in percentage
-        
+        primitive_filter_text = ""
+        if primitive is not None:
+            primitive_filter_text = " AND data->>'Primitive' = '" + primitive + "' "
         gs_query = "SELECT data->'enter'->>'Timestamp' AS enter_timestamp, " \
             + " data->'leave'->>'Timestamp' AS leave_timestamp, " \
             + " data->>'Location' AS Location FROM mytr.traveler" \
             + " TABLESAMPLE BERNOULLI(" + elements + ") REPEATABLE(100)" \
-            + " WHERE data->>'Location' = '" + str(location) + "'" \
+            + " WHERE data->>'Location' = '" + str(location) + "'" + primitive_filter_text \
             + " AND (data->'leave'->>'Timestamp')::int8 >= " + str(begin) + " AND (data->'enter'->>'Timestamp')::int8 <= " + str(end)
         
         def getBinSize(time_begin: int, time_end: int, bins: int) -> int:

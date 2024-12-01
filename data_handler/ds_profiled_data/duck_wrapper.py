@@ -60,16 +60,21 @@ class DuckWrapper():
         # print(len(values_only))
         return values_only
     
-    def db_min_max_test(self, bins, b, e, l):
+    def db_min_max_test(self, bins, b, e, l, primitive):
         bin_size = int((int(e) - int(b)) / int(bins))
         begin = str(b)
         end = str(e)
         location = str(l)
+        primitive_filter_text = ""
+        if primitive is not None:
+            primitive_filter_text = " AND Primitive = '" + primitive + "' "
         tst_sql = "SELECT enter_timestamp as atime, 1 AS ct FROM intervals WHERE " \
                 " leave_timestamp >= " + begin + " and enter_timestamp <= " + end + " and Location = " + location + "" \
+                + primitive_filter_text + \
                 " UNION " \
                 " SELECT leave_timestamp as atime, 0 AS ct FROM intervals WHERE " \
                 " leave_timestamp >= " + begin + " and enter_timestamp <= " + end + " and Location = " + location + "" \
+                + primitive_filter_text + \
                 " ORDER BY atime "
         with_tst_sql = "WITH Q AS (" + tst_sql + ")"
         bin_find_sql = "round(" + str(bins) + "*(atime - " + begin + ")/(" + end + " - " + begin + "))"
@@ -105,11 +110,14 @@ class DuckWrapper():
 
         return locDict
     
-    def db_gantt_sketch(self, bins, begin, end, location):
-        # print("DuckDB gantt sketch")
+    def db_gantt_sketch(self, bins, begin, end, location, primitive):
+        print("DuckDB gantt sketch")
         elements = str((int(bins) * 3) + 1)# "1000000"
+        primitive_filter_text = ""
+        if primitive is not None:
+            primitive_filter_text = " AND Primitive = '" + primitive + "' "
         gs_query = "SELECT enter_timestamp, leave_timestamp, Location FROM intervals" \
-            " WHERE Location = " + str(location) + \
+            " WHERE Location = '" + str(location) + "'" + primitive_filter_text + \
             " AND leave_timestamp >= " + str(begin) + " AND enter_timestamp <= " + str(end) + \
             " USING SAMPLE reservoir(" + elements + " ROWS) REPEATABLE(100)"
         results = self.connection.execute(gs_query).fetchall()

@@ -40,7 +40,7 @@ def get_intervals(datasetId: str, \
                 eid = dqi.GetAttributeOfEvent(begin, location, "kd_tree")
             elif dsp.profiled_ds == dsp.SGT:
                 eid = dqi.GetAttributeOfEvent(begin, location, "segment_tree")
-            elif dsp.profiled_ds == dsp.DUCK or dsp.profiled_ds == dsp.POSTGRES:
+            elif dsp.profiled_ds.startswith("db"):
                 eid = dsp.db_wrapper.db_get_attribute_of_event(begin, location)
             fetchTimer = round(time.time() * 1000000)
             if eid is not None:
@@ -157,7 +157,7 @@ def intervalTrace(datasetId: str,
     def intervalGenerator():
         timerStart = round(time.time() * 1000000)
         
-        if dsp.profiled_ds == dsp.DUCK or dsp.profiled_ds == dsp.POSTGRES:
+        if dsp.profiled_ds.startswith("db"):
             yield dsp.db_wrapper.db_get_parent_child_trace(intervalId, begin, end)
         else:            
             yield '{"ancestors":{'

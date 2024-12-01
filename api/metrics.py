@@ -112,8 +112,11 @@ def get_utilization_histogram(datasetId: str,
         else:
             ret['locations'] = {}
             for location in locations:
-                if dsp.profiled_ds == dsp.DUCK or dsp.profiled_ds == dsp.POSTGRES:
-                    ret['locations'][location] = dsp.db_wrapper.db_min_max_test(bins, begin, end, location)
+                if dsp.profiled_ds.startswith("db"):
+                    if dsp.profiled_ds.endswith(dsp.DBTYPE_MIN_MAX):
+                        ret['locations'][location] = dsp.db_wrapper.db_min_max_test(bins, begin, end, location, primitive)
+                    else:
+                        ret['locations'][location] = dsp.db_wrapper.db_gantt_sketch(bins, begin, end, location, primitive)
                 else:
                     ret['locations'][location] = utilObject.calcUtilizationForLocation(bins, begin, end, location)
                 calcHistorgramTimer = calcHistorgramTimer + utilObject.utilLocationEstiamteTimer
