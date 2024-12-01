@@ -94,12 +94,6 @@ def get_intervals(datasetId: str, \
         yield ']'
         if location is not None:
             print(datasetId, str(begin), str(end), str(location), str(fetchTimer - timerStart), str(postProcessTimer - fetchTimer), "attribute", sep=",")
-            if intervalIdCheck is not None:
-                timerStart = round(time.time() * 1000000)
-                childList = db[datasetId]['intervals'][intervalIdCheck]['children']
-                timerEnd = round(time.time() * 1000000)
-                print(datasetId, str(begin), str(end), intervalIdCheck, str(0), str(timerEnd - timerStart), 'neighbor', sep=",")
-
 
     return StreamingResponse(intervalGenerator(), media_type='application/json')
 
@@ -161,81 +155,87 @@ def intervalTrace(datasetId: str,
         return '"' + intervalObj['intervalId'] + '":' + json.dumps(result)
 
     def intervalGenerator():
+        timerStart = round(time.time() * 1000000)
+        
         if dsp.profiled_ds == dsp.DUCK or dsp.profiled_ds == dsp.POSTGRES:
             yield dsp.db_wrapper.db_get_parent_child_trace(intervalId, begin, end)
-            return
-        yield '{"ancestors":{'
+        else:            
+            yield '{"ancestors":{'
 
-        lastInterval = None
-        yieldComma = False
-        intervalObj = targetInterval = db[datasetId]['intervals'][intervalId]
+            lastInterval = None
+            yieldComma = False
+            intervalObj = targetInterval = db[datasetId]['intervals'][intervalId]
 
-        # First phase: from the targetInterval, rewind until we encounter
-        # an interval in the queried range (or we run out of intervals)
-        while intervalObj['parent'] is not None and intervalObj['enter']['Timestamp'] > end:
-            lastInterval = intervalObj
-            parentId = intervalObj['parent']
-            intervalObj = db[datasetId]['intervals'][parentId]
+            # First phase: from the targetInterval, rewind until we encounter
+            # an interval in the queried range (or we run out of intervals)
+            while intervalObj['parent'] is not None and intervalObj['enter']['Timestamp'] > end:
+                lastInterval = intervalObj
+                parentId = intervalObj['parent']
+                intervalObj = db[datasetId]['intervals'][parentId]
 
-        # Second phase: if we had to rewind, include the lastInterval to enable
-        # drawing offscreen lines to the right
-        if intervalObj != targetInterval:
-            yield format_interval(lastInterval, None)
-            yieldComma = True
+            # Second phase: if we had to rewind, include the lastInterval to enable
+            # drawing offscreen lines to the right
+            if intervalObj != targetInterval:
+                yield format_interval(lastInterval, None)
+                yieldComma = True
 
-        # Third phase: include intervals until we encounter one beyond
-        # the queried range (or we run out)
-        while intervalObj is not None and intervalObj['leave']['Timestamp'] >= begin:
-            if yieldComma:
-                yield ','
-            yieldComma = True
-            childId = lastInterval['intervalId'] if lastInterval is not None else None
-            yield format_interval(intervalObj, childId)
-            lastInterval = intervalObj
-            parentId = intervalObj['parent']
-            intervalObj = db[datasetId]['intervals'][parentId] if parentId is not None else None
-
-        # Fourth phase: if the last intervalObj was offscreen, we still want to
-        # include it to enable drawing a line offscreen to the left
-        if intervalObj is not None:
-            if yieldComma:
-                yield ','
-            yieldComma = True
-            childId = lastInterval['intervalId'] if lastInterval is not None else None
-            yield format_interval(intervalObj, childId)
-
-        # Start on descendants
-        yield '},"descendants":{'
-        childQueue = [intervalId]
-        yieldComma = False
-
-        while len(childQueue) > 0:
-            intervalObj = db[datasetId]['intervals'][childQueue.pop(0)]
-            # yield any interval where itself or its child (to allow offscreen
-            # lines to the left) is in the queried range
-            yieldThisInterval = False
-            if intervalObj['leave']['Timestamp'] >= begin:
-                yieldThisInterval = True
-            else:
-                for childId in intervalObj['children']:
-                    if db[datasetId]['intervals'][childId]['enter']['Timestamp'] >= begin:
-                        yieldThisInterval = True
-
-            if yieldThisInterval:
+            # Third phase: include intervals until we encounter one beyond
+            # the queried range (or we run out)
+            while intervalObj is not None and intervalObj['leave']['Timestamp'] >= begin:
                 if yieldComma:
                     yield ','
                 yieldComma = True
-                yield format_interval(intervalObj)
+                childId = lastInterval['intervalId'] if lastInterval is not None else None
+                yield format_interval(intervalObj, childId)
+                lastInterval = intervalObj
+                parentId = intervalObj['parent']
+                intervalObj = db[datasetId]['intervals'][parentId] if parentId is not None else None
 
-            # Only add children to the queue if this interval ends before the
-            # queried range does
-            if intervalObj['leave']['Timestamp'] <= end:
-                for childId in intervalObj['children']:
-                    if not childId in childQueue:
-                        childQueue.append(childId)
+            # Fourth phase: if the last intervalObj was offscreen, we still want to
+            # include it to enable drawing a line offscreen to the left
+            if intervalObj is not None:
+                if yieldComma:
+                    yield ','
+                yieldComma = True
+                childId = lastInterval['intervalId'] if lastInterval is not None else None
+                yield format_interval(intervalObj, childId)
 
-        # Finished
-        yield '}}'
+            # Start on descendants
+            yield '},"descendants":{'
+            childQueue = [intervalId]
+            yieldComma = False
+
+            while len(childQueue) > 0:
+                intervalObj = db[datasetId]['intervals'][childQueue.pop(0)]
+                # yield any interval where itself or its child (to allow offscreen
+                # lines to the left) is in the queried range
+                yieldThisInterval = False
+                if intervalObj['leave']['Timestamp'] >= begin:
+                    yieldThisInterval = True
+                else:
+                    for childId in intervalObj['children']:
+                        if db[datasetId]['intervals'][childId]['enter']['Timestamp'] >= begin:
+                            yieldThisInterval = True
+
+                if yieldThisInterval:
+                    if yieldComma:
+                        yield ','
+                    yieldComma = True
+                    yield format_interval(intervalObj)
+
+                # Only add children to the queue if this interval ends before the
+                # queried range does
+                if intervalObj['leave']['Timestamp'] <= end:
+                    for childId in intervalObj['children']:
+                        if not childId in childQueue:
+                            childQueue.append(childId)
+
+            # Finished
+            yield '}}'
+
+        timerEnd = round(time.time() * 1000000)
+        print(datasetId, str(begin), str(end), intervalId, str(0), str(timerEnd - timerStart), 'neighbor', sep=",")
+        
 
     return StreamingResponse(intervalGenerator(), media_type='application/json')
 
