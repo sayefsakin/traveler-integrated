@@ -92,8 +92,8 @@ def get_intervals(datasetId: str, \
 
             postProcessTimer = round(time.time() * 1000000)
         yield ']'
-        if location is not None:
-            print(datasetId, str(begin), str(end), str(location), str(fetchTimer - timerStart), str(postProcessTimer - fetchTimer), "attribute", sep=",")
+        if intervalIdCheck is not None:
+            print(datasetId, str(begin), str(location), str(intervalIdCheck), str(fetchTimer - timerStart), str(postProcessTimer - fetchTimer), "attribute", sep=",")
 
     return StreamingResponse(intervalGenerator(), media_type='application/json')
 

@@ -62,7 +62,8 @@ def wheel_element(element, deltaY = 120, offsetX = 0, offsetY = 0):
         var clientX = box.left + (arguments[2] || box.width / 2);
         var clientY = box.top + (arguments[3] || box.height / 2);
         var target = element.ownerDocument.elementFromPoint(clientX, clientY);
-    
+        console.log(box.width);
+        console.log(box.height);
         for (var e = target; e; e = e.parentElement) {
           if (e === element) {
             target.dispatchEvent(new MouseEvent('mouseover', {view: window, bubbles: true, cancelable: true, clientX: clientX, clientY: clientY}));
@@ -153,7 +154,48 @@ def getNextCircularPoint(tx, ty):
         dx = dx - 1
     return dx, dy
 
+def scrollToWindow(driver, timeout, p_freq):
+    hoverTarget = driver.find_elements(By.XPATH, "//*[@class='hoverTarget']")
+    rightHandleLocation = 0
+    leftHandleLocation = 0
+    
+    for each_hover in hoverTarget:
+        parent_element = each_hover.find_element(By.XPATH, "..")
+        if parent_element.get_attribute("class") == 'rightHandle':
+            rightHandleLocation = each_hover.location['x']
+        else:
+            leftHandleLocation = each_hover.location['x']
+    handleWindow = rightHandleLocation - leftHandleLocation
+
+    iteration_count = 1
+    previous_handle = rightHandleLocation
+
+    for i in range(2): # for kmeans
+        c_begin = int(handleWindow * (85 / 100)) + leftHandleLocation
+        c_end = int(handleWindow * (86 / 100)) + leftHandleLocation
+        for each_hover in hoverTarget:
+            parent_element = each_hover.find_element(By.XPATH, "..")
+            start = each_hover.location
+            drag_offset = c_begin - start['x']
+            current_handle = c_begin
+            if parent_element.get_attribute("class") == 'rightHandle':
+                drag_offset = c_end - start['x']
+                previous_handle = c_begin
+                current_handle = c_end
+            ActionChains(driver).drag_and_drop_by_offset(each_hover, drag_offset, 0).perform()
+            startTimer = round(time.time() * 1000000)
+            WebDriverWait(driver, timeout=timeout, poll_frequency=p_freq).until(GanttLoadingVisible())
+            endTimer = round(time.time() * 1000000)
+            brush_percentage = int(abs(previous_handle - current_handle) / handleWindow * 100.0)
+            # print(str(iteration_count), str(brush_percentage), str(endTimer - startTimer), sep=",")
+            # print('Iteration', '{:2d}'.format(iteration_count), end=' ')
+            # print('Brush percentage', '{:3d}%'.format(brush_percentage), end=' ')
+            # print('Total drawing time:', '{:5d}'.format(endTimer - startTimer), 'ms')
+            iteration_count = iteration_count + 1
+        previous_handle = c_end
+
 def conductRandomClicking(driver, timeout, p_freq, TOTAL_SAMPLE):
+    scrollToWindow(driver, timeout, p_freq)
     # zoom out in the gantt y axis to reveal all locations
     ganttYScroller = driver.find_element(By.CLASS_NAME, "yAxisScrollCapturer")
     wheel_element(ganttYScroller, -150)
@@ -195,17 +237,17 @@ def conductRandomClicking(driver, timeout, p_freq, TOTAL_SAMPLE):
     print("successfully run the profiling on", driver.title)
 
 def conductBrushing(driver, timeout, p_freq, TOTAL_SAMPLE):
-    domain_window = 30
+    time.sleep(3)
+    domain_window = 90
     # zoom out in the gantt y axis to reveal all locations
     ganttYScroller = driver.find_element(By.CLASS_NAME, "yAxisScrollCapturer")
     wheel_element(ganttYScroller, -150)
-    # wheel_element(ganttYScroller, -150)
 
-    element = WebDriverWait(driver, timeout=timeout, poll_frequency=p_freq).until(UtilizationLoadingVisible())
-
+    # element = WebDriverWait(driver, timeout=timeout, poll_frequency=p_freq).until(UtilizationLoadingVisible())
     hoverTarget = driver.find_elements(By.XPATH, "//*[@class='hoverTarget']")
     rightHandleLocation = 0
     leftHandleLocation = 0
+    
     for each_hover in hoverTarget:
         parent_element = each_hover.find_element(By.XPATH, "..")
         if parent_element.get_attribute("class") == 'rightHandle':
@@ -220,8 +262,11 @@ def conductBrushing(driver, timeout, p_freq, TOTAL_SAMPLE):
     print("iteration,brush percentage,total drawing time (micros)")
     random.seed(10)
     for i in range(int(TOTAL_SAMPLE/2)):
-        c_begin = random.randint(leftHandleLocation, int(handleWindow * (domain_window / 100)) + leftHandleLocation)
-        c_end = random.randint(int(handleWindow * ((100 - domain_window) / 100)) + leftHandleLocation, rightHandleLocation)
+        # c_begin = random.randint(leftHandleLocation, int(handleWindow * (domain_window / 100)) + leftHandleLocation)
+        # c_end = random.randint(int(handleWindow * ((100 - domain_window) / 100)) + leftHandleLocation, rightHandleLocation)
+        left_handle_list = random.randint(65, 90) # for kmeans
+        c_begin = int(handleWindow * (left_handle_list / 100)) + leftHandleLocation
+        c_end = int(handleWindow * ((left_handle_list + random.randint(4,10)) / 100)) + leftHandleLocation
         # print(leftHandleLocation, c_begin, c_end, rightHandleLocation)
         for each_hover in hoverTarget:
             parent_element = each_hover.find_element(By.XPATH, "..")
@@ -244,7 +289,75 @@ def conductBrushing(driver, timeout, p_freq, TOTAL_SAMPLE):
             iteration_count = iteration_count + 1
         previous_handle = c_end
 
-    print("successfully run the profiling on", driver.title)
+    # print("successfully run the profiling on", driver.title)
+
+
+def conductFixedScrolling(driver, timeout, p_freq, TOTAL_SAMPLE):
+    time.sleep(3)
+    domain_window = 90
+    # zoom out in the gantt y axis to reveal all locations
+    ganttYScroller = driver.find_element(By.CLASS_NAME, "yAxisScrollCapturer")
+    wheel_element(ganttYScroller, 150)
+    # wheel_element(ganttYScroller, -150)
+    time.sleep(3)
+
+    # canvas_element = driver.find_elements(By.XPATH, "//canvas")
+    # foreign_element = canvas_element.find_element(By.XPATH, "..")
+
+    ganttXScroller = driver.find_element(By.CLASS_NAME, "eventCapturer")
+    if ganttXScroller is None:
+        print("not found")
+    else:
+        print("X scroller found")
+    for i in range(5):
+        wheel_element(ganttXScroller)
+        print("scrolling")
+        time.sleep(3)
+
+    # # element = WebDriverWait(driver, timeout=timeout, poll_frequency=p_freq).until(UtilizationLoadingVisible())
+    # hoverTarget = driver.find_elements(By.XPATH, "//*[@class='hoverTarget']")
+    # rightHandleLocation = 0
+    # leftHandleLocation = 0
+    
+    # for each_hover in hoverTarget:
+    #     parent_element = each_hover.find_element(By.XPATH, "..")
+    #     if parent_element.get_attribute("class") == 'rightHandle':
+    #         rightHandleLocation = each_hover.location['x']
+    #     else:
+    #         leftHandleLocation = each_hover.location['x']
+    # handleWindow = rightHandleLocation - leftHandleLocation
+
+    # iteration_count = 1
+    # previous_handle = rightHandleLocation
+
+    # print("iteration,brush percentage,total drawing time (micros)")
+    # random.seed(10)
+    # for i in range(int(TOTAL_SAMPLE/2)):
+    #     c_begin = random.randint(leftHandleLocation, int(handleWindow * (domain_window / 100)) + leftHandleLocation)
+    #     c_end = random.randint(int(handleWindow * ((100 - domain_window) / 100)) + leftHandleLocation, rightHandleLocation)
+    #     # print(leftHandleLocation, c_begin, c_end, rightHandleLocation)
+    #     for each_hover in hoverTarget:
+    #         parent_element = each_hover.find_element(By.XPATH, "..")
+    #         start = each_hover.location
+    #         drag_offset = c_begin - start['x']
+    #         current_handle = c_begin
+    #         if parent_element.get_attribute("class") == 'rightHandle':
+    #             drag_offset = c_end - start['x']
+    #             previous_handle = c_begin
+    #             current_handle = c_end
+    #         ActionChains(driver).drag_and_drop_by_offset(each_hover, drag_offset, 0).perform()
+    #         startTimer = round(time.time() * 1000000)
+    #         WebDriverWait(driver, timeout=timeout, poll_frequency=p_freq).until(GanttLoadingVisible())
+    #         endTimer = round(time.time() * 1000000)
+    #         brush_percentage = int(abs(previous_handle - current_handle) / handleWindow * 100.0)
+    #         print(str(iteration_count), str(brush_percentage), str(endTimer - startTimer), sep=",")
+    #         # print('Iteration', '{:2d}'.format(iteration_count), end=' ')
+    #         # print('Brush percentage', '{:3d}%'.format(brush_percentage), end=' ')
+    #         # print('Total drawing time:', '{:5d}'.format(endTimer - startTimer), 'ms')
+    #         iteration_count = iteration_count + 1
+    #     previous_handle = c_end
+
+    # print("successfully run fixed scrolling profiling on", driver.title)
 
 if __name__ == '__main__':
     url = "https://stackoverflow.com"
@@ -265,7 +378,7 @@ if __name__ == '__main__':
 
     base_params = {
         'dataset': os.getenv('DATASET_ID', DGEM_ID),
-        'baseUrl': "http://localhost:8000",
+        'baseUrl': os.getenv('BASE_URL', "http://localhost:8000")
     }
     TOTAL_SAMPLE = int(os.getenv('TOTAL_SAMPLE', 20))
     QUERY_TYPE = os.getenv('QUERY_TYPE', 'window')
@@ -290,15 +403,16 @@ if __name__ == '__main__':
         element = WebDriverWait(driver, timeout=timeout, poll_frequency=p_freq).until(GanttLoadingVisible())
         #element = WebDriverWait(driver, timeout=timeout, poll_frequency=p_freq).until(MozSketchLoadingVisible())
         endTimer = round(time.time() * 1000000)
-        print('Initial Gantt Loading Time: ', '{:9d}'.format(endTimer - startTimer), 'micros ')
 
         # canvas_elem = driver.find_elements(By.XPATH, "//canvas")
         # for parent_element in canvas_elem:
         #     print(parent_element.rect)
 
+        # conductFixedScrolling(driver, timeout, p_freq, TOTAL_SAMPLE)
         if QUERY_TYPE == 'window':
             conductBrushing(driver, timeout, p_freq, TOTAL_SAMPLE)
         elif QUERY_TYPE == 'attribute':
             conductRandomClicking(driver, timeout, p_freq, TOTAL_SAMPLE)
         elif QUERY_TYPE == 'cond':
             time.sleep(60)
+        print('Initial Gantt Loading Time: ', '{:9d}'.format(endTimer - startTimer), 'micros ')

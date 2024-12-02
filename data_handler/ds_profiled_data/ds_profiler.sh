@@ -3,10 +3,16 @@
 
 traveler_base_directory="/mnt/c/Users/sayef/IdeaProjects/traveler-integrated"
 profile_directory=$traveler_base_directory"/data_handler/ds_profiled_data"
+python_env_directory=$traveler_base_directory"/traveler39"
+export DATASET_LOCATION="/mnt/d/Projects/mosaic_testing/mosaic/data/traveler_data"
 
 KDT="kd_tree"
 SGT="segment_tree"
 SAT="summed_area_table"
+DUCK_MIN_MAX="db_duck_min_max"
+DUCK_SKETCH="db_duck_sketch"
+POSTGRES_MIN_MAX="db_postgres_min_max"
+POSTGRES_SKETCH="db_postgres_sketch"
 
 Q_WINDOW='window'
 Q_ATTRIBUTE='attribute'
@@ -21,20 +27,29 @@ KMEANS_LARGE_ID="c3d5e8fe-32df-4f4f-8cbb-4ba6fabd7d3d"
 
 #for attribute and child query
 DGEM_ID_N="a9bd20ca-c4f2-4b54-8c49-b968ae7e78be"
-KMEANS_ID_N="00932997-9971-49b9-8154-42ff1d9253a7"
+KMEANS_ID_N="faf17535-2f66-4621-995f-49c7dbd84e8b"
 LULESH_ID_N="0deeca3b-8910-47ca-a3a1-f7bfefe64494"
 KMEANS_LARGE_ID_N="908fc737-2cc7-41d8-8281-7dd9e83155ff"
-#DATASET_ID="DATASET_ID="$DGEM_ID
 
-export DATASET_ID=$DGEM_ID
+#DATASET_ID="DATASET_ID="$DGEM_ID
+LOCALHOST_URL="http://localhost:8000"
+LONEPEAK_URL="http://lonepeak2:8000"
+
+export DATASET_ID=$KMEANS_ID_N
 export TOTAL_SAMPLE=10
-export PROFILED_DS=$KDT
+export PROFILED_DS=$POSTGRES_MIN_MAX
 export QUERY_TYPE=$Q_WINDOW
+export BASE_URL=$LOCALHOST_URL
 
 serve_watch=$profile_directory"/"$PROFILED_DS"_"$QUERY_TYPE"_serve_check"
 echo "Writing Traveler serve output to file: "$serve_watch
+source $python_env_directory"/bin/activate"
 
 traveler(){
+  if [[ $PROFILED_DS == db_postgres* ]] ; then
+    echo "starting postgres server";
+    sudo service postgresql start;
+  fi
   # run traveler first
   cd /mnt/c/Users/sayef/IdeaProjects/traveler-integrated
   python3 serve.py > $serve_watch &
@@ -48,13 +63,16 @@ traveler(){
     fi
   done
   sleep 1
+  export PYTHON_PROCESS_ID=`ps -u $USER | grep python3 | awk '{print $1}'`
+  export PRE_MEMORY_CHECK=`pmap $PYTHON_PROCESS_ID | grep total | awk '{print $2}' | awk '{SUM += $1} END {print SUM/1024}'`
 }
 
 cgal(){
   # run the cgal server
-  if [[ $PROFILED_DS == $SAT ]]; then
+  if [[ $PROFILED_DS != $KDT ]]; then
     return 0;
   fi
+  export CGAL_PROCESS_ID=`ps -u $USER | grep make | awk '{print $1}'`
   cgal_watch=$profile_directory"/"$PROFILED_DS"_"$QUERY_TYPE"_cgal_check"
   echo "Writing CGAL server output to file: "$cgal_watch
   cd $traveler_base_directory"/data_handler/cgal_libs/cgal_server"
@@ -110,7 +128,11 @@ prompt_help(){
 }
 
 killing_cgal(){
+  if [[ $PROFILED_DS != $KDT ]]; then
+    return 0;
+  fi
   if pgrep -x make >/dev/null; then
+    export POST_CGAL_MEMORY_CHECK=`pmap $CGAL_PROCESS_ID | grep total | awk '{print $2}' | awk '{SUM += $1} END {print SUM/1024}'`
     echo "killing cgal data server";
     killall make 2>/dev/null;
   fi
@@ -127,6 +149,7 @@ killing_cgal(){
 
 killing_traveler(){
   if pgrep -x python3 >/dev/null; then
+    export POST_MEMORY_CHECK=`pmap $PYTHON_PROCESS_ID | grep total | awk '{print $2}' | awk '{SUM += $1} END {print SUM/1024}'`
     echo "killing Traveler";
     killall python3 2>/dev/null;
   fi
@@ -162,7 +185,7 @@ prepare_and_merge_files(){
   mkdir -p $DATASET_ID;
   cp $serve_watch $DATASET_ID;
 
-  if [[ $PROFILED_DS !=  $SAT ]]; then
+  if [[ $PROFILED_DS ==  $KDT ]]; then
     linenumber=$(grep -n "Server is now listening" "$cgal_watch" | head -n 1 | cut -d: -f1);
     sed -i "1,${linenumber}d" "$cgal_watch";
     if [[ $IS_KILLED == 1 ]]; then
@@ -175,14 +198,19 @@ prepare_and_merge_files(){
   fi
 
   if [[ $QUERY_TYPE ==  $Q_WINDOW ]]; then
-    sed -i '$d' $selenium_watch;
+    # sed -i '$d' $selenium_watch;
     cp $selenium_watch $DATASET_ID;
   fi
 
   cd $DATASET_ID;
 #  rm -f *_selenium_check;
   paste -d , "$PROFILED_DS"_"$QUERY_TYPE"_* > "$PROFILED_DS"_"$QUERY_TYPE"_merged.csv;
+  echo "Initial memory: $PRE_MEMORY_CHECK GB" >> "$PROFILED_DS"_"$QUERY_TYPE"_merged.csv;
+  echo "Post run memory: $POST_MEMORY_CHECK GB" >> "$PROFILED_DS"_"$QUERY_TYPE"_merged.csv;
 
+  if [[ $PROFILED_DS == $KDT ]]; then
+    echo "Post postgres memory: $POST_CGAL_MEMORY_CHECK GB" >> "$PROFILED_DS"_"$QUERY_TYPE"_merged.csv;
+  fi
   echo "Formatting all output files";
 }
 
@@ -222,5 +250,6 @@ while IFS= read -r line; do
   prompt_help
 done
 
+deactivate
 echo "DS Profiler exited successfully"
 

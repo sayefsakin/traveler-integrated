@@ -126,8 +126,11 @@ def get_utilization_histogram(datasetId: str,
     postProcessTimer = round(time.time() * 1000000)
 
     # datasetId, begin, end, bins, fetch time, post process time
+    api_fetch_text = str(fetchTimer - timerStart + calcHistorgramTimer)
+    if primitive is not None:
+        api_fetch_text = primitive
     if locations:
-        print(datasetId, str(begin), str(end), str(bins), str(fetchTimer - timerStart + calcHistorgramTimer), str(postProcessTimer - fetchTimer), ds_command, sep=",")
+        print(datasetId, str(begin), str(end), str(bins), api_fetch_text, str(postProcessTimer - fetchTimer), ds_command, sep=",")
 
     ret['metadata'] = {'begin': begin, 'end': end, 'bins': bins}
     return ret

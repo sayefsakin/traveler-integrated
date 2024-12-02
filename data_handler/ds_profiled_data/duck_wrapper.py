@@ -14,7 +14,7 @@ class DuckWrapper():
             " FROM read_json(\'" + self.dataset_location + "/" + self.dataset_id + \
             ".json\', auto_detect=true, format=\'array\', maximum_depth=-1)"
         self.connection.sql(qry)
-        print("Fetching data from DuckDB")
+        # print("Fetching data from DuckDB")
         self.connection.sql("CREATE INDEX IF NOT EXISTS et_idx ON intervals (enter_timestamp)")
         self.connection.sql("CREATE INDEX IF NOT EXISTS lt_idx ON intervals (leave_timestamp)")
         # print("duckdb database created: " + qry)
@@ -61,6 +61,7 @@ class DuckWrapper():
         return values_only
     
     def db_min_max_test(self, bins, b, e, l, primitive):
+        # print("from duckdb min max")
         bin_size = int((int(e) - int(b)) / int(bins))
         begin = str(b)
         end = str(e)
@@ -111,7 +112,6 @@ class DuckWrapper():
         return locDict
     
     def db_gantt_sketch(self, bins, begin, end, location, primitive):
-        print("DuckDB gantt sketch")
         elements = str((int(bins) * 3) + 1)# "1000000"
         primitive_filter_text = ""
         if primitive is not None:
