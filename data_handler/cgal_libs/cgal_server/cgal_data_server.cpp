@@ -1,5 +1,6 @@
 #include <iostream>
 #include <vector>
+#include <map>
 #include <string>
 #include <algorithm>
 
@@ -28,6 +29,7 @@
 #include <chrono>
 #include "curl_get.cpp"
 #include "optimized_binned_kdt.h"
+#include "agglomerate_clustering.h"
 #include "rapidjson/document.h"
 #include "rapidjson/writer.h"
 #include "rapidjson/stringbuffer.h"
@@ -42,7 +44,7 @@ typedef Kernel::Point_2 Point_2;
 typedef std::vector<Point_2> Point_vector;
 
 typedef CGAL::Quadtree<Kernel, Point_vector> Quadtree;
-typedef CGAL::Orthtrees::Preorder_traversal Preorder_traversal;
+// typedef CGAL::Orthtrees::Preorder_traversal Preorder_traversal;
 
 typedef CGAL::Simple_cartesian<double> K;
 typedef K::Point_3 Point_d;
@@ -75,6 +77,7 @@ typedef Kd_tree_search::Tree NNKdtree;
 
 string KDTREE("kd_tree");
 string SGTREE("segment_tree");
+string AGCLUSTER("agglomerative_clustering");
 string GETDATAINRANGE("GetDataInRange");
 string GETEVENTATTRIBUTE("GetEventAttribute");
 string GETCHILDREN("GetChildren");
@@ -237,6 +240,19 @@ Document binnedKDTreeSearchQuery( BinnedKDT *tree,
     Document d = convertLocDictToDocument(lResults);
     lResults.clear();
     return d;
+}
+
+Document binnedAGCSearchQuery( AgglomerateClusters *agc,
+    int64_t time_begin,
+    int64_t time_end,
+    uint64_t location_begin,
+    uint64_t location_end,
+    uint64_t bins) {
+
+LocDict lResults = agc->binnedRangeQuery(time_begin, time_end, location_begin, location_end, bins);
+Document d = convertLocDictToDocument(lResults);
+lResults.clear();
+return d;
 }
 
 Document kdTreeSearchQuery( Kdtree *kdtree,
@@ -457,6 +473,7 @@ Document processReceivedRequest(BinnedKDT *binnedKDT,
                                 Segment_tree_3_type *Segment_tree_3,
                                 BinnedKDT *neighborKDT,
                                 Segment_tree_3_type *neighborSGT,
+                                AgglomerateClusters *agglomerateClusters,
                                 Document *d,
                                 int64_t minId, int64_t maxId,
                                 int64_t minTime, int64_t maxTime,
@@ -510,6 +527,9 @@ Document processReceivedRequest(BinnedKDT *binnedKDT,
         } else if(ds_request == SGTREE) {
             if(DEBUG) cout << "got Segment Tree request" << endl;
             return sgmntTreeSearchQuery(Segment_tree_3, time_begin, time_end, location_begin, location_end, bins, pm[primitive], maxId);
+        } else if(ds_request == AGCLUSTER) {
+            if(DEBUG) cout << "got agglomerate cluster request" << endl;
+            return binnedAGCSearchQuery(agglomerateClusters, time_begin, time_end, location_begin, location_end, bins);
         } else {
             if(DEBUG) cout << "invalid ds request" << endl;
         }
@@ -540,6 +560,7 @@ void startServerListening(BinnedKDT *binnedKDT,
                         Segment_tree_3_type *Segment_tree_3,
                         BinnedKDT *neighborKDT,
                         Segment_tree_3_type *neighborSGT,
+                        AgglomerateClusters *agglomerateClusters,
                         uint64_t tree_build_time,
                         int64_t minId, int64_t maxId,
                         int64_t minTime, int64_t maxTime,
@@ -602,6 +623,7 @@ void startServerListening(BinnedKDT *binnedKDT,
         Document queryResults = processReceivedRequest(
             binnedKDT, Segment_tree_3,
             neighborKDT, neighborSGT,
+            agglomerateClusters,
             &d, minId, maxId, 
             minTime, maxTime,
             minLocation, maxLocation, pm
@@ -662,6 +684,9 @@ int main(int argc, char *argv[])
     BinnedKDT neighborKDT;
     Segment_tree_3_type Segment_tree_3;
     Segment_tree_3_type Segment_tree_neighbor_3;
+    AgglomerateClusters agglomerateClusters;
+
+    map<uint64_t, unique_ptr<BinnedKDT>> locationKDT;
 
     int64_t minId = numeric_limits<int64_t>::max();
     int64_t maxId = 0;
@@ -670,6 +695,9 @@ int main(int argc, char *argv[])
     uint64_t minLocation = 1000000000;
     uint64_t maxLocation = 0;
     uint64_t tree_build_time = 0;
+
+    const string baseLocation = "/mnt/c/Users/sayef/IdeaProjects/traveler-integrated/data_handler/cgal_libs/cgal_server/location_data/";
+
     for (auto& v : fetchedData.GetArray()) {
         cPrimitive = v.GetObject()["Primitive"].GetString();
         cPrimitiveNumber = -1;
@@ -698,6 +726,13 @@ int main(int argc, char *argv[])
         minTime = min(minTime, (int64_t)interval_enter.x());
         maxTime = max(maxTime, (int64_t)interval_end.x());
 
+        // string locFileName = baseLocation + v.GetObject()["Location"].GetString() + ".loc";
+        // ofstream outfile(locFileName, ios::app);
+        // if(outfile) {
+        //     outfile << std::fixed << std::setprecision(0) << interval_enter.x() << std::endl << interval_end.x() << std::endl;
+        // }
+        // outfile.close();
+
         if(profiled_ds == KDTREE) {
             binnedKDT.insertDataIntoTree(interval_enter.x(), interval_enter.y(), 
                                         interval_end.x(), interval_end.y(), 
@@ -706,6 +741,12 @@ int main(int argc, char *argv[])
                                         interval_end.x(), interval_end.y(), 
                                         v.GetObject()["intervalId"].GetString(), 
                                         parent_id);
+            if (locationKDT.find(locationId) == locationKDT.end()) {
+                locationKDT[locationId] = make_unique<BinnedKDT>();
+            }
+            locationKDT[locationId]->insertDataIntoTree(interval_enter.x(), interval_enter.y(), 
+                                        interval_end.x(), interval_end.y(), 
+                                        v.GetObject()["intervalId"].GetString(), cPrimitiveNumber);
         } else if(profiled_ds == SGTREE) {
             InputList.emplace_back(Interval(
                     getPurIntervalFromPoint(interval_enter, interval_end), 
@@ -718,6 +759,8 @@ int main(int argc, char *argv[])
                     ),
                     v.GetObject()["intervalId"].GetString()
             ));
+        } else if(profiled_ds == AGCLUSTER) {
+            agglomerateClusters.insertDataIntoTree(interval_enter.x(), interval_end.x(), v.GetObject()["Location"].GetString());
         }
         totalIntervals++;
         if(totalIntervals % 2500 == 0)
@@ -728,19 +771,41 @@ int main(int argc, char *argv[])
     cout << endl;
 
     if(profiled_ds == KDTREE) {
+        // std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+        // binnedKDT.tree.build(); // explicitely call build, so that the first query wount spend time in building
+        // std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+        // tree_build_time = std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count();
+        // std::cout << "KD Tree build time = " << tree_build_time << "[microseconds]" << std::endl;
+        // neighborKDT.tree.build();
+
+        const string baseDotFileLocation = "/mnt/c/Users/sayef/IdeaProjects/traveler-integrated/data_handler/cgal_libs/cgal_server/figures";
+        // std::string outputFilePath = baseDotFileLocation + "/binnedKDT.dot";
+        // binnedKDT.outputToDot(outputFilePath);
+        // binnedKDT.tree.statistics(std::cout);
+
+        // for (const auto& pair : locationKDT) {
+        //     const std::uint64_t& location = pair.first;
+
+        //     string outputFilePath = baseDotFileLocation + "/binnedKDT_" + to_string(location) + ".dot";
+        //     locationKDT[location]->tree.build();
+        //     cout << "Initialized KDT in location: " << to_string(location) << endl;
+        //     locationKDT[location]->outputToDot(outputFilePath);
+        //     locationKDT[location]->tree.statistics(std::cout);
+        //     cout << endl;
+        // }
+    } else if(profiled_ds == AGCLUSTER) {
         std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
-        binnedKDT.tree.build(); // explicitely call build, so that the first query wount spend time in building
+        agglomerateClusters.buildAllAggClusters();
         std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
         tree_build_time = std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count();
-        std::cout << "KD Tree build time = " << tree_build_time << "[microseconds]" << std::endl;
-        neighborKDT.tree.build();
+        std::cout << "Agglomerate Cluster build time = " << tree_build_time << "[microseconds]" << std::endl;
     }
     // begin = std::chrono::steady_clock::now();
     // kdtree.build();
     // end = std::chrono::steady_clock::now();
     // std::cout << "Old KD Tree build time = " << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() << "[microseconds]" << std::endl;
 
-    if(profiled_ds == SGTREE) {
+    else if(profiled_ds == SGTREE) {
         std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
         Segment_tree_3.make_tree(InputList.begin(),InputList.end());
         std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
@@ -748,13 +813,14 @@ int main(int argc, char *argv[])
         std::cout << "Segment Tree build time = " << tree_build_time << "[microseconds]" << std::endl;
         Segment_tree_neighbor_3.make_tree(NeighborInputList.begin(),NeighborInputList.end());
     }
-    cout << "kd tree and segment tree build done" << endl << "Total interval count: " << totalIntervals <<  ", Primitive count: " << cPrimitiveNumber << endl;
+    cout << "Tree build done" << endl << "Total interval count: " << totalIntervals <<  ", Primitive count: " << cPrimitiveNumber << endl;
     // testSearchQueries(&kdtree, &Segment_tree_3, minId, maxId, urlparser.datasetId);
     // point_with_info_testing();
 
     startServerListening(
         &binnedKDT, &Segment_tree_3, 
-        &neighborKDT, &Segment_tree_neighbor_3, 
+        &neighborKDT, &Segment_tree_neighbor_3,
+        &agglomerateClusters,
         tree_build_time, 
         minId, maxId, 
         minTime, maxTime,

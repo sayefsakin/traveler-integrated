@@ -82,6 +82,7 @@ public:
                             int64_t primitive);
   string findNearestInterval(int64_t c_time, uint64_t c_location);
   void getNeighborQuery(int64_t parent_id);
+  void outputToDot(std::string fileName);
 };
 
 #endif

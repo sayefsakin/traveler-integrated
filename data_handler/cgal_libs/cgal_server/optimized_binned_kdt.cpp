@@ -311,3 +311,53 @@ void BinnedKDT::getNeighborQuery(int64_t parent_id) {
   cout << "0,KDT," << "ds_neighbor," << parent_id << "," << result.size()/2 << "," << std::chrono::duration_cast<std::chrono::microseconds>(clock_end - clock_begin).count() <<
     endl;
 }
+
+void BinnedKDT::outputToDot(string fileName) {
+  ofstream dotFile(fileName.c_str());
+  if (!dotFile.is_open()) {
+    cout << "Output stream is not open" << endl;
+    return;
+  }
+  tree.write_graphviz(dotFile);
+  // cout << "Exporting to dot file: " << fileName << endl;
+
+  // dotFile << "digraph BinnedKDT {\n";
+  // dotFile << "node [shape=record];\n";
+
+  // int nodeId = 0;
+  
+  // tree.traverse([&](const auto& node) {
+  //     int currentId = nodeId++;
+  //     if (node.is_leaf()) {
+  //         dotFile << "node" << currentId << " [label=\"Leaf\\n";
+  //         for (const auto& point : node.points()) {
+  //             dotFile << "(" << point.x() << ", " << point.y() << ", " << point.z() << ")\\n";
+  //         }
+  //         dotFile << "\"];\n";
+  //     } else {
+  //         dotFile << "node" << currentId << " [label=\"Internal\\nBounding Box\\n[("
+  //                 << node.bounding_box().min(0) << ", " << node.bounding_box().min(1) << ", " << node.bounding_box().min(2)
+  //                 << ") -> ("
+  //                 << node.bounding_box().max(0) << ", " << node.bounding_box().max(1) << ", " << node.bounding_box().max(2)
+  //                 << ")\"];\n";
+
+  //         for (const auto& child : node.children()) {
+  //             int childId = nodeId++;
+  //             dotFile << "node" << currentId << " -> node" << childId << ";\n";
+  //         }
+  //     }
+  // });
+
+  // dotFile << "}\n";
+  dotFile.close();
+  cout << "DOT file exported as " << fileName << endl;
+
+
+
+
+
+
+
+
+
+}

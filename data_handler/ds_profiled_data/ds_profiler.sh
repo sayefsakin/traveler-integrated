@@ -9,6 +9,7 @@ export DATASET_LOCATION="/mnt/d/Projects/mosaic_testing/mosaic/data/traveler_dat
 KDT="kd_tree"
 SGT="segment_tree"
 SAT="summed_area_table"
+AGC="agglomerative_clustering"
 DUCK_MIN_MAX="db_duck_min_max"
 DUCK_SKETCH="db_duck_sketch"
 POSTGRES_MIN_MAX="db_postgres_min_max"
@@ -37,7 +38,7 @@ LONEPEAK_URL="http://lonepeak2:8000"
 
 export DATASET_ID=$KMEANS_ID_N
 export TOTAL_SAMPLE=10
-export PROFILED_DS=$POSTGRES_MIN_MAX
+export PROFILED_DS=$DUCK_SKETCH
 export QUERY_TYPE=$Q_WINDOW
 export BASE_URL=$LOCALHOST_URL
 
@@ -72,7 +73,6 @@ cgal(){
   if [[ $PROFILED_DS != $KDT ]]; then
     return 0;
   fi
-  export CGAL_PROCESS_ID=`ps -u $USER | grep make | awk '{print $1}'`
   cgal_watch=$profile_directory"/"$PROFILED_DS"_"$QUERY_TYPE"_cgal_check"
   echo "Writing CGAL server output to file: "$cgal_watch
   cd $traveler_base_directory"/data_handler/cgal_libs/cgal_server"
@@ -86,6 +86,7 @@ cgal(){
     fi
   done
   echo "CGAL server is running";
+  export CGAL_PROCESS_ID=`ps -u $USER | grep make | awk '{print $1}'`
   sleep 1
 }
 
@@ -205,11 +206,11 @@ prepare_and_merge_files(){
   cd $DATASET_ID;
 #  rm -f *_selenium_check;
   paste -d , "$PROFILED_DS"_"$QUERY_TYPE"_* > "$PROFILED_DS"_"$QUERY_TYPE"_merged.csv;
-  echo "Initial memory: $PRE_MEMORY_CHECK GB" >> "$PROFILED_DS"_"$QUERY_TYPE"_merged.csv;
-  echo "Post run memory: $POST_MEMORY_CHECK GB" >> "$PROFILED_DS"_"$QUERY_TYPE"_merged.csv;
+  echo "Initial memory: $PRE_MEMORY_CHECK MB" >> "$PROFILED_DS"_"$QUERY_TYPE"_merged.csv;
+  echo "Post run memory: $POST_MEMORY_CHECK MB" >> "$PROFILED_DS"_"$QUERY_TYPE"_merged.csv;
 
-  if [[ $PROFILED_DS == $KDT ]]; then
-    echo "Post postgres memory: $POST_CGAL_MEMORY_CHECK GB" >> "$PROFILED_DS"_"$QUERY_TYPE"_merged.csv;
+  if [[ $PROFILED_DS == db_postgres* ]] ; then
+    echo "Post postgres memory: $POST_CGAL_MEMORY_CHECK MB" >> "$PROFILED_DS"_"$QUERY_TYPE"_merged.csv;
   fi
   echo "Formatting all output files";
 }

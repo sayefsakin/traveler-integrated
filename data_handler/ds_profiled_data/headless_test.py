@@ -15,6 +15,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 from selenium.common.exceptions import WebDriverException
 from selenium.common.exceptions import NoSuchElementException
 from selenium.common.exceptions import StaleElementReferenceException
+from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 
 import requests
 
@@ -283,6 +284,7 @@ def conductBrushing(driver, timeout, p_freq, TOTAL_SAMPLE):
             endTimer = round(time.time() * 1000000)
             brush_percentage = int(abs(previous_handle - current_handle) / handleWindow * 100.0)
             print(str(iteration_count), str(brush_percentage), str(endTimer - startTimer), sep=",")
+            time.sleep(3000)
             # print('Iteration', '{:2d}'.format(iteration_count), end=' ')
             # print('Brush percentage', '{:3d}%'.format(brush_percentage), end=' ')
             # print('Total drawing time:', '{:5d}'.format(endTimer - startTimer), 'ms')
@@ -291,6 +293,10 @@ def conductBrushing(driver, timeout, p_freq, TOTAL_SAMPLE):
 
     # print("successfully run the profiling on", driver.title)
 
+def conductSVGOutput(driver, params):
+    ganttEventCapturerElement = driver.find_elements(By.XPATH, "//*[@class='GLView ZoomableTimelineView']")[0]
+    ganttEventCapturerElement.screenshot(params['exportLocation'] + "/" + params['dataset'] + "_gantt.png")
+    print("Saved screenshot of the Gantt event capturer element as gantt_event_capturer.png")
 
 def conductFixedScrolling(driver, timeout, p_freq, TOTAL_SAMPLE):
     time.sleep(3)
@@ -362,7 +368,7 @@ def conductFixedScrolling(driver, timeout, p_freq, TOTAL_SAMPLE):
 if __name__ == '__main__':
     url = "https://stackoverflow.com"
     options = webdriver.ChromeOptions()
-    #options.add_argument('--headless')
+    # options.add_argument('--headless')
     options.add_argument("--start-maximized") # open Browser in maximized mode
     #options.add_argument("disable-infobars") # disabling infobars
     # options.add_argument("--disable-extensions") # disabling extensions
@@ -378,10 +384,13 @@ if __name__ == '__main__':
 
     base_params = {
         'dataset': os.getenv('DATASET_ID', DGEM_ID),
-        'baseUrl': os.getenv('BASE_URL', "http://localhost:8000")
+        'baseUrl': os.getenv('BASE_URL', "http://localhost:8000"),
+        'exportLocation': "."
     }
     TOTAL_SAMPLE = int(os.getenv('TOTAL_SAMPLE', 20))
     QUERY_TYPE = os.getenv('QUERY_TYPE', 'window')
+    if len(sys.argv) > 1:
+        base_params['exportLocation'] = sys.argv[1]
 
     timeout = 500  # in seconds
     p_freq = 0.001  # in seconds
@@ -393,6 +402,7 @@ if __name__ == '__main__':
 
     # Set binary location and service
     options.binary_location = chrome_binary_path
+    options.set_capability('goog:loggingPrefs', {'performance': 'ALL'})
     service = ChromeService(chromedriver_path)
 
     with webdriver.Chrome(service=service, options=options) as driver:
@@ -403,16 +413,21 @@ if __name__ == '__main__':
         element = WebDriverWait(driver, timeout=timeout, poll_frequency=p_freq).until(GanttLoadingVisible())
         #element = WebDriverWait(driver, timeout=timeout, poll_frequency=p_freq).until(MozSketchLoadingVisible())
         endTimer = round(time.time() * 1000000)
-
+        # timing = driver.execute_script("return window.performance.timing;")
+        # print("Iniital Gantt Render time: ", timing["domContentLoadedEventEnd"] - timing["navigationStart"])
+        conductSVGOutput(driver, base_params)
         # canvas_elem = driver.find_elements(By.XPATH, "//canvas")
         # for parent_element in canvas_elem:
         #     print(parent_element.rect)
 
         # conductFixedScrolling(driver, timeout, p_freq, TOTAL_SAMPLE)
-        if QUERY_TYPE == 'window':
-            conductBrushing(driver, timeout, p_freq, TOTAL_SAMPLE)
-        elif QUERY_TYPE == 'attribute':
-            conductRandomClicking(driver, timeout, p_freq, TOTAL_SAMPLE)
-        elif QUERY_TYPE == 'cond':
-            time.sleep(60)
-        print('Initial Gantt Loading Time: ', '{:9d}'.format(endTimer - startTimer), 'micros ')
+        # time.sleep(3000)
+        # if QUERY_TYPE == 'window':
+        #     conductBrushing(driver, timeout, p_freq, TOTAL_SAMPLE)
+        # elif QUERY_TYPE == 'attribute':
+        #     conductRandomClicking(driver, timeout, p_freq, TOTAL_SAMPLE)
+        # elif QUERY_TYPE == 'cond':
+        #     time.sleep(60)
+        # print('Initial Gantt Loading Time: ', '{:9d}'.format(endTimer - startTimer), 'micros ')
+        # for entry in driver.get_log('performance'):
+        #     print(entry)
