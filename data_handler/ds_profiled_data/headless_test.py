@@ -18,6 +18,7 @@ from selenium.common.exceptions import StaleElementReferenceException
 from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 
 import requests
+import json
 
 #if __name__ == '__main__':
 #
@@ -293,10 +294,60 @@ def conductBrushing(driver, timeout, p_freq, TOTAL_SAMPLE):
 
     # print("successfully run the profiling on", driver.title)
 
-def conductSVGOutput(driver, params):
+def conductPNGOutput(driver, params):
+    loading_elem = driver.find_elements(By.XPATH, "//*[@class='scrollArea GLView SelectionInfoView']")
+    json_data = {}
+    for each_element in loading_elem:
+        following_sibling = each_element.find_element(By.TAG_NAME, "pre")
+        try:
+            json_data = json.loads(following_sibling.text)
+            break
+        except json.JSONDecodeError as e:
+            print("Failed to parse JSON:", e)
+            return
+    
+    time.sleep(3)
+    # zoom out in the gantt y axis to reveal all locations
+    ganttYScroller = driver.find_element(By.CLASS_NAME, "yAxisScrollCapturer")
+    wheel_element(ganttYScroller, -150)
+
+    # element = WebDriverWait(driver, timeout=timeout, poll_frequency=p_freq).until(UtilizationLoadingVisible())
+    hoverTarget = driver.find_elements(By.XPATH, "//*[@class='hoverTarget']")
+    rightHandleLocation = 0
+    leftHandleLocation = 0
+    
+    for each_hover in hoverTarget:
+        parent_element = each_hover.find_element(By.XPATH, "..")
+        if parent_element.get_attribute("class") == 'rightHandle':
+            rightHandleLocation = each_hover.location['x']
+        else:
+            leftHandleLocation = each_hover.location['x']
+    handleWindow = rightHandleLocation - leftHandleLocation
+
+    start_boundary = json_data["intervalDomain"][0]
+    end_boundary = json_data["intervalDomain"][1]
+    start_time = params['exportStartTime']
+    end_time = params['exportEndTime']
+
+    start_p = (start_time - start_boundary) / (end_boundary - start_boundary)
+    end_p = (end_time - start_boundary) / (end_boundary - start_boundary)
+
+    c_begin = int(handleWindow * start_p) + leftHandleLocation
+    c_end = int(handleWindow * end_p) + leftHandleLocation
+    # print(leftHandleLocation, c_begin, c_end, rightHandleLocation)
+    for each_hover in hoverTarget:
+        parent_element = each_hover.find_element(By.XPATH, "..")
+        start = each_hover.location
+        drag_offset = c_begin - start['x']
+        if parent_element.get_attribute("class") == 'rightHandle':
+            drag_offset = c_end - start['x']
+        ActionChains(driver).drag_and_drop_by_offset(each_hover, drag_offset, 0).perform()
+        WebDriverWait(driver, timeout=timeout, poll_frequency=p_freq).until(GanttLoadingVisible())
+
     ganttEventCapturerElement = driver.find_elements(By.XPATH, "//*[@class='GLView ZoomableTimelineView']")[0]
-    ganttEventCapturerElement.screenshot(params['exportLocation'] + "/" + params['dataset'] + "_gantt.png")
-    print("Saved screenshot of the Gantt event capturer element as gantt_event_capturer.png")
+    exported_file_name = params['exportLocation'] + "/" + params['dataset'] + "_gantt.png"
+    ganttEventCapturerElement.screenshot(exported_file_name)
+    print("Saved screenshot from ", str(params['exportStartTime']), "ns to ", str(params['exportEndTime']), "ns of the Gantt chart at: ", exported_file_name)
 
 def conductFixedScrolling(driver, timeout, p_freq, TOTAL_SAMPLE):
     time.sleep(3)
@@ -385,12 +436,18 @@ if __name__ == '__main__':
     base_params = {
         'dataset': os.getenv('DATASET_ID', DGEM_ID),
         'baseUrl': os.getenv('BASE_URL', "http://localhost:8000"),
-        'exportLocation': "."
+        'exportLocation': ".",
+        'exportStartTime': 200000000,
+        'exportEndTime': 250000000,
     }
     TOTAL_SAMPLE = int(os.getenv('TOTAL_SAMPLE', 20))
     QUERY_TYPE = os.getenv('QUERY_TYPE', 'window')
     if len(sys.argv) > 1:
         base_params['exportLocation'] = sys.argv[1]
+    if len(sys.argv) > 2:
+        base_params['exportStartTime'] = sys.argv[2]
+    if len(sys.argv) > 3:
+        base_params['exportEndTime'] = int(sys.argv[3])
 
     timeout = 500  # in seconds
     p_freq = 0.001  # in seconds
@@ -415,7 +472,7 @@ if __name__ == '__main__':
         endTimer = round(time.time() * 1000000)
         # timing = driver.execute_script("return window.performance.timing;")
         # print("Iniital Gantt Render time: ", timing["domContentLoadedEventEnd"] - timing["navigationStart"])
-        conductSVGOutput(driver, base_params)
+        conductPNGOutput(driver, base_params)
         # canvas_elem = driver.find_elements(By.XPATH, "//canvas")
         # for parent_element in canvas_elem:
         #     print(parent_element.rect)
