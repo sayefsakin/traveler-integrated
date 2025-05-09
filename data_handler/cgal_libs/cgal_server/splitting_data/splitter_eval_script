@@ -1,0 +1,1 @@
+for i in {1..5}; do make | grep 'KD Tree Splitting' >> splitter_results; done

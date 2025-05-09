@@ -1,0 +1,54 @@
+rm -f cgal_data_server
+g++ -g -Wall -o cgal_data_server cgal_data_server.cpp curl_get.cpp optimized_binned_kdt.cpp -I./rapidjson/include -lcurl
+./cgal_data_server 8b3289c9-a740-4091-a56d-e4d55af526b5
+Generated Url String: http://localhost:8000/datasets/8b3289c9-a740-4091-a56d-e4d55af526b5/intervals
+.....KD Tree build time = 723613[microseconds]
+Old KD Tree build time = 506752[microseconds]
+Segment Tree build time = 487701[microseconds]
+kd tree and segment tree build done
+Total interval count: 14698, Primitive count: 109
+Server is now listening
+ds type,ds query type,ds query begin,ds query end,ds query time (micros)
+KDT OLD,ds_window,47907181,1400844060,3818
+KDT,ds_window,47907181,1400844060,85932
+KDT OLD,ds_window,-1305029698,2753780939,3665
+KDT,ds_window,-1305029698,2753780939,68926
+KDT OLD,ds_window,-661665776,2432098978,3123
+KDT,ds_window,-661665776,2432098978,77572
+KDT OLD,ds_window,221120508,1990705836,3552
+KDT,ds_window,221120508,1990705836,103789
+KDT OLD,ds_window,47907181,1400844060,5281
+KDT,ds_window,47907181,1400844060,116945
+KDT OLD,ds_window,54984336,2073773922,3178
+KDT,ds_window,54984336,2073773922,200096
+KDT OLD,ds_window,756813032,1722859574,3120
+KDT,ds_window,756813032,1722859574,245134
+KDT OLD,ds_window,895999245,1444487148,3141
+KDT,ds_window,895999245,1444487148,320348
+KDT OLD,ds_window,895999245,1444487148,3167
+KDT,ds_window,895999245,1444487148,324903
+KDT OLD,ds_window,895999245,1444487148,3415
+KDT,ds_window,895999245,1444487148,328434
+KDT OLD,ds_window,1035185458,1583673361,3108
+KDT,ds_window,1035185458,1583673361,310708
+KDT OLD,ds_window,1035185458,1583673361,5299
+KDT,ds_window,1035185458,1583673361,38144
+KDT OLD,ds_window,1035185458,1583673361,5518
+KDT,ds_window,1035185458,1583673361,56395
+KDT OLD,ds_window,1035185458,1583673361,5626
+KDT,ds_window,1035185458,1583673361,93775
+KDT OLD,ds_window,1035185458,1583673361,6007
+KDT,ds_window,1035185458,1583673361,153468
+KDT OLD,ds_window,902486771,1450974677,5962
+KDT,ds_window,902486771,1450974677,160191
+KDT OLD,ds_window,578112204,1126600113,1128
+KDT,ds_window,578112204,1126600113,85175
+KDT OLD,ds_window,351049962,899537874,33
+KDT,ds_window,351049962,899537874,65437
+KDT OLD,ds_window,905435627,1453923542,6059
+KDT,ds_window,905435627,1453923542,162662
+KDT OLD,ds_window,1219783999,1296749356,1478
+KDT,ds_window,1219783999,1296749356,163863
+double free or corruption (!prev)
+Makefile:22: recipe for target 'all' failed
+make: *** [all] Aborted

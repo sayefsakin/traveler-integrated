@@ -1,0 +1,10 @@
+rm -f cgal_data_server
+g++ -g -Wall -o cgal_data_server cgal_data_server.cpp curl_get.cpp -I rapidjson/include -lcurl
+./cgal_data_server 589ca754-ef75-426c-8d51-841cc61dc84a
+Generated Url String: http://localhost:8000/datasets/589ca754-ef75-426c-8d51-841cc61dc84a/intervals
+KD Tree build time = 19332[microseconds]
+Segment Tree build time = 38289[microseconds]
+kd tree and segment tree build done
+Total interval count: 676, Primitive count: 43
+0 675
+KD Tree Midpoint_of_rectangle Splitting, 102
