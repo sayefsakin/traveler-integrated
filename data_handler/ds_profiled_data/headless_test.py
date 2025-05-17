@@ -311,43 +311,47 @@ def conductPNGOutput(driver, params):
     ganttYScroller = driver.find_element(By.CLASS_NAME, "yAxisScrollCapturer")
     wheel_element(ganttYScroller, -150)
 
-    # element = WebDriverWait(driver, timeout=timeout, poll_frequency=p_freq).until(UtilizationLoadingVisible())
-    hoverTarget = driver.find_elements(By.XPATH, "//*[@class='hoverTarget']")
-    rightHandleLocation = 0
-    leftHandleLocation = 0
+    element = WebDriverWait(driver, timeout=timeout, poll_frequency=p_freq).until(GanttLoadingVisible())
+    time.sleep(10)
+    if 'exportStartTime' in params:
+        # element = WebDriverWait(driver, timeout=timeout, poll_frequency=p_freq).until(UtilizationLoadingVisible())
+        hoverTarget = driver.find_elements(By.XPATH, "//*[@class='hoverTarget']")
+        rightHandleLocation = 0
+        leftHandleLocation = 0
+        
+        for each_hover in hoverTarget:
+            parent_element = each_hover.find_element(By.XPATH, "..")
+            if parent_element.get_attribute("class") == 'rightHandle':
+                rightHandleLocation = each_hover.location['x']
+            else:
+                leftHandleLocation = each_hover.location['x']
+        handleWindow = rightHandleLocation - leftHandleLocation
+
+        start_boundary = json_data["intervalDomain"][0]
+        end_boundary = json_data["intervalDomain"][1]
     
-    for each_hover in hoverTarget:
-        parent_element = each_hover.find_element(By.XPATH, "..")
-        if parent_element.get_attribute("class") == 'rightHandle':
-            rightHandleLocation = each_hover.location['x']
-        else:
-            leftHandleLocation = each_hover.location['x']
-    handleWindow = rightHandleLocation - leftHandleLocation
+        start_time = params['exportStartTime']
+        end_time = params['exportEndTime']
 
-    start_boundary = json_data["intervalDomain"][0]
-    end_boundary = json_data["intervalDomain"][1]
-    start_time = params['exportStartTime']
-    end_time = params['exportEndTime']
+        start_p = (start_time - start_boundary) / (end_boundary - start_boundary)
+        end_p = (end_time - start_boundary) / (end_boundary - start_boundary)
 
-    start_p = (start_time - start_boundary) / (end_boundary - start_boundary)
-    end_p = (end_time - start_boundary) / (end_boundary - start_boundary)
-
-    c_begin = int(handleWindow * start_p) + leftHandleLocation
-    c_end = int(handleWindow * end_p) + leftHandleLocation
-    # print(leftHandleLocation, c_begin, c_end, rightHandleLocation)
-    for each_hover in hoverTarget:
-        parent_element = each_hover.find_element(By.XPATH, "..")
-        start = each_hover.location
-        drag_offset = c_begin - start['x']
-        if parent_element.get_attribute("class") == 'rightHandle':
-            drag_offset = c_end - start['x']
-        ActionChains(driver).drag_and_drop_by_offset(each_hover, drag_offset, 0).perform()
-        WebDriverWait(driver, timeout=timeout, poll_frequency=p_freq).until(GanttLoadingVisible())
+        c_begin = int(handleWindow * start_p) + leftHandleLocation
+        c_end = int(handleWindow * end_p) + leftHandleLocation
+        # print(leftHandleLocation, c_begin, c_end, rightHandleLocation)
+        for each_hover in hoverTarget:
+            parent_element = each_hover.find_element(By.XPATH, "..")
+            start = each_hover.location
+            drag_offset = c_begin - start['x']
+            if parent_element.get_attribute("class") == 'rightHandle':
+                drag_offset = c_end - start['x']
+            ActionChains(driver).drag_and_drop_by_offset(each_hover, drag_offset, 0).perform()
+            WebDriverWait(driver, timeout=timeout, poll_frequency=p_freq).until(GanttLoadingVisible())
 
     ganttEventCapturerElement = driver.find_elements(By.XPATH, "//*[@class='GLView ZoomableTimelineView']")[0]
     exported_file_name = params['exportLocation'] + "/" + params['dataset'] + "_gantt.png"
     ganttEventCapturerElement.screenshot(exported_file_name)
-    print("Saved screenshot from ", str(params['exportStartTime']), "ns to ", str(params['exportEndTime']), "ns of the Gantt chart at: ", exported_file_name)
+    print("Saved screenshot from of the Gantt chart at: ", exported_file_name)
 
 def conductFixedScrolling(driver, timeout, p_freq, TOTAL_SAMPLE):
     time.sleep(3)
@@ -419,7 +423,7 @@ def conductFixedScrolling(driver, timeout, p_freq, TOTAL_SAMPLE):
 if __name__ == '__main__':
     url = "https://stackoverflow.com"
     options = webdriver.ChromeOptions()
-    # options.add_argument('--headless')
+    options.add_argument('--headless')
     options.add_argument("--start-maximized") # open Browser in maximized mode
     #options.add_argument("disable-infobars") # disabling infobars
     # options.add_argument("--disable-extensions") # disabling extensions
@@ -436,9 +440,7 @@ if __name__ == '__main__':
     base_params = {
         'dataset': os.getenv('DATASET_ID', DGEM_ID),
         'baseUrl': os.getenv('BASE_URL', "http://localhost:8000"),
-        'exportLocation': ".",
-        'exportStartTime': 200000000,
-        'exportEndTime': 250000000,
+        'exportLocation': "."
     }
     TOTAL_SAMPLE = int(os.getenv('TOTAL_SAMPLE', 20))
     QUERY_TYPE = os.getenv('QUERY_TYPE', 'window')

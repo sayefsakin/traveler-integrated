@@ -6,10 +6,12 @@ from .duck_wrapper import DuckWrapper
 
 class DSProfiler:
     def __init__(self):
+        self.RAW = "raw"
         self.KDT = "kd_tree"
         self.SGT = "segment_tree"
         self.SAT = "summed_area_table"
         self.AGC = "agglomerative_clustering"
+        self.EKM = "eseman_kdt"
         self.DUCK = "db_duck"
         self.POSTGRES = "db_postgres"
         self.DBTYPE_MIN_MAX = "min_max"

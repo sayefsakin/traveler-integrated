@@ -155,7 +155,7 @@ vector<double> EventAgglomerateClustering::binnedRangeQuery(int64_t time_begin, 
   // data_short_list.push_back(data[(s_end*2)+1]);
 
   vector<int64_t> data_short_list;
-  findClusters(time_begin, time_end, (int64_t)bin_size, npoints-2, data_short_list);
+  findClusters(time_begin, time_end, (int64_t)bin_size*8, npoints-2, data_short_list);
 
   for(long unsigned int i = 0; i < data_short_list.size(); i+=2) {
     int64_t start_time = data_short_list[i];
@@ -236,17 +236,17 @@ LocDict AgglomerateClusters::binnedRangeQuery(int64_t time_begin,
 //     PRINTLOG("Agglomerate Clustering Starting!");
 //     EventAgglomerateClustering agglomerate_clustering;
 
-//     string input_file_path = "/mnt/c/Users/sayef/IdeaProjects/traveler-integrated/data_handler/cgal_libs/cgal_server/location_data/";
-//     fstream input_file(input_file_path + "9.location");
-//     if (!input_file.is_open()) {
-//         PRINTLOG("Failed to open input file");
-//         return -1;
-//     }
-//     uint64_t start_time, end_time;
-//     while(input_file >> start_time >> end_time) {
-//         agglomerate_clustering.insertDataIntoTree(start_time, end_time);
-//     }
-//     input_file.close();
+    // string input_file_path = "/mnt/c/Users/sayef/IdeaProjects/traveler-integrated/data_handler/cgal_libs/cgal_server/location_data/";
+    // fstream input_file(input_file_path + "9.location");
+    // if (!input_file.is_open()) {
+    //     PRINTLOG("Failed to open input file");
+    //     return -1;
+    // }
+    // uint64_t start_time, end_time;
+    // while(input_file >> start_time >> end_time) {
+    //     agglomerate_clustering.insertDataIntoTree(start_time, end_time);
+    // }
+    // input_file.close();
 //     agglomerate_clustering.getDataSize();//6666739
 //     PRINTLOG("Data inserted into the cluster");
 

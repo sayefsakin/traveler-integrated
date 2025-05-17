@@ -112,14 +112,15 @@ class DuckWrapper():
         return locDict
     
     def db_gantt_sketch(self, bins, begin, end, location, primitive):
+        print("from duckdb gantt sketch")
         elements = str((int(bins) * 3) + 1)# "1000000"
         primitive_filter_text = ""
         if primitive is not None:
             primitive_filter_text = " AND Primitive = '" + primitive + "' "
         gs_query = "SELECT enter_timestamp, leave_timestamp, Location FROM intervals" \
             " WHERE Location = '" + str(location) + "'" + primitive_filter_text + \
-            " AND leave_timestamp >= " + str(begin) + " AND enter_timestamp <= " + str(end) + \
-            " USING SAMPLE reservoir(" + elements + " ROWS) REPEATABLE(100)"
+            " AND leave_timestamp >= " + str(begin) + " AND enter_timestamp <= " + str(end)# + \
+            # " USING SAMPLE reservoir(" + elements + " ROWS) REPEATABLE(100)"
         results = self.connection.execute(gs_query).fetchall()
 
 

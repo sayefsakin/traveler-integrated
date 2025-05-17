@@ -30,6 +30,7 @@
 #include "curl_get.cpp"
 #include "optimized_binned_kdt.h"
 #include "agglomerate_clustering.h"
+#include "eseman_kdt.h"
 #include "rapidjson/document.h"
 #include "rapidjson/writer.h"
 #include "rapidjson/stringbuffer.h"
@@ -78,6 +79,7 @@ typedef Kd_tree_search::Tree NNKdtree;
 string KDTREE("kd_tree");
 string SGTREE("segment_tree");
 string AGCLUSTER("agglomerative_clustering");
+string ESEMAN("eseman_kdt");
 string GETDATAINRANGE("GetDataInRange");
 string GETEVENTATTRIBUTE("GetEventAttribute");
 string GETCHILDREN("GetChildren");
@@ -249,10 +251,23 @@ Document binnedAGCSearchQuery( AgglomerateClusters *agc,
     uint64_t location_end,
     uint64_t bins) {
 
-LocDict lResults = agc->binnedRangeQuery(time_begin, time_end, location_begin, location_end, bins);
-Document d = convertLocDictToDocument(lResults);
-lResults.clear();
-return d;
+    LocDict lResults = agc->binnedRangeQuery(time_begin, time_end, location_begin, location_end, bins);
+    Document d = convertLocDictToDocument(lResults);
+    lResults.clear();
+    return d;
+}
+
+Document binnedESEMANSearchQuery( EseManKDT *emk,
+    int64_t time_begin,
+    int64_t time_end,
+    uint64_t location_begin,
+    uint64_t location_end,
+    uint64_t bins) {
+
+    LocDict lResults = emk->binnedRangeQuery(time_begin, time_end, location_begin, location_end, bins);
+    Document d = convertLocDictToDocument(lResults);
+    lResults.clear();
+    return d;
 }
 
 Document kdTreeSearchQuery( Kdtree *kdtree,
@@ -474,6 +489,7 @@ Document processReceivedRequest(BinnedKDT *binnedKDT,
                                 BinnedKDT *neighborKDT,
                                 Segment_tree_3_type *neighborSGT,
                                 AgglomerateClusters *agglomerateClusters,
+                                EseManKDT *emk,
                                 Document *d,
                                 int64_t minId, int64_t maxId,
                                 int64_t minTime, int64_t maxTime,
@@ -530,6 +546,9 @@ Document processReceivedRequest(BinnedKDT *binnedKDT,
         } else if(ds_request == AGCLUSTER) {
             if(DEBUG) cout << "got agglomerate cluster request" << endl;
             return binnedAGCSearchQuery(agglomerateClusters, time_begin, time_end, location_begin, location_end, bins);
+        } else if(ds_request == ESEMAN) {
+            if(DEBUG) cout << "got eseman cluster request" << endl;
+            return binnedESEMANSearchQuery(emk, time_begin, time_end, location_begin, location_end, bins);
         } else {
             if(DEBUG) cout << "invalid ds request" << endl;
         }
@@ -561,6 +580,7 @@ void startServerListening(BinnedKDT *binnedKDT,
                         BinnedKDT *neighborKDT,
                         Segment_tree_3_type *neighborSGT,
                         AgglomerateClusters *agglomerateClusters,
+                        EseManKDT *emk,
                         uint64_t tree_build_time,
                         int64_t minId, int64_t maxId,
                         int64_t minTime, int64_t maxTime,
@@ -624,6 +644,7 @@ void startServerListening(BinnedKDT *binnedKDT,
             binnedKDT, Segment_tree_3,
             neighborKDT, neighborSGT,
             agglomerateClusters,
+            emk,
             &d, minId, maxId, 
             minTime, maxTime,
             minLocation, maxLocation, pm
@@ -685,6 +706,7 @@ int main(int argc, char *argv[])
     Segment_tree_3_type Segment_tree_3;
     Segment_tree_3_type Segment_tree_neighbor_3;
     AgglomerateClusters agglomerateClusters;
+    EseManKDT *esemanKDT = new EseManKDT();
 
     map<uint64_t, unique_ptr<BinnedKDT>> locationKDT;
 
@@ -761,6 +783,11 @@ int main(int argc, char *argv[])
             ));
         } else if(profiled_ds == AGCLUSTER) {
             agglomerateClusters.insertDataIntoTree(interval_enter.x(), interval_end.x(), v.GetObject()["Location"].GetString());
+        } else if(profiled_ds == ESEMAN) {
+            esemanKDT->insertDataIntoTree(interval_enter.x(), interval_end.x(), v.GetObject()["Location"].GetString());
+        } else {
+            cout << "Invalid data structure" << endl;
+            return EXIT_FAILURE;
         }
         totalIntervals++;
         if(totalIntervals % 2500 == 0)
@@ -771,12 +798,12 @@ int main(int argc, char *argv[])
     cout << endl;
 
     if(profiled_ds == KDTREE) {
-        // std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
-        // binnedKDT.tree.build(); // explicitely call build, so that the first query wount spend time in building
-        // std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
-        // tree_build_time = std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count();
-        // std::cout << "KD Tree build time = " << tree_build_time << "[microseconds]" << std::endl;
-        // neighborKDT.tree.build();
+        std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+        binnedKDT.tree.build(); // explicitely call build, so that the first query wount spend time in building
+        std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+        tree_build_time = std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count();
+        std::cout << "KD Tree build time = " << tree_build_time << "[microseconds]" << std::endl;
+        neighborKDT.tree.build();
 
         const string baseDotFileLocation = "/mnt/c/Users/sayef/IdeaProjects/traveler-integrated/data_handler/cgal_libs/cgal_server/figures";
         // std::string outputFilePath = baseDotFileLocation + "/binnedKDT.dot";
@@ -799,6 +826,12 @@ int main(int argc, char *argv[])
         std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
         tree_build_time = std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count();
         std::cout << "Agglomerate Cluster build time = " << tree_build_time << "[microseconds]" << std::endl;
+    } else if(profiled_ds == ESEMAN) {
+        std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+        esemanKDT->buildKDT();
+        std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+        tree_build_time = std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count();
+        std::cout << "EseMAN KDT build time = " << tree_build_time << "[microseconds]" << std::endl;
     }
     // begin = std::chrono::steady_clock::now();
     // kdtree.build();
@@ -821,6 +854,7 @@ int main(int argc, char *argv[])
         &binnedKDT, &Segment_tree_3, 
         &neighborKDT, &Segment_tree_neighbor_3,
         &agglomerateClusters,
+        esemanKDT,
         tree_build_time, 
         minId, maxId, 
         minTime, maxTime,
