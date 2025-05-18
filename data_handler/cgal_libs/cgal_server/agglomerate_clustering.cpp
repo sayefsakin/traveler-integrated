@@ -155,7 +155,7 @@ vector<double> EventAgglomerateClustering::binnedRangeQuery(int64_t time_begin, 
   // data_short_list.push_back(data[(s_end*2)+1]);
 
   vector<int64_t> data_short_list;
-  findClusters(time_begin, time_end, (int64_t)bin_size*8, npoints-2, data_short_list);
+  findClusters(time_begin, time_end, (int64_t)bin_size*1, npoints-2, data_short_list);
 
   for(long unsigned int i = 0; i < data_short_list.size(); i+=2) {
     int64_t start_time = data_short_list[i];

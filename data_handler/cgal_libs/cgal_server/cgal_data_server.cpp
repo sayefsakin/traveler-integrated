@@ -701,12 +701,24 @@ int main(int argc, char *argv[])
     int64_t cPrimitiveNumber = -1;
     primitiveMapping[""] = -1;
 
-    BinnedKDT binnedKDT;
-    BinnedKDT neighborKDT;
-    Segment_tree_3_type Segment_tree_3;
-    Segment_tree_3_type Segment_tree_neighbor_3;
-    AgglomerateClusters agglomerateClusters;
-    EseManKDT *esemanKDT = new EseManKDT();
+    BinnedKDT *binnedKDT = nullptr;
+    BinnedKDT *neighborKDT = nullptr;
+    Segment_tree_3_type *Segment_tree_3 = nullptr;
+    Segment_tree_3_type *Segment_tree_neighbor_3 = nullptr;
+    AgglomerateClusters *agglomerateClusters = nullptr;
+    EseManKDT *esemanKDT = nullptr;
+
+    if(profiled_ds == KDTREE) {
+        binnedKDT = new BinnedKDT();
+        neighborKDT = new BinnedKDT();
+    } else if(profiled_ds == SGTREE) {
+        Segment_tree_3 = new Segment_tree_3_type();
+        Segment_tree_neighbor_3 = new Segment_tree_3_type();
+    } else if(profiled_ds == AGCLUSTER) {
+        agglomerateClusters = new AgglomerateClusters();
+    } else if(profiled_ds == ESEMAN) {
+        esemanKDT = new EseManKDT();
+    }
 
     map<uint64_t, unique_ptr<BinnedKDT>> locationKDT;
 
@@ -756,10 +768,10 @@ int main(int argc, char *argv[])
         // outfile.close();
 
         if(profiled_ds == KDTREE) {
-            binnedKDT.insertDataIntoTree(interval_enter.x(), interval_enter.y(), 
+            binnedKDT->insertDataIntoTree(interval_enter.x(), interval_enter.y(), 
                                         interval_end.x(), interval_end.y(), 
                                         v.GetObject()["intervalId"].GetString(), cPrimitiveNumber);
-            neighborKDT.insertDataIntoTree(interval_enter.x(), interval_enter.y(), 
+            neighborKDT->insertDataIntoTree(interval_enter.x(), interval_enter.y(), 
                                         interval_end.x(), interval_end.y(), 
                                         v.GetObject()["intervalId"].GetString(), 
                                         parent_id);
@@ -782,7 +794,7 @@ int main(int argc, char *argv[])
                     v.GetObject()["intervalId"].GetString()
             ));
         } else if(profiled_ds == AGCLUSTER) {
-            agglomerateClusters.insertDataIntoTree(interval_enter.x(), interval_end.x(), v.GetObject()["Location"].GetString());
+            agglomerateClusters->insertDataIntoTree(interval_enter.x(), interval_end.x(), v.GetObject()["Location"].GetString());
         } else if(profiled_ds == ESEMAN) {
             esemanKDT->insertDataIntoTree(interval_enter.x(), interval_end.x(), v.GetObject()["Location"].GetString());
         } else {
@@ -799,11 +811,11 @@ int main(int argc, char *argv[])
 
     if(profiled_ds == KDTREE) {
         std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
-        binnedKDT.tree.build(); // explicitely call build, so that the first query wount spend time in building
+        binnedKDT->tree.build(); // explicitely call build, so that the first query wount spend time in building
         std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
         tree_build_time = std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count();
         std::cout << "KD Tree build time = " << tree_build_time << "[microseconds]" << std::endl;
-        neighborKDT.tree.build();
+        neighborKDT->tree.build();
 
         const string baseDotFileLocation = "/mnt/c/Users/sayef/IdeaProjects/traveler-integrated/data_handler/cgal_libs/cgal_server/figures";
         // std::string outputFilePath = baseDotFileLocation + "/binnedKDT.dot";
@@ -822,7 +834,7 @@ int main(int argc, char *argv[])
         // }
     } else if(profiled_ds == AGCLUSTER) {
         std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
-        agglomerateClusters.buildAllAggClusters();
+        agglomerateClusters->buildAllAggClusters();
         std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
         tree_build_time = std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count();
         std::cout << "Agglomerate Cluster build time = " << tree_build_time << "[microseconds]" << std::endl;
@@ -840,20 +852,20 @@ int main(int argc, char *argv[])
 
     else if(profiled_ds == SGTREE) {
         std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
-        Segment_tree_3.make_tree(InputList.begin(),InputList.end());
+        Segment_tree_3->make_tree(InputList.begin(),InputList.end());
         std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
         tree_build_time = std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count();
         std::cout << "Segment Tree build time = " << tree_build_time << "[microseconds]" << std::endl;
-        Segment_tree_neighbor_3.make_tree(NeighborInputList.begin(),NeighborInputList.end());
+        Segment_tree_neighbor_3->make_tree(NeighborInputList.begin(),NeighborInputList.end());
     }
     cout << "Tree build done" << endl << "Total interval count: " << totalIntervals <<  ", Primitive count: " << cPrimitiveNumber << endl;
     // testSearchQueries(&kdtree, &Segment_tree_3, minId, maxId, urlparser.datasetId);
     // point_with_info_testing();
 
     startServerListening(
-        &binnedKDT, &Segment_tree_3, 
-        &neighborKDT, &Segment_tree_neighbor_3,
-        &agglomerateClusters,
+        binnedKDT, Segment_tree_3, 
+        neighborKDT, Segment_tree_neighbor_3,
+        agglomerateClusters,
         esemanKDT,
         tree_build_time, 
         minId, maxId, 
