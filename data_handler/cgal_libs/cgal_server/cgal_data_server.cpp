@@ -678,8 +678,9 @@ int main(int argc, char *argv[])
     urlparser.travelerApi = "intervals";//"primitives";
     if(argc>1) urlparser.datasetId = argv[1];
     char *pds = getenv("PROFILED_DS");
+    char *pds2 = getenv("HORIZONTAL_RESOLUTION_DIVISOR");
     string profiled_ds = pds == NULL ? string("summed_area_table") : string(pds);
-
+    int horizontal_resolution_divisor = pds2 == NULL ? 1 : atoi(pds2);
 /*
     urlparser.urlParameters.Parse(R""""({
                                       "begin":"813481624",
@@ -716,8 +717,10 @@ int main(int argc, char *argv[])
         Segment_tree_neighbor_3 = new Segment_tree_3_type();
     } else if(profiled_ds == AGCLUSTER) {
         agglomerateClusters = new AgglomerateClusters();
+        agglomerateClusters->horizontal_resolution_divisor = horizontal_resolution_divisor;
     } else if(profiled_ds == ESEMAN) {
         esemanKDT = new EseManKDT();
+        esemanKDT->horizontal_resolution_divisor = horizontal_resolution_divisor;
     }
 
     map<uint64_t, unique_ptr<BinnedKDT>> locationKDT;

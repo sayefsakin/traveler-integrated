@@ -134,7 +134,7 @@ void EventAgglomerateClustering::findClusters(int64_t start_t, int64_t end_t, in
   findClusters(start_t, end_t, bin_size, right_node_index - npoints, results);
 }
 
-vector<double> EventAgglomerateClustering::binnedRangeQuery(int64_t time_begin, int64_t time_end, uint64_t bins) {
+vector<double> EventAgglomerateClustering::binnedRangeQuery(int64_t time_begin, int64_t time_end, uint64_t bins, int hrd) {
   vector<double> results(bins);
   uint64_t bin_size(getAGCBinSize(time_begin, time_end, bins));
   PRINTLOG("Got AGC binned range query");
@@ -155,7 +155,7 @@ vector<double> EventAgglomerateClustering::binnedRangeQuery(int64_t time_begin, 
   // data_short_list.push_back(data[(s_end*2)+1]);
 
   vector<int64_t> data_short_list;
-  findClusters(time_begin, time_end, (int64_t)bin_size*1, npoints-2, data_short_list);
+  findClusters(time_begin, time_end, (int64_t)bin_size*hrd, npoints-2, data_short_list);
 
   for(long unsigned int i = 0; i < data_short_list.size(); i+=2) {
     int64_t start_time = data_short_list[i];
@@ -218,7 +218,7 @@ LocDict AgglomerateClusters::binnedRangeQuery(int64_t time_begin,
       continue;
     }
     
-    locDict[c_loc] = agglomerate_clusters[c_loc_str].binnedRangeQuery(time_begin, time_end, bins);
+    locDict[c_loc] = agglomerate_clusters[c_loc_str].binnedRangeQuery(time_begin, time_end, bins, horizontal_resolution_divisor);
   }
   std::chrono::steady_clock::time_point clock_end = std::chrono::steady_clock::now();
   // for (const auto& myPair : locDict) {

@@ -74,7 +74,7 @@ class EventAgglomerateClustering {
 
     void insertDataIntoTree(double start_time, double end_time);
     void buildAggCluster();
-    vector<double> binnedRangeQuery(int64_t time_begin, int64_t time_end, uint64_t bins);
+    vector<double> binnedRangeQuery(int64_t time_begin, int64_t time_end, uint64_t bins, int hrd);
 
     void getDataSize() {
       PRINTLOG("Data size: " << data.size());
@@ -87,6 +87,7 @@ class AgglomerateClusters {
     std::map<std::string, EventAgglomerateClustering> agglomerate_clusters;
 
   public:
+    int horizontal_resolution_divisor = 1;
   AgglomerateClusters() {
     // Initialization logic for AgglomerateClusters
   }
