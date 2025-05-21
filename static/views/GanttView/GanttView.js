@@ -343,28 +343,120 @@ class GanttView extends ZoomableTimelineView { // abstracts a lot of common logi
     const canvas = this.d3el.select('canvas');
     const ctx = canvas.node().getContext('2d');
 
+    function drawGrayBars (binNo, y0, bandwidth, sUtilGrayCount, tUtilGrayCount, isBlack) {
+      var starterBin = binNo;
+      var grayCount = 0;
+      if (sUtilGrayCount > 0) {
+        ctx.fillStyle = theme['--selection-border-color'];
+        if(isBlack) {
+          ctx.fillStyle = theme['--selection-color'];
+        }
+        starterBin = binNo - sUtilGrayCount;
+        grayCount = sUtilGrayCount;
+      } else if (tUtilGrayCount > 0) {
+        ctx.fillStyle = theme['--text-color-softer'];
+        if(isBlack) {
+          ctx.fillStyle = theme['--disabled-color'];
+        }
+        starterBin = binNo - tUtilGrayCount;
+        grayCount = tUtilGrayCount;
+      }
+      var yy0 = y0;
+      if (isBlack) {
+        yy0 = y0 + 1;
+      }
+      var bands = bandwidth;
+      if (isBlack) {
+        bands = bandwidth - 2;
+      }
+      ctx.fillRect(starterBin, yy0, grayCount, bands);
+    }
+
+
+
     const bandwidth = this.yScale.bandwidth();
     for (const [location, data] of Object.entries(totalUtilization.locations)) {
       const y0 = this.yScale(location);
+      var sUtilBlackCount = 0;
+      var sUtilGrayCount = 0;
+      var tUtilBlackCount = 0;
+      var tUtilGrayCount = 0;
+      var isGrayDraw = false;
+      var isBlackDraw = false;
+      var isPendingBlackDraw = -1;
+      let blackStack = [];
       for (const [binNo, tUtil] of data.entries()) {
         const sUtil = selectionUtilization?.locations?.[location]?.[binNo];
         // Which border to draw (if any)?
         if (sUtil > 0) {
-          ctx.fillStyle = theme['--selection-border-color'];
-          ctx.fillRect(binNo, y0, 1, bandwidth);
+          sUtilGrayCount += 1;
+          isGrayDraw = true;
         } else if (tUtil > 0) {
-          ctx.fillStyle = theme['--text-color-softer'];
-          ctx.fillRect(binNo, y0, 1, bandwidth);
+          tUtilGrayCount += 1;
+          isGrayDraw = true;
+        } else {
+          if (isGrayDraw) {
+            drawGrayBars (binNo, y0, bandwidth, sUtilGrayCount, tUtilGrayCount, false);
+            if(isPendingBlackDraw > -1) {
+              blackStack.push([isPendingBlackDraw, sUtilBlackCount, tUtilBlackCount]);
+              isPendingBlackDraw = -1;
+              sUtilBlackCount = 0;
+              tUtilBlackCount = 0;
+            }
+            while (blackStack.length > 0) {
+              const [a, b, c] = blackStack.pop();
+              drawGrayBars (a, y0, bandwidth, b, c, true);
+            }
+            isGrayDraw = false;
+            sUtilGrayCount = 0;
+            tUtilGrayCount = 0;
+          }
         }
 
         // Which fill to draw (if any)?
         if (sUtil >= 1) {
-          ctx.fillStyle = theme['--selection-color'];
-          ctx.fillRect(binNo, y0 + 1, 1, bandwidth - 2);
+          if(isPendingBlackDraw > -1) {
+            blackStack.push([isPendingBlackDraw, sUtilBlackCount, tUtilBlackCount]);
+            isPendingBlackDraw = -1;
+            sUtilBlackCount = 0;
+            tUtilBlackCount = 0;
+          }
+          sUtilBlackCount += 1;
+          isBlackDraw = true;
         } else if (tUtil >= 1) {
-          ctx.fillStyle = theme['--disabled-color'];
-          ctx.fillRect(binNo, y0 + 1, 1, bandwidth - 2);
+          if(isPendingBlackDraw > -1) {
+            blackStack.push([isPendingBlackDraw, sUtilBlackCount, tUtilBlackCount]);
+            isPendingBlackDraw = -1;
+            sUtilBlackCount = 0;
+            tUtilBlackCount = 0;
+          }
+          tUtilBlackCount += 1;
+          isBlackDraw = true;
+        } else {
+          if (isBlackDraw) {
+            isPendingBlackDraw = binNo;
+            isBlackDraw = false;
+          }
         }
+      }
+      if (isGrayDraw) {
+        drawGrayBars (data.length, y0, bandwidth, sUtilGrayCount, tUtilGrayCount, false);
+        if(isPendingBlackDraw > -1) {
+          blackStack.push([isPendingBlackDraw, sUtilBlackCount, tUtilBlackCount]);
+          isPendingBlackDraw = -1;
+          sUtilBlackCount = 0;
+          tUtilBlackCount = 0;
+        }
+        while (blackStack.length > 0) {
+          const [a, b, c] = blackStack.pop();
+          drawGrayBars (a, y0, bandwidth, b, c, true);
+        }
+        isGrayDraw = false;
+        sUtilGrayCount = 0;
+        tUtilGrayCount = 0;
+      }
+      if (isBlackDraw) {
+        drawGrayBars (data.length, y0, bandwidth, sUtilBlackCount, tUtilBlackCount, true);
       }
     }
   }
