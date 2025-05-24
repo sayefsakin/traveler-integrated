@@ -799,7 +799,7 @@ int main(int argc, char *argv[])
         } else if(profiled_ds == AGCLUSTER) {
             agglomerateClusters->insertDataIntoTree(interval_enter.x(), interval_end.x(), v.GetObject()["Location"].GetString());
         } else if(profiled_ds == ESEMAN) {
-            esemanKDT->insertDataIntoTree(interval_enter.x(), interval_end.x(), v.GetObject()["Location"].GetString());
+            esemanKDT->insertDataIntoTree(interval_enter.x(), interval_end.x(), v.GetObject()["Location"].GetString(), cPrimitive);
         } else {
             cout << "Invalid data structure" << endl;
             return EXIT_FAILURE;

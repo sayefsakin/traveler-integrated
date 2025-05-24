@@ -9,15 +9,15 @@ inline double distance_event(const double& s11, const double& s12, const double&
     if (s12 < s21)
       return s21 - s12;
     return s11 - s22;
-  }
+}
 
-void EventAgglomerateClustering::insertDataIntoTree(double start_time, double end_time) {
+void EventAgglomerateClustering::insertDataIntoTree(double start_time, double end_time, string primitive_name) {
     if (start_time > end_time) {
         PRINTLOG("Invalid time range: start_time > end_time");
         return;
     }
-    data.push_back(start_time);
-    data.push_back(end_time);
+    data.push_back(EventDict{{"time",start_time},{"primitive", primitive_name}});
+    data.push_back(EventDict{{"time",end_time},{"primitive", primitive_name}});
 }
 
 void EventAgglomerateClustering::buildAggCluster() {
@@ -32,9 +32,13 @@ void EventAgglomerateClustering::buildAggCluster() {
     // computation of condensed distance matrix
     double* distmat = new double[(npoints*(npoints-1))/2];
     k = 0;
+    
     for (i=0; i<npoints; i++) {
         for (j=i+1; j<npoints; j++) {
-        distmat[k] = distance_event(data[i*2], data[(i*2)+1], data[j*2], data[(j*2)+1]);
+        distmat[k] = distance_event(getEventTime(data[i*2]), 
+                                    getEventTime(data[(i*2)+1]), 
+                                    getEventTime(data[j*2]),
+                                    getEventTime(data[(j*2)+1]));
         k++;
         }
     }
@@ -52,14 +56,14 @@ void EventAgglomerateClustering::buildAggCluster() {
     for (i=0; i<npoints-1; i++) {
       left_node_index = changeMerge(merge[i], npoints);
       if(left_node_index < npoints) {
-        start_events[left_node_index] = data[left_node_index*2];
-        end_events[left_node_index] = data[(left_node_index*2)+1];
+        start_events[left_node_index] = getEventTime(data[left_node_index*2]);
+        end_events[left_node_index] = getEventTime(data[(left_node_index*2)+1]);
       }
 
       right_node_index = changeMerge(merge[i+npoints-1], npoints);
       if(right_node_index < npoints) {
-        start_events[right_node_index] = data[right_node_index*2];
-        end_events[right_node_index] = data[(right_node_index*2)+1];
+        start_events[right_node_index] = getEventTime(data[right_node_index*2]);
+        end_events[right_node_index] = getEventTime(data[(right_node_index*2)+1]);
       }
 
       if(end_events[left_node_index] > start_events[right_node_index]) {
@@ -80,9 +84,9 @@ int EventAgglomerateClustering::searchEvent(int64_t tb, int begin_index) {
   int s_begin = 0;
   while(left < right) {
     int mid = (left + right) / 2;
-    if(data[(mid*2)+1] < tb) {
+    if(getEventTime(data[(mid*2)+1]) < tb) {
       left = mid + 1;
-    } else if(data[mid*2] > tb) {
+    } else if(getEventTime(data[mid*2]) > tb) {
       right = mid - 1;
     } else {
       s_begin = mid;
@@ -136,7 +140,7 @@ void EventAgglomerateClustering::findClusters(int64_t start_t, int64_t end_t, in
 
 vector<double> EventAgglomerateClustering::binnedRangeQuery(int64_t time_begin, int64_t time_end, uint64_t bins, int hrd) {
   vector<double> results(bins);
-  uint64_t bin_size(getAGCBinSize(time_begin, time_end, bins));
+  uint64_t bin_size(getBinSize(time_begin, time_end, bins));
   PRINTLOG("Got AGC binned range query");
 
   int* labels = new int[npoints];
@@ -168,8 +172,8 @@ vector<double> EventAgglomerateClustering::binnedRangeQuery(int64_t time_begin, 
     if(start_time > time_end) continue;
     if(end_time < time_begin) continue;
     if(end_time > time_end) end_time = time_end;
-    int64_t startingBin = getAGCBinNumber(time_begin, time_end, bins, start_time);
-    int64_t endingBin = getAGCBinNumber(time_begin, time_end, bins, end_time);
+    int64_t startingBin = getBinNumber(time_begin, time_end, bins, start_time);
+    int64_t endingBin = getBinNumber(time_begin, time_end, bins, end_time);
     if(startingBin < 0 || endingBin < 0) continue;
 
     for(int64_t bin_it = startingBin+1;
@@ -188,12 +192,12 @@ vector<double> EventAgglomerateClustering::binnedRangeQuery(int64_t time_begin, 
   return results;
 }
 
-void AgglomerateClusters::insertDataIntoTree(double start_time, double end_time, string track) {
+void AgglomerateClusters::insertDataIntoTree(double start_time, double end_time, string track, string primitive_name) {
   if(agglomerate_clusters.find(track) == agglomerate_clusters.end()) {
     agglomerate_clusters[track] = EventAgglomerateClustering();
     agglomerate_clusters[track].track = track;
   }
-  agglomerate_clusters[track].insertDataIntoTree(start_time, end_time);
+  agglomerate_clusters[track].insertDataIntoTree(start_time, end_time, primitive_name);
 }
 
 void AgglomerateClusters::buildAllAggClusters() {
@@ -232,31 +236,34 @@ LocDict AgglomerateClusters::binnedRangeQuery(int64_t time_begin,
   return locDict;
 }
 
-// int main() {
-//     PRINTLOG("Agglomerate Clustering Starting!");
-//     EventAgglomerateClustering agglomerate_clustering;
+#ifdef TESTING
+int main() {
+    PRINTLOG("Agglomerate Clustering Starting!");
+    EventAgglomerateClustering agglomerate_clustering;
 
-    // string input_file_path = "/mnt/c/Users/sayef/IdeaProjects/traveler-integrated/data_handler/cgal_libs/cgal_server/location_data/";
-    // fstream input_file(input_file_path + "9.location");
-    // if (!input_file.is_open()) {
-    //     PRINTLOG("Failed to open input file");
-    //     return -1;
-    // }
-    // uint64_t start_time, end_time;
-    // while(input_file >> start_time >> end_time) {
-    //     agglomerate_clustering.insertDataIntoTree(start_time, end_time);
-    // }
-    // input_file.close();
-//     agglomerate_clustering.getDataSize();//6666739
-//     PRINTLOG("Data inserted into the cluster");
+    string input_file_path = "/mnt/c/Users/sayef/IdeaProjects/traveler-integrated/data_handler/cgal_libs/cgal_server/location_data/";
+    fstream input_file(input_file_path + "9.location");
+    if (!input_file.is_open()) {
+        PRINTLOG("Failed to open input file");
+        return -1;
+    }
+    uint64_t start_time, end_time;
+    while(input_file >> start_time >> end_time) {
+        agglomerate_clustering.insertDataIntoTree(start_time, end_time, "1");
+    }
+    input_file.close();
+    agglomerate_clustering.getDataSize();//6666739
+    PRINTLOG("Data inserted into the cluster");
 
-//     agglomerate_clustering.buildAggCluster();
-//     vector<double> results = agglomerate_clustering.binnedRangeQuery(1074655386, 1246477086, 100);
-//     PRINTLOG("Results: ");
-//     for (const auto& result : results) {
-//         cout << setprecision(1) << result << " ";
-//     }
-//     cout << endl;
-//     PRINTLOG("Agglomerate Clustering Finished!");
-//     return 0;
-// }
+    agglomerate_clustering.buildAggCluster();
+    // vector<double> results = agglomerate_clustering.binnedRangeQuery(1074655386, 1246477086, 100, 1);
+    vector<double> results = agglomerate_clustering.binnedRangeQuery(-1305029698, 2753780939, 10, 1);
+    PRINTLOG("Results: ");
+    for (const auto& result : results) {
+        cout << setprecision(1) << result << " ";
+    }
+    cout << endl;
+    PRINTLOG("Agglomerate Clustering Finished!");
+    return 0;
+}
+#endif
