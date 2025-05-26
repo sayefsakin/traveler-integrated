@@ -76,13 +76,13 @@ typedef vector<string> Primitive_reverse_mapping;
 typedef CGAL::Orthogonal_k_neighbor_search<Traits> Kd_tree_search;
 typedef Kd_tree_search::Tree NNKdtree;
 
-string KDTREE("kd_tree");
-string SGTREE("segment_tree");
-string AGCLUSTER("agglomerative_clustering");
-string ESEMAN("eseman_kdt");
-string GETDATAINRANGE("GetDataInRange");
-string GETEVENTATTRIBUTE("GetEventAttribute");
-string GETCHILDREN("GetChildren");
+const string KDTREE("kd_tree");
+const string SGTREE("segment_tree");
+const string AGCLUSTER("agglomerative_clustering");
+const string ESEMAN("eseman_kdt");
+const string GETDATAINRANGE("GetDataInRange");
+const string GETEVENTATTRIBUTE("GetEventAttribute");
+const string GETCHILDREN("GetChildren");
 
 Pure_interval getPurIntervalFromPoint(Point_d p, Point_d q) {
     return Pure_interval(Key(p.x(),(p.y()*2)-1, (p.z()*2)-1), Key(q.x(),q.y()*2,q.z()*2));
@@ -202,6 +202,42 @@ Document kdTreeGetAttributeQuery(BinnedKDT *binnedKDT, BinnedKDT *neighborKDT, u
     Document::AllocatorType& allocator = document.GetAllocator();
     if(new_result.length()>0) {
         neighborKDT->getNeighborQuery(stol(new_result));
+        Value val(kObjectType);
+        val.SetString(new_result.c_str(), static_cast<SizeType>(new_result.length()), allocator);
+        document.AddMember("event_id", val, allocator);
+    }
+    return document;
+}
+
+Document agcGetAttributeQuery(AgglomerateClusters *agc, uint64_t cTime, uint64_t cLocation) {
+    std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+    string new_result = agc->findNearestEvent(cTime, cLocation);
+    std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+    cout << "AGC," << "ds_attribute," << cTime << "," << cLocation << "," << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() <<
+    endl;
+
+    Document document;
+    document.SetObject();
+    Document::AllocatorType& allocator = document.GetAllocator();
+    if(new_result.length()>0) {
+        Value val(kObjectType);
+        val.SetString(new_result.c_str(), static_cast<SizeType>(new_result.length()), allocator);
+        document.AddMember("event_id", val, allocator);
+    }
+    return document;
+}
+
+Document esemanGetAttributeQuery(EseManKDT *emk, uint64_t cTime, uint64_t cLocation) {
+    std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+    string new_result = emk->findNearestEvent(cTime, cLocation);
+    std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+    cout << "ESEMAN," << "ds_attribute," << cTime << "," << cLocation << "," << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() <<
+    endl;
+
+    Document document;
+    document.SetObject();
+    Document::AllocatorType& allocator = document.GetAllocator();
+    if(new_result.length()>0) {
         Value val(kObjectType);
         val.SetString(new_result.c_str(), static_cast<SizeType>(new_result.length()), allocator);
         document.AddMember("event_id", val, allocator);
@@ -574,6 +610,12 @@ Document processReceivedRequest(BinnedKDT *binnedKDT,
                                             minId, maxId,
                                             minTime, maxTime,
                                             minLocation, maxLocation);
+        } else if(ds_request == AGCLUSTER) {
+            if(DEBUG) cout << "got AGC request get attribute request" << endl;
+            return agcGetAttributeQuery(agglomerateClusters, cTime, cLocation);
+        } else if(ds_request == ESEMAN) {
+            if(DEBUG) cout << "got ESEMAN get attribute request" << endl;
+            return esemanGetAttributeQuery(emk, cTime, cLocation);
         } else {
             if(DEBUG) cout << "invalid ds request" << endl;
         }
@@ -803,9 +845,17 @@ int main(int argc, char *argv[])
                     v.GetObject()["intervalId"].GetString()
             ));
         } else if(profiled_ds == AGCLUSTER) {
-            agglomerateClusters->insertDataIntoTree(interval_enter.x(), interval_end.x(), v.GetObject()["Location"].GetString(), cPrimitive);
+            agglomerateClusters->insertDataIntoTree(interval_enter.x(),
+                                                    interval_end.x(),
+                                                    v.GetObject()["Location"].GetString(),
+                                                    cPrimitive,
+                                                    v.GetObject()["intervalId"].GetString());
         } else if(profiled_ds == ESEMAN) {
-            esemanKDT->insertDataIntoTree(interval_enter.x(), interval_end.x(), v.GetObject()["Location"].GetString(), cPrimitive);
+            esemanKDT->insertDataIntoTree(interval_enter.x(),
+                                          interval_end.x(),
+                                          v.GetObject()["Location"].GetString(),
+                                          cPrimitive,
+                                          v.GetObject()["intervalId"].GetString());
         } else {
             cout << "Invalid data structure" << endl;
             return EXIT_FAILURE;

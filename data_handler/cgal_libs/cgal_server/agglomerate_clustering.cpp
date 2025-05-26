@@ -32,13 +32,13 @@ void EventAgglomerateClustering::addAttributeAtIndex(size_t index, const string&
 }
 
 
-void EventAgglomerateClustering::insertDataIntoTree(double start_time, double end_time, string primitive_name) {
+void EventAgglomerateClustering::insertDataIntoTree(double start_time, double end_time, string primitive_name, string interval_id) {
     if (start_time > end_time) {
         PRINTLOG("Invalid time range: start_time > end_time");
         return;
     }
-    data.push_back(EventDict{{"time",start_time},{"primitive", primitive_name}});
-    data.push_back(EventDict{{"time",end_time},{"primitive", primitive_name}});
+    data.push_back(EventDict{{"time",start_time},{"primitive", primitive_name},{"ID", interval_id}});
+    data.push_back(EventDict{{"time",end_time},{"primitive", primitive_name},{"ID", interval_id}});
 }
 
 void EventAgglomerateClustering::buildAggCluster(AttributeDict& event_data_attributes) {
@@ -157,8 +157,16 @@ void EventAgglomerateClustering::findClusters(int64_t start_t, int64_t end_t, in
   int64_t end_time = (int64_t)end_events[root_node];
   if(start_time >= end_t || end_time <= start_t) return;
   if(bin_size >= (end_time - start_time + 1)) {
-    results.push_back(start_time);
-    results.push_back(end_time);
+    if(return_attribute_key != "") {
+      if(!hasAttributeAtIndex(root_node, return_attribute_key)) {
+        PRINTLOG("Attribute not found at index: " << root_node << ", key: " << return_attribute_key);
+        return;
+      }
+      results.push_back((int64_t)(*attribute_lists[root_node][return_attribute_key].begin()));
+    } else {
+      results.push_back(start_time);
+      results.push_back(end_time);
+    }
     PRINTLOG("Cluster: " << root_node << ", Start: " << start_time << ", End: " << end_time);
     return;
   }
@@ -169,8 +177,16 @@ void EventAgglomerateClustering::findClusters(int64_t start_t, int64_t end_t, in
     if(end_time > end_t) {
       end_time = end_t;
     }
-    results.push_back(start_time);
-    results.push_back(end_time);
+    if(return_attribute_key != "") {
+      if(!hasAttributeAtIndex(root_node, return_attribute_key)) {
+        PRINTLOG("Attribute not found at index: " << root_node << ", key: " << return_attribute_key);
+        return;
+      }
+      results.push_back((int64_t)(*attribute_lists[root_node][return_attribute_key].begin()));
+    } else {
+      results.push_back(start_time);
+      results.push_back(end_time);
+    }
     PRINTLOG("Cluster-Leaf: " << root_node << ", Start: " << start_time << ", End: " << end_time);
     return;
   }
@@ -188,21 +204,6 @@ vector<double> EventAgglomerateClustering::binnedRangeQuery(int64_t time_begin, 
   vector<double> results(bins);
   uint64_t bin_size(getBinSize(time_begin, time_end, bins));
   PRINTLOG("Got AGC binned range query");
-
-  int* labels = new int[npoints];
-  
-  // cutree_cdist(npoints, merge, height, (double)bin_size, labels);
-  // int s_begin = searchEvent(time_begin, 0);
-  // int s_end = searchEvent(time_end, s_begin);
-
-  // vector<double> data_short_list;
-  // data_short_list.push_back(data[s_begin*2]);
-  // for(int i = s_begin+1; i <= s_end; i++) {
-  //   if(labels[i] == labels[i-1]) continue;
-  //   data_short_list.push_back(data[((i-1)*2)+1]);
-  //   data_short_list.push_back(data[(i*2)]);
-  // }
-  // data_short_list.push_back(data[(s_end*2)+1]);
 
   vector<int64_t> data_short_list;
   findClusters(time_begin, time_end, (int64_t)bin_size*hrd, npoints-2, data_short_list);
@@ -234,7 +235,6 @@ vector<double> EventAgglomerateClustering::binnedRangeQuery(int64_t time_begin, 
   }
   
   data_short_list.clear();
-  delete[] labels;
   filters.clear();
   return results;
 }
@@ -258,16 +258,39 @@ bool EventAgglomerateClustering::checkFiltersSatisfied(const size_t node_id) {
   return true;
 }
 
-void AgglomerateClusters::insertDataIntoTree(double start_time, double end_time, string track, string primitive_name) {
+int64_t EventAgglomerateClustering::findNearestEvent(uint64_t cTime) {
+  int64_t ret_result = -1;
+  return_attribute_key = "ID";
+  vector<int64_t> data_short_list;
+
+  uint64_t bin_size(getBinSize(cTime, cTime+1, 1));
+  findClusters(cTime, cTime+1, (int64_t)bin_size, npoints-2, data_short_list);
+  if(data_short_list.size() > 0) ret_result = data_short_list[0];
+
+  data_short_list.clear();
+  return_attribute_key = "";
+  return ret_result;
+}
+
+void AgglomerateClusters::insertDataIntoTree(double start_time,
+                                             double end_time, 
+                                             string track, 
+                                             string primitive_name,
+                                             string interval_id) {
   if(agglomerate_clusters.find(track) == agglomerate_clusters.end()) {
     agglomerate_clusters[track] = EventAgglomerateClustering();
     agglomerate_clusters[track].track = track;
   }
-  agglomerate_clusters[track].insertDataIntoTree(start_time, end_time, primitive_name);
+  agglomerate_clusters[track].insertDataIntoTree(start_time, end_time, primitive_name, interval_id);
   if(event_data_attributes.find("primitive") == event_data_attributes.end()) {
       event_data_attributes.insert(make_pair("primitive", StringIndexMapper()));
   }
   event_data_attributes["primitive"].insert(primitive_name);
+
+  if(event_data_attributes.find("ID") == event_data_attributes.end()) {
+      event_data_attributes.insert(make_pair("ID", StringIndexMapper()));
+  }
+  event_data_attributes["ID"].insert(interval_id);
 }
 
 void AgglomerateClusters::buildAllAggClusters() {
@@ -320,6 +343,18 @@ LocDict AgglomerateClusters::binnedRangeQuery(int64_t time_begin,
   return locDict;
 }
 
+string AgglomerateClusters::findNearestEvent(uint64_t cTime, uint64_t cLocation) {
+  string ret_result("");
+  string c_loc_str = to_string(cLocation);
+  if(agglomerate_clusters.find(c_loc_str) == agglomerate_clusters.end()) {
+    PRINTLOG("Track not found in agglomerate clusters " << c_loc_str);
+    return ret_result;
+  }
+  int64_t result = agglomerate_clusters[c_loc_str].findNearestEvent(cTime);
+  if(result >= 0) ret_result = event_data_attributes["ID"][result];
+  return ret_result;
+}
+
 #ifdef TESTING
 int main() {
     PRINTLOG("Agglomerate Clustering Starting!");
@@ -335,10 +370,12 @@ int main() {
     uint64_t start_time, end_time;
     while(input_file >> start_time >> end_time) {
       string primitive_name = "first";
+      string interval_id = "100000";
       if (start_time == 74755483) {
         primitive_name = "second";
+        interval_id = "320000";
       }
-      agglomerate_clustering.insertDataIntoTree(start_time, end_time, "9", primitive_name);
+      agglomerate_clustering.insertDataIntoTree(start_time, end_time, "9", primitive_name, interval_id);
     }
     input_file.close();
     // agglomerate_clustering.getDataSize();//6666739
@@ -347,7 +384,8 @@ int main() {
     agglomerate_clustering.buildAllAggClusters();
     // vector<double> results = agglomerate_clustering.binnedRangeQuery(1074655386, 1246477086, 100, 1);
 
-    agglomerate_clustering.addPrimitiveFilter("second");
+    // agglomerate_clustering.addPrimitiveFilter("second");
+    // agglomerate_clustering.addIDFilter("320000");
     LocDict results = agglomerate_clustering.binnedRangeQuery(-1305029698, 2753780939, 9, 9, 10);
     PRINTLOG("Results: ");
     for(const auto& [loc, values] : results) {
@@ -357,6 +395,9 @@ int main() {
       }
       cout << endl;
     }
+    results = agglomerate_clustering.binnedRangeQuery(83188392, 83188393, 9, 9, 1);
+    string i_id = agglomerate_clustering.findNearestEvent(83188387, 9);
+    cout << "Interval ID: " << i_id << endl;
     // for (const auto& result : results) {
     //     cout << setprecision(1) << result << " ";
     // }

@@ -77,6 +77,7 @@ private:
   vector<EventDictList>            event_data_values;
   vector<EsemanNode*>              event_data_nodes;
   AttributeDict                    event_data_attributes;
+  string return_attribute_key = "";
 
   EventDictList                    filters;
   bool checkFilterSatisfied(const EsemanNode* node, const EventDict& filter);
@@ -109,7 +110,7 @@ public:
       event_data_attributes.clear();
   }
 
-  void insertDataIntoTree(double start_time, double end_time, string track, string primitive_name);
+  void insertDataIntoTree(double start_time, double end_time, string track, string primitive_name, string interval_id);
   void buildKDT();
   void printKDTDotPerTrack(size_t track_index);
   void printKDTDot();
@@ -134,6 +135,7 @@ public:
   LocDict binnedRangeQuery(int64_t time_begin, int64_t time_end, 
                           uint64_t location_begin, uint64_t location_end, 
                           uint64_t bins);
+  string findNearestEvent(uint64_t cTime, uint64_t cLocation);
 };
 
 #endif

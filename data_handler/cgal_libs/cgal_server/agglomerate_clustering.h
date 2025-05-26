@@ -23,6 +23,7 @@ class EventAgglomerateClustering {
     double* end_events = NULL;
     int npoints = 0;
     vector<AttributeList> attribute_lists;
+    string return_attribute_key = "";
 
     int searchEvent(int64_t tb, int begin_index);
     void findClusters(int64_t start_t, int64_t end_t, int64_t bin_size, int c_node, vector<int64_t> &results);
@@ -45,9 +46,10 @@ class EventAgglomerateClustering {
       attribute_lists.clear();
     }
 
-    void insertDataIntoTree(double start_time, double end_time, string primitive_name);
+    void insertDataIntoTree(double start_time, double end_time, string primitive_name, string interval_id);
     void buildAggCluster(AttributeDict& event_data_attributes);
     vector<double> binnedRangeQuery(int64_t time_begin, int64_t time_end, uint64_t bins, int hrd);
+    int64_t findNearestEvent(uint64_t cTime);
 
     void getDataSize() {
       PRINTLOG("Data size: " << data.size());
@@ -76,13 +78,14 @@ class AgglomerateClusters {
       event_data_attributes.clear();
       // Memory cleanup logic for AgglomerateClusters
     }
-    void insertDataIntoTree(double start_time, double end_time, string track, string primitive_name);
+    void insertDataIntoTree(double start_time, double end_time, string track, string primitive_name, string interval_id);
     void buildAllAggClusters();
     LocDict binnedRangeQuery(int64_t time_begin, 
       int64_t time_end, 
       uint64_t location_begin, 
       uint64_t location_end, 
       uint64_t bins);
+    string findNearestEvent(uint64_t cTime, uint64_t cLocation);
     
     void addPrimitiveFilter(string primitive_filter) {
       for (const auto& filter : filters) {

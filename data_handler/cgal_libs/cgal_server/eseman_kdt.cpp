@@ -58,7 +58,7 @@ void EsemanNode::addAttribute(const string& key, const int attr_index) {
     // value |= mask;
 }
 
-void EseManKDT::insertDataIntoTree(double start_time, double end_time, string track, string primitive_name) {
+void EseManKDT::insertDataIntoTree(double start_time, double end_time, string track, string primitive_name, string interval_id) {
     size_t track_index = event_tracks.get_track_index(track);
     if(track_index > event_tracks.size()) {
         PRINTLOG("Track index out of range: " << track_index);
@@ -69,13 +69,18 @@ void EseManKDT::insertDataIntoTree(double start_time, double end_time, string tr
         event_data_values.push_back(EventDictList());
         event_data_nodes.push_back(nullptr);
     }
-    event_data_values[track_index].push_back(EventDict{{"time",start_time},{"primitive", primitive_name}});
-    event_data_values[track_index].push_back(EventDict{{"time",end_time},{"primitive", primitive_name}});
+    event_data_values[track_index].push_back(EventDict{{"time",start_time},{"primitive", primitive_name},{"ID", interval_id}});
+    event_data_values[track_index].push_back(EventDict{{"time",end_time},{"primitive", primitive_name},{"ID", interval_id}});
     
     if(event_data_attributes.find("primitive") == event_data_attributes.end()) {
         event_data_attributes.insert(make_pair("primitive", StringIndexMapper()));
     }
     event_data_attributes["primitive"].insert(primitive_name);
+
+    if(event_data_attributes.find("ID") == event_data_attributes.end()) {
+        event_data_attributes.insert(make_pair("ID", StringIndexMapper()));
+    }
+    event_data_attributes["ID"].insert(interval_id);
 }
 
 void EseManKDT::deleteTree(EsemanNode* node) {
@@ -180,8 +185,16 @@ void EseManKDT::findClusters(int64_t start_t, int64_t end_t, int64_t bin_size, c
     int64_t end_time = (int64_t)c_node->end_time;
     if(start_time >= end_t || end_time <= start_t) return;
     if(bin_size >= (end_time - start_time + 1)) {
-        results.push_back(start_time);
-        results.push_back(end_time);
+        if(return_attribute_key != "") {
+            if(!c_node->hasAttribute(return_attribute_key)) {
+                PRINTLOG("Attribute not found for key: " << return_attribute_key);
+                return;
+            }
+            results.push_back((int64_t)(*c_node->attribute_lists.at(return_attribute_key).begin()));
+        } else {
+            results.push_back(start_time);
+            results.push_back(end_time);
+        }
         PRINTLOG("Cluster: " << " Start: " << start_time << ", End: " << end_time);
         return;
     }
@@ -192,8 +205,16 @@ void EseManKDT::findClusters(int64_t start_t, int64_t end_t, int64_t bin_size, c
         if(end_time > end_t) {
             end_time = end_t;
         }
-        results.push_back(start_time);
-        results.push_back(end_time);
+        if(return_attribute_key != "") {
+            if(!c_node->hasAttribute(return_attribute_key)) {
+                PRINTLOG("Attribute not found for key: " << return_attribute_key);
+                return;
+            }
+            results.push_back((int64_t)(*c_node->attribute_lists.at(return_attribute_key).begin()));
+        } else {
+            results.push_back(start_time);
+            results.push_back(end_time);
+        }
         PRINTLOG("Cluster-Leaf: " << " Start: " << start_time << ", End: " << end_time);
         return;
     }
@@ -281,6 +302,25 @@ LocDict EseManKDT::binnedRangeQuery(int64_t time_begin,
     return locDict;
 }
 
+string EseManKDT::findNearestEvent(uint64_t cTime, uint64_t cLocation) {
+  string ret_result("");
+  string c_loc_str = to_string(cLocation);
+  size_t track_index = event_tracks.get_track_index(c_loc_str);
+  
+
+  int64_t result = -1;
+  return_attribute_key = "ID";
+  vector<int64_t> data_short_list;
+
+  uint64_t bin_size(getBinSize(cTime, cTime+1, 1));
+  findClusters(cTime, cTime+1, (int64_t)bin_size, event_data_nodes[track_index], data_short_list);
+  if(data_short_list.size() > 0) result = data_short_list[0];
+  if(result >= 0) ret_result = event_data_attributes["ID"][result];
+  data_short_list.clear();
+  return_attribute_key = "";
+  return ret_result;
+}
+
 void EseManKDT::printKDTDotPerTrack(size_t track_index) {
     ofstream dotFile("track_" + to_string(track_index) + ".dot");
     dotFile << "digraph G {" << endl;
@@ -359,7 +399,11 @@ void test_KDT_build() {
         if (start_time == 74755483) {
             primitive_name = "second";
         }
-        kdt->insertDataIntoTree(start_time, end_time, "9", primitive_name);
+        string interval_id = "100000";
+        if (start_time == 74755483) {
+            interval_id = "320000";
+        }
+        kdt->insertDataIntoTree(start_time, end_time, "9", primitive_name, interval_id);
     }
     input_file.close();
 
@@ -369,7 +413,7 @@ void test_KDT_build() {
         return;
     }
     while(input_file1 >> start_time >> end_time) {
-        kdt->insertDataIntoTree(start_time, end_time, "1", "first");
+        kdt->insertDataIntoTree(start_time, end_time, "1", "first", "iid_1");
     }
     input_file1.close();
 
@@ -383,7 +427,7 @@ void test_KDT_build() {
         if (start_time == 74755483) {
             primitive_name = "second";
         }
-        kdt->insertDataIntoTree(start_time, end_time, "14", primitive_name);
+        kdt->insertDataIntoTree(start_time, end_time, "14", primitive_name, "iid_1");
     }
     input_file2.close();
 
@@ -394,9 +438,12 @@ void test_KDT_build() {
     //                     12, 12, 
     //                     100);
     // kdt->addPrimitiveFilter("first");
+    // kdt->addIDFilter("320000");
     kdt->binnedRangeQuery(-1305029698, 2753780939, 
                             9, 9, 
                             10);
+    string i_id = kdt->findNearestEvent(83188392, 9);
+    cout << "Interval ID: " << i_id << endl;
 }
 
 // void find_bitwise_insertion_index(int num) {
