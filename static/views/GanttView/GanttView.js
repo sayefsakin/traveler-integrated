@@ -61,6 +61,14 @@ class GanttView extends ZoomableTimelineView { // abstracts a lot of common logi
     this.linkedState.on('verticalDomainChanged' + '.' + this.clipPathId, () => {
       this.updateDataIfNeeded();
     });
+    
+    if (window.location.search) {
+      const params = new URLSearchParams(window.location.search);
+      const selectedPrimitive = params.get('SELECTED_PRIMITIVE');
+      if (selectedPrimitive) {
+        this.linkedState.selectPrimitive(selectedPrimitive);
+      }
+    }
   }
 
   handleDestroyEvent() {

@@ -53,7 +53,10 @@ def getDatasetDetails(params):
 
 
 def generateInterfaceUrl(params):
-    return params['baseUrl'] + '/static/interface.html#' + params['dataset']
+    primitive_string = ''
+    if 'SELECTED_PRIMITIVE' in params and params['SELECTED_PRIMITIVE'] != '':
+        primitive_string = '?SELECTED_PRIMITIVE=' + requests.utils.quote(params['SELECTED_PRIMITIVE'])
+    return params['baseUrl'] + '/static/interface.html' + primitive_string + '#' + params['dataset']
 
 
 def wheel_element(element, deltaY = 120, offsetX = 0, offsetY = 0):
@@ -349,7 +352,10 @@ def conductPNGOutput(driver, params):
             WebDriverWait(driver, timeout=timeout, poll_frequency=p_freq).until(GanttLoadingVisible())
 
     ganttEventCapturerElement = driver.find_elements(By.XPATH, "//*[@class='GLView ZoomableTimelineView']")[0]
-    exported_file_name = params['exportLocation'] + "/" + params['dataset'] + "_gantt.png"
+    primitive_string = ''
+    if 'SELECTED_PRIMITIVE' in params and params['SELECTED_PRIMITIVE'] != '':
+        primitive_string = '_' + params['SELECTED_PRIMITIVE']
+    exported_file_name = params['exportLocation'] + "/" + params['dataset'] + primitive_string + "_gantt.png"
     ganttEventCapturerElement.screenshot(exported_file_name)
     print("Saved screenshot from of the Gantt chart at: ", exported_file_name)
 
@@ -450,6 +456,7 @@ if __name__ == '__main__':
         base_params['exportStartTime'] = sys.argv[2]
     if len(sys.argv) > 3:
         base_params['exportEndTime'] = int(sys.argv[3])
+    base_params['SELECTED_PRIMITIVE'] = os.getenv('SELECTED_PRIMITIVE', '')
 
     timeout = 500  # in seconds
     p_freq = 0.001  # in seconds
