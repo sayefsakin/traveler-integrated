@@ -95,9 +95,7 @@ bool EseManKDT::checkFilterSatisfied(const EsemanNode* node, const EventDict& fi
     try {
         for (const auto& [key, value] : filter) {
             if (!(node->hasAttribute(key))) return false;
-            if (get<string>(value) != "" && !node->attribute_lists.at(key).count(event_data_attributes[key].get_track_index(get<string>(value)))) {
-                return false;
-            }
+            if (!node->attribute_lists.at(key).count(get<size_t>(value))) return false;
         }
     } catch (...) {
         return true;
@@ -251,8 +249,18 @@ LocDict EseManKDT::binnedRangeQuery(int64_t time_begin,
                                     uint64_t bins){
     LocDict locDict;
     PRINTLOG("Got EseMan KDT binned range query");
-    chrono::steady_clock::time_point clock_begin = chrono::steady_clock::now();
 
+    try {
+        for (size_t i = 0; i < filters.size(); i++) {
+            for (const auto& [key, value] : filters[i]) {
+                filters[i][key] = event_data_attributes[key].get_track_index(get<string>(value));
+            }
+        }
+    } catch (...) {
+        PRINTLOG("Error in converting filter attributes to indices");
+    }
+    
+    chrono::steady_clock::time_point clock_begin = chrono::steady_clock::now();
     for (uint64_t c_loc = location_begin; c_loc <= location_end; c_loc++) {
         string c_loc_str = to_string(c_loc);
         size_t track_index = event_tracks.get_track_index(c_loc_str);
