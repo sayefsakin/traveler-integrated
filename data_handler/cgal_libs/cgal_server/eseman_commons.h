@@ -94,6 +94,10 @@ public:
     tracks.clear();
     track_to_index.clear();
   }
+  void cleanMemory() {
+    tracks.clear();
+    track_to_index.clear();
+  }
   const string& operator[](size_t idx) const {
     return at(idx);
   }
@@ -154,6 +158,12 @@ inline int getBinNumber(int64_t time_begin, int64_t time_end, uint64_t bins, int
   uint64_t bin_size = getBinSize(time_begin, time_end, bins);
   if(ctime < time_begin || ctime > time_end) return -1;
   return (int)floor((double)(ctime - time_begin) / (double)bin_size);
+}
+
+inline string doubleToStringZeroPrecision(double value) {
+    stringstream ss;
+    ss << fixed << setprecision(0) << value;
+    return ss.str();
 }
 
 #endif // ESEMAN_COMMONS_H

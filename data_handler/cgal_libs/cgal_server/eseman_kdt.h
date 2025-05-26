@@ -2,42 +2,18 @@
 #define ESEMAN_KDT_H_
 
 #include "eseman_commons.h"
+#include <boost/uuid/uuid.hpp>
+#include <boost/uuid/uuid_generators.hpp>
+#include <boost/uuid/uuid_io.hpp>
 
 inline string generate_uuid() {
-  static random_device              rd;
-  static mt19937                    gen(rd());
-  static uniform_int_distribution<> dis(0, 15);
-  static uniform_int_distribution<> dis2(8, 11);
-
-  stringstream ss;
-  int i;
-  ss << hex;
-  for (i = 0; i < 8; i++) {
-    ss << dis(gen);
-  }
-  ss << "-";
-  for (i = 0; i < 4; i++) {
-    ss << dis(gen);
-  }
-  ss << "-4"; // version 4
-  for (i = 0; i < 3; i++) {
-    ss << dis(gen);
-  }
-  ss << "-";
-  ss << dis2(gen); // variant
-  for (i = 0; i < 3; i++) {
-    ss << dis(gen);
-  }
-  ss << "-";
-  for (i = 0; i < 12; i++) {
-    ss << dis(gen);
-  }
-  return ss.str();
+  return boost::uuids::to_string(boost::uuids::random_generator()());
 }
 
 class EsemanNode {
 private:
 public:
+  string        uuid = generate_uuid();
   double        start_time;
   double        end_time;
   size_t        start_track;
@@ -76,10 +52,11 @@ private:
   StringIndexMapper                event_tracks;
   vector<EventDictList>            event_data_values;
   vector<EsemanNode*>              event_data_nodes;
+  vector<string>                   eseman_node_uuids;
   AttributeDict                    event_data_attributes;
-  string return_attribute_key = "";
-
+  string                           return_attribute_key = "";
   EventDictList                    filters;
+
   bool checkFilterSatisfied(const EsemanNode* node, const EventDict& filter);
   bool checkFiltersSatisfied(const EsemanNode* node);
 
@@ -92,10 +69,14 @@ private:
   void findClusters(int64_t start_t, int64_t end_t, int64_t bin_size, const EsemanNode* c_node, vector<int64_t> &results);
   void deleteTree(EsemanNode* node);
 
+  void saveNodeToFile(const EsemanNode* node);
+  EsemanNode* loadNodeFromFile(const string& uuid);
+
 public:
   int horizontal_resolution_divisor = 1;
   int vertical_resolution_divisor = 1;
   bool is_vertical_split = false;
+  string node_storage_base_path = ".";
   
   EseManKDT() {
       // Constructor logic if needed
@@ -108,6 +89,7 @@ public:
       event_data_values.clear();
       event_data_nodes.clear();
       event_data_attributes.clear();
+      eseman_node_uuids.clear();
   }
 
   void insertDataIntoTree(double start_time, double end_time, string track, string primitive_name, string interval_id);
@@ -115,6 +97,8 @@ public:
   void printKDTDotPerTrack(size_t track_index);
   void printKDTDot();
 
+  void cleanNodesFromMemory();
+  void reloadNodesFromFile();
 
   void addPrimitiveFilter(string primitive_filter) {
     for (const auto& filter : filters) {

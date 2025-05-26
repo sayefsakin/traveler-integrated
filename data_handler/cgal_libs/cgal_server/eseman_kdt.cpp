@@ -368,81 +368,282 @@ void EseManKDT::buildKDT() {
             PRINTLOG("Deleting old KDT for track index: " << event_tracks[i]);
             deleteTree(event_data_nodes[i]);
         }
-        if(is_vertical_split == false)
+        if(is_vertical_split == false) {
             event_data_nodes[i] = constructKDTPerTrack(0, event_data_values[i].size() - 1, i);
+            eseman_node_uuids.push_back(event_data_nodes[i]->uuid);
+        }
         PRINTLOG("Constructing KDT for track index: " << event_tracks[i]);
-        // event_data_values[i].clear();
+        event_data_values[i].clear();
     }
-    // event_data_values.clear();
+    event_data_values.clear();
     // if(is_vertical_split)
     //     event_data_nodes[0] = constructKDTPerTrack(0, event_data_values[i].size() - 1, i);
 }
 
+void EseManKDT::saveNodeToFile(const EsemanNode* node) {
+    if (!node) return;
+
+    // Create file using node's UUID
+    ofstream file(node_storage_base_path + "/" + node->uuid);
+    if (!file.is_open()) {
+        cerr << "Failed to open file: " << node->uuid << endl;
+        return;
+    }
+
+    // Save node data
+    file << doubleToStringZeroPrecision(node->start_time) << " " << doubleToStringZeroPrecision(node->end_time) << " "
+            << node->start_track << " " << node->end_track << "\n";
+
+    // Save attributes
+    file << node->attribute_lists.size() << "\n";
+    for (const auto& attr : node->attribute_lists) {
+        file << attr.first << " " << attr.second.size() << "\n";
+        for (int val : attr.second) {
+        file << val << " ";
+        }
+        file << "\n";
+    }
+
+    // Save child UUIDs for reference
+    file << (node->left_child ? node->left_child->uuid : "NULL") << "\n";
+    file << (node->right_child ? node->right_child->uuid : "NULL") << "\n";
+    file.close();
+
+    // Recursively save children
+    if (node->left_child) saveNodeToFile(node->left_child);
+    if (node->right_child) saveNodeToFile(node->right_child);
+}
+
+EsemanNode* EseManKDT::loadNodeFromFile(const string& uuid) {
+    if (uuid == "NULL") return nullptr;
+
+    ifstream file(node_storage_base_path + "/" + uuid);
+    if (!file.is_open()) {
+        cerr << "Failed to open file: " << uuid << endl;
+        return nullptr;
+    }
+
+    EsemanNode* node = new EsemanNode();
+    node->uuid = uuid;
+
+    // Load node data
+    file >> node->start_time >> node->end_time 
+            >> node->start_track >> node->end_track;
+
+    // Load attributes
+    int attr_count;
+    file >> attr_count;
+    file.ignore();
+
+    for (int i = 0; i < attr_count; i++) {
+        string key;
+        int size;
+        file >> key >> size;
+        
+        for (int j = 0; j < size; j++) {
+            size_t val;
+            file >> val;
+            node->attribute_lists[key].insert(val);
+        }
+        
+        file.ignore();
+    }
+
+    // Load child nodes recursively
+    string left_uuid, right_uuid;
+    file >> left_uuid >> right_uuid;
+
+    node->left_child = loadNodeFromFile(left_uuid);
+    node->right_child = loadNodeFromFile(right_uuid);
+
+    return node;
+}
+
+void EseManKDT::cleanNodesFromMemory() {
+    // Save event_data_attributes to file
+    ofstream attr_file(node_storage_base_path + "/event_data_attributes.dat");
+    if (attr_file.is_open()) {
+        // Write number of attributes
+        attr_file << event_data_attributes.size() << "\n";
+        for (const auto& [key, mapper] : event_data_attributes) {
+            // Write key and number of tracks
+            attr_file << key << " " << mapper.size() << "\n";
+            // Write each track
+            for (size_t i = 0; i < mapper.size(); i++) {
+                attr_file << mapper[i] << "\n";
+            }
+        }
+        attr_file.close();
+    }
+    // Save event_tracks to file
+    ofstream tracks_file(node_storage_base_path + "/event_tracks.dat");
+    if (tracks_file.is_open()) {
+        tracks_file << event_tracks.size() << "\n";
+        for (size_t i = 0; i < event_tracks.size(); i++) {
+            tracks_file << event_tracks[i] << "\n";
+        }
+        tracks_file.close();
+    }
+    // Save eseman_node_uuids to file
+    ofstream uuid_file(node_storage_base_path + "/eseman_node_uuids.dat");
+    if (uuid_file.is_open()) {
+        uuid_file << eseman_node_uuids.size() << "\n";
+        for (const auto& uuid : eseman_node_uuids) {
+            uuid_file << uuid << "\n";
+        }
+        uuid_file.close();
+    }
+    // Save each node to file
+    for (auto node : event_data_nodes) {
+        saveNodeToFile(node);
+        deleteTree(node);
+    }
+    event_data_nodes.clear();
+    event_data_attributes.clear();
+    event_tracks.cleanMemory();
+    eseman_node_uuids.clear();
+}
+
+void EseManKDT::reloadNodesFromFile() {
+    // Load event_data_attributes from file
+    event_data_attributes.clear();
+    ifstream attr_file(node_storage_base_path + "/event_data_attributes.dat");
+    if (attr_file.is_open()) {
+        int attr_count;
+        attr_file >> attr_count;
+        for (int i = 0; i < attr_count; i++) {
+            string key;
+            int track_count;
+            attr_file >> key >> track_count;
+            event_data_attributes.insert(make_pair(key, StringIndexMapper()));
+            for (int j = 0; j < track_count; j++) {
+                string track;
+                attr_file >> track;
+                event_data_attributes[key].insert(track);
+            }
+        }
+        attr_file.close();
+    }
+
+    // Load event_tracks from file
+    ifstream tracks_file(node_storage_base_path + "/event_tracks.dat");
+    if (tracks_file.is_open()) {
+        int track_count;
+        tracks_file >> track_count;
+        for (int i = 0; i < track_count; i++) {
+            string track;
+            tracks_file >> track;
+            event_tracks.insert(track);
+        }
+        tracks_file.close();
+    }
+
+    // Load eseman_node_uuids from file
+    eseman_node_uuids.clear();
+    ifstream uuid_file(node_storage_base_path + "/eseman_node_uuids.dat");
+    if (uuid_file.is_open()) {
+        int uuid_count;
+        uuid_file >> uuid_count;
+        for (int i = 0; i < uuid_count; i++) {
+            string uuid;
+            uuid_file >> uuid;
+            eseman_node_uuids.push_back(uuid);
+        }
+        uuid_file.close();
+    }
+    
+    // Load each node from file
+    event_data_nodes.clear();
+    for (string node_uid : eseman_node_uuids) {
+        EsemanNode* node = loadNodeFromFile(node_uid);
+        if (node) {
+            event_data_nodes.push_back(node);
+            PRINTLOG("Loaded node with UUID: " << node->uuid);
+        } else {
+            PRINTLOG("Failed to load node with UUID: " << node_uid);
+        }
+    }
+}
+
 void test_KDT_build() {
     EseManKDT *kdt = new EseManKDT();
-    // kdt.insertDataIntoTree(5.0, 6.0, "12");
-    // kdt.insertDataIntoTree(1.0, 2.0, "12");
-    // kdt.insertDataIntoTree(1100.0, 1110.0, "12");
-    // kdt.insertDataIntoTree(11.0, 12.0, "12");
-    // kdt.insertDataIntoTree(14.0, 18.0, "12");
+    // // kdt.insertDataIntoTree(5.0, 6.0, "12");
+    // // kdt.insertDataIntoTree(1.0, 2.0, "12");
+    // // kdt.insertDataIntoTree(1100.0, 1110.0, "12");
+    // // kdt.insertDataIntoTree(11.0, 12.0, "12");
+    // // kdt.insertDataIntoTree(14.0, 18.0, "12");
 
 
-    string input_file_path = "/mnt/c/Users/sayef/IdeaProjects/traveler-integrated/data_handler/cgal_libs/cgal_server/location_data/";
-    fstream input_file(input_file_path + "9.location");
-    if (!input_file.is_open()) {
-        PRINTLOG("Failed to open input file");
-        return;
-    }
-    uint64_t start_time, end_time;
-    while(input_file >> start_time >> end_time) {
-        string primitive_name = "first";
-        if (start_time == 74755483) {
-            primitive_name = "second";
-        }
-        string interval_id = "100000";
-        if (start_time == 74755483) {
-            interval_id = "320000";
-        }
-        kdt->insertDataIntoTree(start_time, end_time, "9", primitive_name, interval_id);
-    }
-    input_file.close();
+    // string input_file_path = "/mnt/c/Users/sayef/IdeaProjects/traveler-integrated/data_handler/cgal_libs/cgal_server/location_data/";
+    // fstream input_file(input_file_path + "9.location");
+    // if (!input_file.is_open()) {
+    //     PRINTLOG("Failed to open input file");
+    //     return;
+    // }
+    // uint64_t start_time, end_time;
+    // while(input_file >> start_time >> end_time) {
+    //     string primitive_name = "first";
+    //     if (start_time == 74755483) {
+    //         primitive_name = "second";
+    //     }
+    //     string interval_id = "100000";
+    //     if (start_time == 74755483) {
+    //         interval_id = "320000";
+    //     }
+    //     kdt->insertDataIntoTree(start_time, end_time, "9", primitive_name, interval_id);
+    // }
+    // input_file.close();
 
-    fstream input_file1(input_file_path + "1.location");
-    if (!input_file1.is_open()) {
-        PRINTLOG("Failed to open input file");
-        return;
-    }
-    while(input_file1 >> start_time >> end_time) {
-        kdt->insertDataIntoTree(start_time, end_time, "1", "first", "iid_1");
-    }
-    input_file1.close();
+    // fstream input_file1(input_file_path + "1.location");
+    // if (!input_file1.is_open()) {
+    //     PRINTLOG("Failed to open input file");
+    //     return;
+    // }
+    // while(input_file1 >> start_time >> end_time) {
+    //     kdt->insertDataIntoTree(start_time, end_time, "1", "first", "iid_1");
+    // }
+    // input_file1.close();
 
-    fstream input_file2(input_file_path + "14.location");
-    if (!input_file2.is_open()) {
-        PRINTLOG("Failed to open input file");
-        return;
-    }
-    while(input_file2 >> start_time >> end_time) {
-        string primitive_name = "first";
-        if (start_time == 74755483) {
-            primitive_name = "second";
-        }
-        kdt->insertDataIntoTree(start_time, end_time, "14", primitive_name, "iid_1");
-    }
-    input_file2.close();
+    // fstream input_file2(input_file_path + "14.location");
+    // if (!input_file2.is_open()) {
+    //     PRINTLOG("Failed to open input file");
+    //     return;
+    // }
+    // while(input_file2 >> start_time >> end_time) {
+    //     string primitive_name = "first";
+    //     if (start_time == 74755483) {
+    //         primitive_name = "second";
+    //     }
+    //     kdt->insertDataIntoTree(start_time, end_time, "14", primitive_name, "iid_1");
+    // }
+    // input_file2.close();
 
-    kdt->buildKDT();
-    // kdt.printKDTDot();
-    // kdt.printKDTDot();
-    // kdt.binnedRangeQuery(1, 1200, 
-    //                     12, 12, 
-    //                     100);
-    // kdt->addPrimitiveFilter("first");
-    // kdt->addIDFilter("320000");
+    // kdt->buildKDT();
+    // // kdt.printKDTDot();
+    // // kdt.printKDTDot();
+    // // kdt.binnedRangeQuery(1, 1200, 
+    // //                     12, 12, 
+    // //                     100);
+    // // kdt->addPrimitiveFilter("first");
+    // // kdt->addIDFilter("320000");
+    // kdt->binnedRangeQuery(-1305029698, 2753780939, 
+    //                         9, 9, 
+    //                         10);
+    // string i_id = kdt->findNearestEvent(83188392, 9);
+    // cout << "Interval ID: " << i_id << endl;
+    int cm;
+    // cin >> cm;
+    kdt->node_storage_base_path = "/mnt/d/tmp/eseman_nodes";
+    // kdt->cleanNodesFromMemory();
+    // PRINTLOG("ESEman KDT cleaned from memory, now reloading from file");
+    // cin >> cm;
+    kdt->reloadNodesFromFile();
+    PRINTLOG("Reloading finished");
+    cin >> cm;
     kdt->binnedRangeQuery(-1305029698, 2753780939, 
                             9, 9, 
                             10);
-    string i_id = kdt->findNearestEvent(83188392, 9);
+    string i_id = kdt->findNearestEvent(83188390, 9);
     cout << "Interval ID: " << i_id << endl;
 }
 
@@ -471,6 +672,7 @@ void test_KDT_build() {
 int main() {
     PRINTLOG("hello inside eseman kdt");
     // test_event_tracks();
+    PRINTLOG("Printing resutls from RAM before cleaning");
     test_KDT_build();
     // test_bitwise_insertion();
     PRINTLOG("Eseman KDT finished!");
