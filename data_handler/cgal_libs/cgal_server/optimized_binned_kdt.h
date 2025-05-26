@@ -13,6 +13,8 @@
 #include <utility>
 #include <string>
 
+#include "eseman_commons.h"
+
 using namespace std;
 
 typedef CGAL::Simple_cartesian<double>                      EPICKernel;
@@ -46,15 +48,15 @@ typedef CGAL::Filter_iterator<NN_iterator, X_not_positive> NN_positive_x_iterato
 
 int point_with_info_testing();
 
-inline uint64_t getBinSize(int64_t time_begin, int64_t time_end, uint64_t bins){
-  return (uint64_t)floor((double)(time_end - time_begin) / (double)bins);
-}
+// inline uint64_t getBinSize(int64_t time_begin, int64_t time_end, uint64_t bins){
+//   return (uint64_t)floor((double)(time_end - time_begin) / (double)bins);
+// }
 
-inline int getBinNumber(int64_t time_begin, int64_t time_end, uint64_t bins, int64_t ctime) {
-  uint64_t bin_size = getBinSize(time_begin, time_end, bins);
-  if(ctime < time_begin || ctime > time_end) return -1;
-  return (int)floor((double)(ctime - time_begin) / (double)bin_size);
-}
+// inline int getBinNumber(int64_t time_begin, int64_t time_end, uint64_t bins, int64_t ctime) {
+//   uint64_t bin_size = getBinSize(time_begin, time_end, bins);
+//   if(ctime < time_begin || ctime > time_end) return -1;
+//   return (int)floor((double)(ctime - time_begin) / (double)bin_size);
+// }
 
 class BinnedKDT {
   int64_t max_interval_length;

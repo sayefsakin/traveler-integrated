@@ -66,7 +66,7 @@ public:
   }
 
   vector<string> getAttributeKeys();
-  bool hasAttribute(const string& key);
+  bool hasAttribute(const string& key) const;
   void addAttribute(const string& key, const int attr_index);
 
 };
@@ -77,6 +77,10 @@ private:
   vector<EventDictList>            event_data_values;
   vector<EsemanNode*>              event_data_nodes;
   AttributeDict                    event_data_attributes;
+
+  EventDictList                    filters;
+  bool checkFilterSatisfied(const EsemanNode* node, const EventDict& filter);
+  bool checkFiltersSatisfied(const EsemanNode* node);
 
   EsemanNode* constructKDTPerTrack(size_t start_index, size_t end_index, size_t track_index);
   void printKDTDotRecursive(EsemanNode* node, ofstream& dotFile);
@@ -110,11 +114,26 @@ public:
   void printKDTDotPerTrack(size_t track_index);
   void printKDTDot();
 
-  LocDict binnedRangeQuery(int64_t time_begin, 
-                                        int64_t time_end, 
-                                        uint64_t location_begin, 
-                                        uint64_t location_end, 
-                                        uint64_t bins);
+
+  void addPrimitiveFilter(string primitive_filter) {
+    for (const auto& filter : filters) {
+      if(getEventPrimitive(filter) == primitive_filter) return;
+    }
+    filters.push_back(EventDict{{"primitive", primitive_filter}});
+  }
+  void addIDFilter(string id_filter) {
+    for (const auto& filter : filters) {
+      if(getEventID(filter) == id_filter) return;
+    }
+    filters.push_back(EventDict{{"ID", id_filter}});
+  }
+  void clearPrimitiveFilters() {
+    filters.clear();
+  }
+
+  LocDict binnedRangeQuery(int64_t time_begin, int64_t time_end, 
+                          uint64_t location_begin, uint64_t location_end, 
+                          uint64_t bins);
 };
 
 #endif

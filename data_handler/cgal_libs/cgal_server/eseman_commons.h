@@ -39,7 +39,7 @@ typedef unordered_map<string, unordered_set<size_t>>  AttributeList;
 // =======================================
 // Event related types and inline functions
 // =======================================
-typedef unordered_map<string, variant<string, double>> EventDict;
+typedef unordered_map<string, variant<string, double, size_t>> EventDict;
 // events are considered ordered by time. odd indexed events are start events and even indexed events are end events.
 typedef vector<EventDict>                             EventDictList;
 

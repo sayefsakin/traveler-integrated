@@ -249,8 +249,11 @@ Document binnedAGCSearchQuery( AgglomerateClusters *agc,
     int64_t time_end,
     uint64_t location_begin,
     uint64_t location_end,
-    uint64_t bins) {
+    uint64_t bins, string primitive) {
 
+    if(primitive.length()>0) {
+        agc->addPrimitiveFilter(primitive);
+    }
     LocDict lResults = agc->binnedRangeQuery(time_begin, time_end, location_begin, location_end, bins);
     Document d = convertLocDictToDocument(lResults);
     lResults.clear();
@@ -262,8 +265,11 @@ Document binnedESEMANSearchQuery( EseManKDT *emk,
     int64_t time_end,
     uint64_t location_begin,
     uint64_t location_end,
-    uint64_t bins) {
+    uint64_t bins, string primitive) {
 
+    if(primitive.length()>0) {
+        emk->addPrimitiveFilter(primitive);
+    }
     LocDict lResults = emk->binnedRangeQuery(time_begin, time_end, location_begin, location_end, bins);
     Document d = convertLocDictToDocument(lResults);
     lResults.clear();
@@ -545,10 +551,10 @@ Document processReceivedRequest(BinnedKDT *binnedKDT,
             return sgmntTreeSearchQuery(Segment_tree_3, time_begin, time_end, location_begin, location_end, bins, pm[primitive], maxId);
         } else if(ds_request == AGCLUSTER) {
             if(DEBUG) cout << "got agglomerate cluster request" << endl;
-            return binnedAGCSearchQuery(agglomerateClusters, time_begin, time_end, location_begin, location_end, bins);
+            return binnedAGCSearchQuery(agglomerateClusters, time_begin, time_end, location_begin, location_end, bins, primitive);
         } else if(ds_request == ESEMAN) {
             if(DEBUG) cout << "got eseman cluster request" << endl;
-            return binnedESEMANSearchQuery(emk, time_begin, time_end, location_begin, location_end, bins);
+            return binnedESEMANSearchQuery(emk, time_begin, time_end, location_begin, location_end, bins, primitive);
         } else {
             if(DEBUG) cout << "invalid ds request" << endl;
         }
@@ -797,7 +803,7 @@ int main(int argc, char *argv[])
                     v.GetObject()["intervalId"].GetString()
             ));
         } else if(profiled_ds == AGCLUSTER) {
-            agglomerateClusters->insertDataIntoTree(interval_enter.x(), interval_end.x(), v.GetObject()["Location"].GetString());
+            agglomerateClusters->insertDataIntoTree(interval_enter.x(), interval_end.x(), v.GetObject()["Location"].GetString(), cPrimitive);
         } else if(profiled_ds == ESEMAN) {
             esemanKDT->insertDataIntoTree(interval_enter.x(), interval_end.x(), v.GetObject()["Location"].GetString(), cPrimitive);
         } else {

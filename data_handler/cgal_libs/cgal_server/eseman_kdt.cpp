@@ -39,7 +39,7 @@ vector<string> EsemanNode::getAttributeKeys() {
     return keys;
 }
 
-bool EsemanNode::hasAttribute(const string& key) {
+bool EsemanNode::hasAttribute(const string& key) const {
     return attribute_lists.find(key) != attribute_lists.end();
 }
 
@@ -89,6 +89,26 @@ void EseManKDT::deleteTree(EsemanNode* node) {
         node->right_child = nullptr;
     }
     delete node;
+}
+
+bool EseManKDT::checkFilterSatisfied(const EsemanNode* node, const EventDict& filter) {
+    try {
+        for (const auto& [key, value] : filter) {
+            if (!(node->hasAttribute(key))) return false;
+            if (get<string>(value) != "" && !node->attribute_lists.at(key).count(event_data_attributes[key].get_track_index(get<string>(value)))) {
+                return false;
+            }
+        }
+    } catch (...) {
+        return true;
+    }
+    return true;
+}
+bool EseManKDT::checkFiltersSatisfied(const EsemanNode* node) {
+    for (const auto& filter : filters) {
+        if (!checkFilterSatisfied(node, filter)) return false;
+    }
+    return true;
 }
 
 // This is following only the sliding midpoint rule.
@@ -157,7 +177,7 @@ EsemanNode* EseManKDT::constructKDTPerTrack(size_t start_index, size_t end_index
 // else return the start end point of the current cluster
 // dfs on the start and end time query
 void EseManKDT::findClusters(int64_t start_t, int64_t end_t, int64_t bin_size, const EsemanNode* c_node, vector<int64_t> &results) {
-    if(c_node == nullptr) return;
+    if(c_node == nullptr || !checkFiltersSatisfied(c_node)) return;
     int64_t start_time = (int64_t)c_node->start_time;
     int64_t end_time = (int64_t)c_node->end_time;
     if(start_time >= end_t || end_time <= start_t) return;
@@ -225,10 +245,10 @@ vector<double> EseManKDT::binnedRangeQueryPerTrack(int64_t time_begin,
 }
 
 LocDict EseManKDT::binnedRangeQuery(int64_t time_begin, 
-                                        int64_t time_end, 
-                                        uint64_t location_begin, 
-                                        uint64_t location_end, 
-                                        uint64_t bins){
+                                    int64_t time_end, 
+                                    uint64_t location_begin, 
+                                    uint64_t location_end, 
+                                    uint64_t bins){
     LocDict locDict;
     PRINTLOG("Got EseMan KDT binned range query");
     chrono::steady_clock::time_point clock_begin = chrono::steady_clock::now();
@@ -244,6 +264,8 @@ LocDict EseManKDT::binnedRangeQuery(int64_t time_begin,
         PRINTLOG("Track index: " << track_index << " " << event_tracks[track_index]);
     }
     chrono::steady_clock::time_point clock_end = chrono::steady_clock::now();
+
+    filters.clear(); // automatically clear filters after query
 
     cout << "ESEMAN," << "ds_window";
     cout << "," << time_begin << "," << time_end << "," << chrono::duration_cast<chrono::microseconds>(clock_end - clock_begin).count() <<
@@ -325,7 +347,11 @@ void test_KDT_build() {
     }
     uint64_t start_time, end_time;
     while(input_file >> start_time >> end_time) {
-        kdt->insertDataIntoTree(start_time, end_time, "9", "first");
+        string primitive_name = "first";
+        if (start_time == 74755483) {
+            primitive_name = "second";
+        }
+        kdt->insertDataIntoTree(start_time, end_time, "9", primitive_name);
     }
     input_file.close();
 
@@ -345,7 +371,11 @@ void test_KDT_build() {
         return;
     }
     while(input_file2 >> start_time >> end_time) {
-        kdt->insertDataIntoTree(start_time, end_time, "14", "first");
+        string primitive_name = "first";
+        if (start_time == 74755483) {
+            primitive_name = "second";
+        }
+        kdt->insertDataIntoTree(start_time, end_time, "14", primitive_name);
     }
     input_file2.close();
 
@@ -355,6 +385,7 @@ void test_KDT_build() {
     // kdt.binnedRangeQuery(1, 1200, 
     //                     12, 12, 
     //                     100);
+    // kdt->addPrimitiveFilter("first");
     kdt->binnedRangeQuery(-1305029698, 2753780939, 
                             9, 9, 
                             10);
