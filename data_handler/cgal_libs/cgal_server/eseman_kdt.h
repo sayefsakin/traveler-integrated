@@ -56,27 +56,30 @@ private:
   AttributeDict                    event_data_attributes;
   string                           return_attribute_key = "";
   EventDictList                    filters;
+  int                              max_depth_to_load = 14;
 
   bool checkFilterSatisfied(const EsemanNode* node, const EventDict& filter);
   bool checkFiltersSatisfied(const EsemanNode* node);
 
+  string findNodeInTimeRange(string uuid, double s_time, double e_time);
   EsemanNode* constructKDTPerTrack(size_t start_index, size_t end_index, size_t track_index);
   void printKDTDotRecursive(EsemanNode* node, ofstream& dotFile);
   vector<double> binnedRangeQueryPerTrack(int64_t time_begin, 
                                       int64_t time_end,
                                       size_t track_index,
                                       uint64_t bins);
-  void findClusters(int64_t start_t, int64_t end_t, int64_t bin_size, const EsemanNode* c_node, vector<int64_t> &results);
+  void findClusters(int64_t start_t, int64_t end_t, int64_t bin_size, const EsemanNode* c_node, vector<int64_t> &results, int depth);
   void deleteTree(EsemanNode* node);
 
   void saveNodeToFile(const EsemanNode* node);
-  EsemanNode* loadNodeFromFile(const string& uuid);
+  EsemanNode* loadNodeFromFile(const string& uuid, int depth);
 
 public:
   int horizontal_resolution_divisor = 1;
   int vertical_resolution_divisor = 1;
   bool is_vertical_split = false;
   string node_storage_base_path = ".";
+  string dataset_id = "default_dataset";
   
   EseManKDT() {
       // Constructor logic if needed
@@ -97,8 +100,8 @@ public:
   void printKDTDotPerTrack(size_t track_index);
   void printKDTDot();
 
-  void cleanNodesFromMemory();
-  void reloadNodesFromFile();
+  void cleanNodesFromMemory(bool is_store_existing);
+  bool reloadNodesFromFile(bool is_load_attributes, double s_time, double e_time);
 
   void addPrimitiveFilter(string primitive_filter) {
     for (const auto& filter : filters) {

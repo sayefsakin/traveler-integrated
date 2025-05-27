@@ -134,8 +134,6 @@ void testSearchQueries(Kdtree *kdtree, Segment_tree_3_type *Segment_tree_2, int 
     if(DEBUG) cout << "KD Tree" << endl;
     if(DEBUG) cout << kdtree << endl;
 */
-    //segmentTreeTest(points_2d);
-    //buildSegmentTreeFromPointVector(points_2d);
     vector<Interval> OutputList1;
     Interval a=Interval(Pure_interval(Key(p.x(),(p.y()*2)-1,0), Key(q.x(),q.y()*2,0)),"z");
     Segment_tree_2->window_query(a,std::back_inserter(OutputList1));
@@ -715,7 +713,6 @@ void startServerListening(BinnedKDT *binnedKDT,
 
 int main(int argc, char *argv[])
 {
-    vector<string> primitives;
     UrlParser urlparser;
     //urlparser.urlString = "http://localhost:8000/datasets/9b9d5286-736c-481a-ba29-0f871979967c/intervalHistograms?bins=100";
     //urlparser.baseUrl = "http://localhost:8000/datasets/9b9d5286-736c-481a-ba29-0f871979967c/primitives";
@@ -724,11 +721,17 @@ int main(int argc, char *argv[])
     //urlparser.datasetId = "8b3289c9-a740-4091-a56d-e4d55af526b5";//kmeans
     urlparser.datasetId = "589ca754-ef75-426c-8d51-841cc61dc84a"; // dgemm
     urlparser.travelerApi = "intervals";//"primitives";
+
     if(argc>1) urlparser.datasetId = argv[1];
+    bool is_build_dataset = false;
+    if(argc>2) is_build_dataset = (string(argv[2]) == "true");
+
     char *pds = getenv("PROFILED_DS");
     char *pds2 = getenv("HORIZONTAL_RESOLUTION_DIVISOR");
+    char *pds3 = getenv("TRAVELER_DATA_BACKUP_LOCATION");
     string profiled_ds = pds == NULL ? string("summed_area_table") : string(pds);
     int horizontal_resolution_divisor = pds2 == NULL ? 1 : atoi(pds2);
+    string data_backup_location = pds3 == NULL ? string("/mnt/d/traveler_dataset_backups") : string(pds3);
 /*
     urlparser.urlParameters.Parse(R""""({
                                       "begin":"813481624",
@@ -738,10 +741,6 @@ int main(int argc, char *argv[])
 
     if(profiled_ds == string("summed_area_table")){ cout << "Summed area table only." << endl; return 0;}
 
-    Document fetchedData = urlparser.fetchContentFromURL();
-    if(fetchedData.IsNull() || kArrayType != fetchedData.GetType()) { if(DEBUG) cout << "nothing is in the content" << endl; return 0;}
-
-    Point_vector points_2d;
     vector<Interval> InputList, NeighborInputList;
     int totalIntervals = 0;
     Primtive_mapping primitiveMapping;
@@ -769,9 +768,11 @@ int main(int argc, char *argv[])
     } else if(profiled_ds == ESEMAN) {
         esemanKDT = new EseManKDT();
         esemanKDT->horizontal_resolution_divisor = horizontal_resolution_divisor;
+        esemanKDT->dataset_id = urlparser.datasetId;
+        esemanKDT->node_storage_base_path = data_backup_location;
     }
 
-    map<uint64_t, unique_ptr<BinnedKDT>> locationKDT;
+    // map<uint64_t, unique_ptr<BinnedKDT>> locationKDT;
 
     int64_t minId = numeric_limits<int64_t>::max();
     int64_t maxId = 0;
@@ -781,7 +782,25 @@ int main(int argc, char *argv[])
     uint64_t maxLocation = 0;
     uint64_t tree_build_time = 0;
 
-    const string baseLocation = "/mnt/c/Users/sayef/IdeaProjects/traveler-integrated/data_handler/cgal_libs/cgal_server/location_data/";
+    if( profiled_ds == ESEMAN && !is_build_dataset) {
+        std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
+        if(esemanKDT->reloadNodesFromFile(true,-1,numeric_limits<int64_t>::max())) {
+            cout << "ESEMAN dataset loaded from disk" << endl;
+            std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
+            tree_build_time = std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count();
+            std::cout << "EseMAN KDT load from disk time = " << tree_build_time << "[microseconds]" << std::endl;
+            startServerListening(binnedKDT, Segment_tree_3, neighborKDT, Segment_tree_neighbor_3,
+                                agglomerateClusters, esemanKDT,
+                                tree_build_time, minId, maxId, minTime, maxTime,
+                                minLocation, maxLocation, primitiveMapping);
+        } else {
+            cout << "ESEMAN dataset not found on disk" << endl;
+        }
+        return 0;
+    }
+
+    Document fetchedData = urlparser.fetchContentFromURL();
+    if(fetchedData.IsNull() || kArrayType != fetchedData.GetType()) { if(DEBUG) cout << "nothing is in the content" << endl; return 0;}
 
     for (auto& v : fetchedData.GetArray()) {
         cPrimitive = v.GetObject()["Primitive"].GetString();
@@ -826,12 +845,12 @@ int main(int argc, char *argv[])
                                         interval_end.x(), interval_end.y(), 
                                         v.GetObject()["intervalId"].GetString(), 
                                         parent_id);
-            if (locationKDT.find(locationId) == locationKDT.end()) {
-                locationKDT[locationId] = make_unique<BinnedKDT>();
-            }
-            locationKDT[locationId]->insertDataIntoTree(interval_enter.x(), interval_enter.y(), 
-                                        interval_end.x(), interval_end.y(), 
-                                        v.GetObject()["intervalId"].GetString(), cPrimitiveNumber);
+            // if (locationKDT.find(locationId) == locationKDT.end()) {
+            //     locationKDT[locationId] = make_unique<BinnedKDT>();
+            // }
+            // locationKDT[locationId]->insertDataIntoTree(interval_enter.x(), interval_enter.y(), 
+            //                             interval_end.x(), interval_end.y(), 
+            //                             v.GetObject()["intervalId"].GetString(), cPrimitiveNumber);
         } else if(profiled_ds == SGTREE) {
             InputList.emplace_back(Interval(
                     getPurIntervalFromPoint(interval_enter, interval_end), 
@@ -876,7 +895,7 @@ int main(int argc, char *argv[])
         std::cout << "KD Tree build time = " << tree_build_time << "[microseconds]" << std::endl;
         neighborKDT->tree.build();
 
-        const string baseDotFileLocation = "/mnt/c/Users/sayef/IdeaProjects/traveler-integrated/data_handler/cgal_libs/cgal_server/figures";
+        // const string baseDotFileLocation = "/mnt/c/Users/sayef/IdeaProjects/traveler-integrated/data_handler/cgal_libs/cgal_server/figures";
         // std::string outputFilePath = baseDotFileLocation + "/binnedKDT.dot";
         // binnedKDT.outputToDot(outputFilePath);
         // binnedKDT.tree.statistics(std::cout);
@@ -903,6 +922,13 @@ int main(int argc, char *argv[])
         std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
         tree_build_time = std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count();
         std::cout << "EseMAN KDT build time = " << tree_build_time << "[microseconds]" << std::endl;
+
+        // esemanKDT->cleanNodesFromMemory(true);
+        // if(esemanKDT->reloadNodesFromFile(true,-1,numeric_limits<int64_t>::max())) {
+        //     cout << "ESEMAN dataset loaded from disk after building" << endl;
+        // } else {
+        //     cout << "ESEMAN dataset not found on disk after building" << endl;
+        // }
     }
     // begin = std::chrono::steady_clock::now();
     // kdtree.build();

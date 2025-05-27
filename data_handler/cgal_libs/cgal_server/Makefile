@@ -4,7 +4,7 @@ CC = g++
 # compiler flags:
 #  -g     - this flag adds debugging information to the executable file
 #  -Wall  - this flag is used to turn on most compiler warnings
-CFLAGS  = -g -Wall #-D_DEBUG
+CFLAGS  = -g -Wall -D_DEBUG
 
 AGC_CFLAGS = -Wall -g -DNO_INCLUDE_FENV
 LDFLAGS = -lstdc++
@@ -27,7 +27,7 @@ DATASET_ID ?= $(KMEANS_ID)
 all: $(CGAL_SERVER).cpp $(AGC).cpp $(ESEMAN).cpp fastcluster.o
 	$(RM) $(CGAL_SERVER)
 	$(CC) $(CFLAGS) -o $(CGAL_SERVER) $(CGAL_SERVER).cpp $(CGET).cpp $(OBKDT).cpp $(AGC).cpp $(ESEMAN).cpp fastcluster.o $(INCLUDE) -lcurl
-	./$(CGAL_SERVER) $(DATASET_ID)
+	./$(CGAL_SERVER) $(DATASET_ID) true
 
 $(AGC): $(AGC).cpp fastcluster.o
 	$(RM) $(AGC)

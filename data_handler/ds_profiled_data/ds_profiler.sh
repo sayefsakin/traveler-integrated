@@ -42,6 +42,9 @@ export TOTAL_SAMPLE=10
 export PROFILED_DS=$DUCK_SKETCH
 export QUERY_TYPE=$Q_WINDOW
 export BASE_URL=$LOCALHOST_URL
+export HORIZONTAL_RESOLUTION_DIVISOR=1
+
+export TRAVELER_DATA_BACKUP_LOCATION="/mnt/d/traveler_dataset_backups"
 
 serve_watch=$profile_directory"/"$PROFILED_DS"_"$QUERY_TYPE"_serve_check"
 echo "Writing Traveler serve output to file: "$serve_watch
