@@ -45,11 +45,12 @@ export BASE_URL=$LOCALHOST_URL
 export HORIZONTAL_RESOLUTION_DIVISOR=1
 
 export TRAVELER_DATA_BACKUP_LOCATION="/mnt/d/traveler_dataset_backups"
+export LMDB_DATABASE_TOTAL_SIZE=20971520
 
 serve_watch=$profile_directory"/"$PROFILED_DS"_"$QUERY_TYPE"_serve_check"
 echo "Writing Traveler serve output to file: "$serve_watch
 source $python_env_directory"/bin/activate"
-
+# sudo apt-get install liblmdb-dev
 traveler(){
   if [[ $PROFILED_DS == db_postgres* ]] ; then
     echo "starting postgres server";

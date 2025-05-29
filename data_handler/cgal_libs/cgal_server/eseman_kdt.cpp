@@ -67,7 +67,6 @@ void EseManKDT::insertDataIntoTree(double start_time, double end_time, string tr
         event_tracks.insert(track);
         track_index = event_tracks.get_track_index(track);
         event_data_values.push_back(EventDictList());
-        event_data_nodes.push_back(nullptr);
     }
     event_data_values[track_index].push_back(EventDict{{"time",start_time},{"primitive", primitive_name},{"ID", interval_id}});
     event_data_values[track_index].push_back(EventDict{{"time",end_time},{"primitive", primitive_name},{"ID", interval_id}});
@@ -83,16 +82,18 @@ void EseManKDT::insertDataIntoTree(double start_time, double end_time, string tr
     event_data_attributes["ID"].insert(interval_id);
 }
 
-void EseManKDT::deleteTree(EsemanNode* node) {
+void EseManKDT::deleteTree(const string& uuid) {
+    if(uuid.empty())return;
+    EsemanNode* node = loadNodeFromLMDB(uuid);
     if (!node) return;
-    if (node->left_child) {
+    
+    if (node->hasLeftChild()) {
         deleteTree(node->left_child);
-        node->left_child = nullptr;
     }
-    if (node->right_child) {
+    if (node->hasRightChild()) {
         deleteTree(node->right_child);
-        node->right_child = nullptr;
     }
+    deleteFromLMDB(uuid);
     delete node;
 }
 
@@ -115,9 +116,10 @@ bool EseManKDT::checkFiltersSatisfied(const EsemanNode* node) {
 }
 
 // This is following only the sliding midpoint rule.
-EsemanNode* EseManKDT::constructKDTPerTrack(size_t start_index, size_t end_index, size_t track_index) {
+string EseManKDT::constructKDTPerTrack(size_t start_index, size_t end_index, size_t track_index) {
+    string result_uuid("");
     EventDictList& data_vector = event_data_values[track_index];
-    if (start_index >= data_vector.size() || end_index >= data_vector.size() || start_index >= end_index) return nullptr;
+    if (start_index >= data_vector.size() || end_index >= data_vector.size() || start_index >= end_index) return result_uuid;
     
     EsemanNode* cur_node = new EsemanNode(getEventTime(data_vector[start_index]), getEventTime(data_vector[end_index]), track_index);
     if (start_index + 1 == end_index) {
@@ -126,15 +128,11 @@ EsemanNode* EseManKDT::constructKDTPerTrack(size_t start_index, size_t end_index
             size_t attr_index = event_data_attributes[key].get_track_index(get<string>(indexes));
             cur_node->addAttribute(key, attr_index);
         }
-        return cur_node;
+        saveNodeToLMDB(cur_node);
+        result_uuid = cur_node->uuid;
+        delete cur_node;
+        return result_uuid;
     }
-    // sliding midpoint rule
-    // double mid_point = data_vector[start_index] + (data_vector[end_index] - data_vector[start_index]) / 2.0;
-    // size_t mid_index = upper_bound(data_vector.begin() + start_index, data_vector.begin() + end_index + 1, mid_point) - data_vector.begin();
-    // if(mid_index%2 == 1)
-    //     mid_index--;
-    // if(mid_index == start_index) mid_index = start_index + 2;
-    // if(mid_index >= end_index) return cur_node;
 
     // sliding midpoint of max distance rule
     double max_distance = 0;
@@ -145,50 +143,57 @@ EsemanNode* EseManKDT::constructKDTPerTrack(size_t start_index, size_t end_index
             mid_index = i+1;
         }
     }
-
-    if(cur_node->left_child != nullptr) {
-        PRINTLOG("Left child deleted");
-        delete cur_node->left_child;
-        cur_node->left_child = nullptr;
-    }
-    if(cur_node->right_child != nullptr) {
-        PRINTLOG("Right child deleted");
-        delete cur_node->right_child;
-        cur_node->right_child = nullptr;
-    }
     cur_node->left_child = constructKDTPerTrack(start_index, mid_index-1, track_index);
     cur_node->right_child = constructKDTPerTrack(mid_index, end_index, track_index);
-    if (cur_node->left_child) {
-        for (const auto& [key, indexes] : cur_node->left_child->attribute_lists) {
-            for (size_t index : indexes) {
-                cur_node->addAttribute(key, index);
+
+    if (cur_node->hasLeftChild()) {
+        EsemanNode* left_node = loadNodeFromLMDB(cur_node->left_child);
+        if(left_node) {
+            for (const auto& [key, indexes] : left_node->attribute_lists) {
+                for (size_t index : indexes) {
+                    cur_node->addAttribute(key, index);
+                }
             }
+            delete left_node;
         }
     }
-    if (cur_node->right_child) {
-        for (const auto& [key, indexes] : cur_node->right_child->attribute_lists) {
-            for (size_t index : indexes) {
-                cur_node->addAttribute(key, index);
+    if (cur_node->hasRightChild()) {
+        EsemanNode* right_node = loadNodeFromLMDB(cur_node->right_child);
+        if(right_node) {
+            for (const auto& [key, indexes] : right_node->attribute_lists) {
+                for (size_t index : indexes) {
+                    cur_node->addAttribute(key, index);
+                }
             }
+            delete right_node;
         }
     }
-    return cur_node;
+    
+    saveNodeToLMDB(cur_node);
+    result_uuid = cur_node->uuid;
+    delete cur_node;
+    return result_uuid;
 }
 
 // search logic
 // if bin size is less than cluster length, then go down
 // else return the start end point of the current cluster
 // dfs on the start and end time query
-void EseManKDT::findClusters(int64_t start_t, int64_t end_t, int64_t bin_size, const EsemanNode* c_node, vector<int64_t> &results, int depth) {
-    if(c_node == nullptr || !checkFiltersSatisfied(c_node)) return;
+void EseManKDT::findClusters(int64_t start_t, int64_t end_t, int64_t bin_size, const string& uuid, vector<int64_t> &results, int depth) {
+    if(uuid.empty())return;
+    EsemanNode *c_node = loadNodeFromLMDB(uuid);
+    if(c_node == nullptr || !checkFiltersSatisfied(c_node)) {
+        if (c_node != nullptr) delete c_node;
+        return;
+    }
     int64_t start_time = (int64_t)c_node->start_time;
     int64_t end_time = (int64_t)c_node->end_time;
-    if(start_time >= end_t || end_time <= start_t) return;
+    if(start_time >= end_t || end_time <= start_t) {delete c_node; return;}
     if(bin_size >= (end_time - start_time + 1)) {
         if(return_attribute_key != "") {
             if(!c_node->hasAttribute(return_attribute_key)) {
                 PRINTLOG("Attribute not found for key: " << return_attribute_key);
-                return;
+                delete c_node; return;
             }
             results.push_back((int64_t)(*c_node->attribute_lists.at(return_attribute_key).begin()));
         } else {
@@ -196,9 +201,9 @@ void EseManKDT::findClusters(int64_t start_t, int64_t end_t, int64_t bin_size, c
             results.push_back(end_time);
         }
         PRINTLOG("Cluster: " << " Start: " << start_time << ", End: " << end_time << ", Depth: " << depth);
-        return;
+        delete c_node; return;
     }
-    if(c_node->left_child == nullptr && c_node->right_child == nullptr) {
+    if(!c_node->hasLeftChild() && !c_node->hasRightChild()) {
         if(start_time < start_t) {
             start_time = start_t;
         }
@@ -208,7 +213,7 @@ void EseManKDT::findClusters(int64_t start_t, int64_t end_t, int64_t bin_size, c
         if(return_attribute_key != "") {
             if(!c_node->hasAttribute(return_attribute_key)) {
                 PRINTLOG("Attribute not found for key: " << return_attribute_key);
-                return;
+                delete c_node; return;
             }
             results.push_back((int64_t)(*c_node->attribute_lists.at(return_attribute_key).begin()));
         } else {
@@ -216,11 +221,14 @@ void EseManKDT::findClusters(int64_t start_t, int64_t end_t, int64_t bin_size, c
             results.push_back(end_time);
         }
         PRINTLOG("Cluster-Leaf: " << " Start: " << start_time << ", End: " << end_time << ", Depth: " << depth);
-        return;
+        delete c_node; return;
     }
     // this is a compound node
-    findClusters(start_t, end_t, bin_size, c_node->left_child, results, depth+1);
-    findClusters(start_t, end_t, bin_size, c_node->right_child, results, depth+1);
+    string left_node_uuid = c_node->left_child;
+    string right_node_uuid = c_node->right_child;
+    delete c_node;
+    findClusters(start_t, end_t, bin_size, left_node_uuid, results, depth+1);
+    findClusters(start_t, end_t, bin_size, right_node_uuid, results, depth+1);
 }
 
 vector<double> EseManKDT::binnedRangeQueryPerTrack(int64_t time_begin, 
@@ -231,7 +239,7 @@ vector<double> EseManKDT::binnedRangeQueryPerTrack(int64_t time_begin,
     uint64_t bin_size(getBinSize(time_begin, time_end, bins));
 
     vector<int64_t> data_short_list;
-    findClusters(time_begin, time_end, (int64_t)bin_size*horizontal_resolution_divisor, event_data_nodes[track_index], data_short_list, 0);
+    findClusters(time_begin, time_end, (int64_t)bin_size*horizontal_resolution_divisor, eseman_node_uuids[track_index], data_short_list, 0);
 
     for(long unsigned int i = 0; i < data_short_list.size(); i+=2) {
         int64_t start_time = data_short_list[i];
@@ -313,7 +321,7 @@ string EseManKDT::findNearestEvent(uint64_t cTime, uint64_t cLocation) {
   vector<int64_t> data_short_list;
 
   uint64_t bin_size(getBinSize(cTime, cTime+1, 1));
-  findClusters(cTime, cTime+1, (int64_t)bin_size, event_data_nodes[track_index], data_short_list, 0);
+  findClusters(cTime, cTime+1, (int64_t)bin_size, eseman_node_uuids[track_index], data_short_list, 0);
   if(data_short_list.size() > 0) result = data_short_list[0];
   if(result >= 0) ret_result = event_data_attributes["ID"][result];
   data_short_list.clear();
@@ -325,28 +333,25 @@ void EseManKDT::printKDTDotPerTrack(size_t track_index) {
     ofstream dotFile("track_" + to_string(track_index) + ".dot");
     dotFile << "digraph G {" << endl;
     dotFile << "  label = \"Track " << event_tracks[track_index] << "\";" << endl;
-    printKDTDotRecursive(event_data_nodes[track_index], dotFile);
+    printKDTDotRecursive(eseman_node_uuids[track_index], dotFile);
     dotFile << "}" << endl;
     dotFile.close();
 }
 
-void EseManKDT::printKDTDotRecursive(EsemanNode* node, ofstream& dotFile) {
-    if (!node) return;
-
-    dotFile << "  \"" << node->start_time << "," << node->end_time << "\" [label=\"["
-            << node->start_time << "," << node->end_time << "]\"];" << endl;
-
-    if (node->left_child) {
-        dotFile << "  \"" << node->start_time << "," << node->end_time << "\" -> \""
-                << node->left_child->start_time << "," << node->left_child->end_time << "\";" << endl;
+void EseManKDT::printKDTDotRecursive(string uuid, ofstream& dotFile) {
+    if (uuid.empty()) return;
+    EsemanNode *node = loadNodeFromLMDB(uuid);
+    if(!node)return;
+    dotFile << "  \"" << node->start_time << "," << node->end_time << "\" [label=\"[" << node->uuid << "]\"];" << endl;
+    if (node->hasLeftChild()) {
+        dotFile << "  \"" << node->uuid << "\" -> \"" << node->left_child << "\";" << endl;
         printKDTDotRecursive(node->left_child, dotFile);
     }
-
-    if (node->right_child) {
-        dotFile << "  \"" << node->start_time << "," << node->end_time << "\" -> \""
-                << node->right_child->start_time << "," << node->right_child->end_time << "\";" << endl;
+    if (node->hasRightChild()) {
+        dotFile << "  \"" << node->uuid << "\" -> \"" << node->right_child << "\";" << endl;
         printKDTDotRecursive(node->right_child, dotFile);
     }
+    delete node;
 }
 
 void EseManKDT::printKDTDot() {
@@ -356,6 +361,11 @@ void EseManKDT::printKDTDot() {
 }
 
 void EseManKDT::buildKDT() {
+    string commands_remove_dir = "cd " + node_storage_base_path + " && mkdir -p " + dataset_id;
+    system(commands_remove_dir.c_str());
+    eseman_node_uuids.clear();
+    
+    openWritePermLMDB();
     for (size_t i = 0; i < event_data_values.size(); ++i) {
         if (event_data_values[i].empty()) continue;
 
@@ -364,100 +374,132 @@ void EseManKDT::buildKDT() {
         //     [](const EventDict& a, const EventDict& b) {
         //         return stod(a.at("time")) < stod(b.at("time"));
         //     });
-        if(event_data_nodes[i] != nullptr) {
-            PRINTLOG("Deleting old KDT for track index: " << event_tracks[i]);
-            deleteTree(event_data_nodes[i]);
-        }
         if(is_vertical_split == false) {
-            event_data_nodes[i] = constructKDTPerTrack(0, event_data_values[i].size() - 1, i);
-            eseman_node_uuids.push_back(event_data_nodes[i]->uuid);
+            eseman_node_uuids.push_back(constructKDTPerTrack(0, event_data_values[i].size() - 1, i));
         }
         PRINTLOG("Constructing KDT for track index: " << event_tracks[i]);
         event_data_values[i].clear();
     }
+    closeWritePermLMDB();
     event_data_values.clear();
     // if(is_vertical_split)
     //     event_data_nodes[0] = constructKDTPerTrack(0, event_data_values[i].size() - 1, i);
 }
 
-void EseManKDT::saveNodeToFile(const EsemanNode* node) {
+void EseManKDT::deleteFromLMDB(const string& uuid) {
+    if (uuid.empty()) return;
+
+    MDB_val key;
+    if(!openWritePermLMDB())return;
+
+    // Set the key to delete
+    key.mv_size = uuid.length();
+    key.mv_data = (void*)uuid.c_str();
+
+    // Attempt deletion
+    int rc = mdb_del(txn, dbi, &key, nullptr);
+
+    if (rc == MDB_NOTFOUND) {
+        PRINTLOG("Key not found.");
+    } else if (rc != 0) {
+        PRINTLOG("Delete failed: " << mdb_strerror(rc));
+    } else {
+        PRINTLOG("Key deleted successfully.");
+    }
+
+    closeWritePermLMDB();
+}
+void EseManKDT::saveNodeToLMDB(const EsemanNode* node) {
     if (!node) return;
 
-    string dataset_path = node_storage_base_path + "/" + dataset_id;
-    // Create file using node's UUID
-    ofstream file(dataset_path + "/" + node->uuid);
-    if (!file.is_open()) {
-        cerr << "Failed to open file during saving: " << node->uuid << endl;
-        return;
-    }
+    MDB_val key, data;
+    int rc;
 
-    // Save node data
-    file << doubleToStringZeroPrecision(node->start_time) << " " << doubleToStringZeroPrecision(node->end_time) << " "
-            << node->start_track << " " << node->end_track << "\n";
+    // Serialize node data
+    ostringstream oss;
+    oss << doubleToStringZeroPrecision(node->start_time) << " " 
+        << doubleToStringZeroPrecision(node->end_time) << " "
+        << node->start_track << " " << node->end_track << "\n";
 
-    // Save attributes
-    file << node->attribute_lists.size() << "\n";
+    // Serialize attributes
+    oss << node->attribute_lists.size() << "\n";
     for (const auto& attr : node->attribute_lists) {
-        file << attr.first << " " << attr.second.size() << "\n";
+        oss << attr.first << " " << attr.second.size() << "\n";
         for (int val : attr.second) {
-        file << val << " ";
+            oss << val << " ";
         }
-        file << "\n";
+        oss << "\n";
     }
 
-    // Save child UUIDs for reference
-    file << (node->left_child ? node->left_child->uuid : "NULL") << "\n";
-    file << (node->right_child ? node->right_child->uuid : "NULL") << "\n";
-    file.close();
+    // Save child UUIDs
+    oss << node->left_child << "\n";
+    oss << node->right_child << "\n";
 
-    // Recursively save children
-    if (node->left_child) saveNodeToFile(node->left_child);
-    if (node->right_child) saveNodeToFile(node->right_child);
+    string serialized_data = oss.str();
+    
+    // Store in LMDB
+    key.mv_data = (void*)node->uuid.c_str();
+    key.mv_size = node->uuid.length();
+    data.mv_data = (void*)serialized_data.c_str();
+    data.mv_size = serialized_data.length();
+
+    rc = mdb_put(txn, dbi, &key, &data, 0);
+    if (rc) {
+        PRINTLOG("mdb_put failed, error " << rc);
+    }
 }
+EsemanNode* EseManKDT::loadNodeFromLMDB(const string& uuid) {
+    if (uuid == "NULL" || uuid == "") return nullptr;
 
-EsemanNode* EseManKDT::loadNodeFromFile(const string& uuid, int depth) {
-    if (uuid == "NULL" || uuid == "" || depth > max_depth_to_load) return nullptr;
+    MDB_val key, data;
+    
+    int rc;
 
-    string dataset_path = node_storage_base_path + "/" + dataset_id;
-    ifstream file(dataset_path + "/" + uuid);
-    if (!file.is_open()) {
-        cerr << "Failed to open file during loading: " << uuid << endl;
+    // Prepare key
+    key.mv_data = (void*)uuid.c_str();
+    key.mv_size = uuid.length();
+
+    // Get data from LMDB
+    rc = mdb_get(txn, dbi, &key, &data);
+    if (rc) {
+        PRINTLOG("mdb_get failed, error " << rc);
         return nullptr;
     }
 
+    // Create new node and parse data
     EsemanNode* node = new EsemanNode();
     node->uuid = uuid;
 
-    // Load node data
-    file >> node->start_time >> node->end_time 
-            >> node->start_track >> node->end_track;
+    string serialized_data((char*)data.mv_data, data.mv_size);
+    istringstream iss(serialized_data);
 
-    // Load attributes
+    // Parse node data
+    iss >> node->start_time >> node->end_time 
+        >> node->start_track >> node->end_track;
+
+    // Parse attributes
     int attr_count;
-    file >> attr_count;
-    file.ignore();
-
+    iss >> attr_count;
+    
     for (int i = 0; i < attr_count; i++) {
         string key;
         int size;
-        file >> key >> size;
+        iss >> key >> size;
         
         for (int j = 0; j < size; j++) {
-            size_t val;
-            file >> val;
+            int val;
+            iss >> val;
             node->attribute_lists[key].insert(val);
         }
-        
-        file.ignore();
     }
 
-    // Load child nodes recursively
+    // Parse child UUIDs
     string left_uuid, right_uuid;
-    file >> left_uuid >> right_uuid;
+    iss >> left_uuid >> right_uuid;
 
-    node->left_child = loadNodeFromFile(left_uuid, depth+1);
-    node->right_child = loadNodeFromFile(right_uuid, depth+1);
-
+    node->left_child = left_uuid;
+    node->right_child = right_uuid;
+    
     return node;
 }
 
@@ -502,18 +544,12 @@ void EseManKDT::cleanNodesFromMemory(bool is_store_existing) {
             uuid_file.close();
         }
     }
-    // Save each node to file
-    for (auto node : event_data_nodes) {
-        if(is_store_existing) saveNodeToFile(node);
-        deleteTree(node);
-    }
-    event_data_nodes.clear();
     event_data_attributes.clear();
     event_tracks.cleanMemory();
     eseman_node_uuids.clear();
 }
 
-bool EseManKDT::reloadNodesFromFile(bool is_load_attributes, double s_time, double e_time) {
+bool EseManKDT::reloadNodesFromFile(bool is_load_attributes) {
     try {
         if(is_load_attributes) {
             string dataset_path = node_storage_base_path + "/" + dataset_id;
@@ -565,23 +601,6 @@ bool EseManKDT::reloadNodesFromFile(bool is_load_attributes, double s_time, doub
                 uuid_file.close();
             }
         }
-        
-        // Load each node from file
-        event_data_nodes.clear();
-        for (string node_uid : eseman_node_uuids) {
-            string c_uid = findNodeInTimeRange(node_uid, s_time, e_time);
-            
-            char *pds4 = getenv("ESEMAN_MAX_LOAD_DEPTH");
-            max_depth_to_load = pds4 == NULL ? 12 : atoi(pds4);
-
-            EsemanNode* node = loadNodeFromFile(c_uid, 0);
-            if (node) {
-                event_data_nodes.push_back(node);
-                PRINTLOG("Loaded node with Grand root UUID: " << node_uid << " and current UUID: " << c_uid);
-            } else {
-                PRINTLOG("Failed to load node with UUID: " << node_uid << " and current UUID: " << c_uid);
-            }
-        }
         return true;
     } catch (const exception& e) {
         PRINTLOG("Error while reloading nodes from file: " << e.what());
@@ -589,103 +608,87 @@ bool EseManKDT::reloadNodesFromFile(bool is_load_attributes, double s_time, doub
     return false;
 }
 
-string EseManKDT::findNodeInTimeRange(string uuid, double s_time, double e_time) {
-    max_depth_to_load = 1;
-    EsemanNode* root = loadNodeFromFile(uuid, 0);
-    string result("");
-    if (!root) return result;
-    
-    if (s_time < root->start_time && root->end_time < e_time) {
-        result = root->uuid;
-    } else if (root->left_child && root->left_child->end_time > s_time && root->right_child && root->right_child->start_time < e_time) {
-        result = root->uuid;
-    } else if (root->right_child && root->right_child->start_time > e_time) {
-        result = findNodeInTimeRange(root->left_child->uuid, s_time, e_time);
-    } else if (root->left_child && root->left_child->end_time < s_time) {
-        result = findNodeInTimeRange(root->right_child->uuid, s_time, e_time);
-    }
-    delete root;
-    return result;
-}
-
 void test_KDT_build() {
     EseManKDT *kdt = new EseManKDT();
-    // // kdt.insertDataIntoTree(5.0, 6.0, "12");
-    // // kdt.insertDataIntoTree(1.0, 2.0, "12");
-    // // kdt.insertDataIntoTree(1100.0, 1110.0, "12");
-    // // kdt.insertDataIntoTree(11.0, 12.0, "12");
-    // // kdt.insertDataIntoTree(14.0, 18.0, "12");
-
-
-    // string input_file_path = "/mnt/c/Users/sayef/IdeaProjects/traveler-integrated/data_handler/cgal_libs/cgal_server/location_data/";
-    // fstream input_file(input_file_path + "9.location");
-    // if (!input_file.is_open()) {
-    //     PRINTLOG("Failed to open input file");
-    //     return;
-    // }
-    // uint64_t start_time, end_time;
-    // while(input_file >> start_time >> end_time) {
-    //     string primitive_name = "first";
-    //     if (start_time == 74755483) {
-    //         primitive_name = "second";
-    //     }
-    //     string interval_id = "100000";
-    //     if (start_time == 74755483) {
-    //         interval_id = "320000";
-    //     }
-    //     kdt->insertDataIntoTree(start_time, end_time, "9", primitive_name, interval_id);
-    // }
-    // input_file.close();
-
-    // fstream input_file1(input_file_path + "1.location");
-    // if (!input_file1.is_open()) {
-    //     PRINTLOG("Failed to open input file");
-    //     return;
-    // }
-    // while(input_file1 >> start_time >> end_time) {
-    //     kdt->insertDataIntoTree(start_time, end_time, "1", "first", "iid_1");
-    // }
-    // input_file1.close();
-
-    // fstream input_file2(input_file_path + "14.location");
-    // if (!input_file2.is_open()) {
-    //     PRINTLOG("Failed to open input file");
-    //     return;
-    // }
-    // while(input_file2 >> start_time >> end_time) {
-    //     string primitive_name = "first";
-    //     if (start_time == 74755483) {
-    //         primitive_name = "second";
-    //     }
-    //     kdt->insertDataIntoTree(start_time, end_time, "14", primitive_name, "iid_1");
-    // }
-    // input_file2.close();
-
-    // kdt->buildKDT();
-    // // kdt.printKDTDot();
-    // // kdt.printKDTDot();
-    // // kdt.binnedRangeQuery(1, 1200, 
-    // //                     12, 12, 
-    // //                     100);
-    // // kdt->addPrimitiveFilter("first");
-    // // kdt->addIDFilter("320000");
-    // kdt->binnedRangeQuery(-1305029698, 2753780939, 
-    //                         9, 9, 
-    //                         10);
-    // string i_id = kdt->findNearestEvent(83188392, 9);
-    // cout << "Interval ID: " << i_id << endl;
-    int cm;
-    // // cin >> cm;
     kdt->node_storage_base_path = "/mnt/d/tmp";
-    // kdt->cleanNodesFromMemory(true);
-    PRINTLOG("ESEman KDT cleaned from memory, now reloading from file");
-    cin >> cm;
-    kdt->reloadNodesFromFile(true, 1144746000, 1399938555);
-    PRINTLOG("Reloading finished");
-    cin >> cm;
-    kdt->binnedRangeQuery(1144746004, 1399938545, 
+    // kdt.insertDataIntoTree(5.0, 6.0, "12");
+    // kdt.insertDataIntoTree(1.0, 2.0, "12");
+    // kdt.insertDataIntoTree(1100.0, 1110.0, "12");
+    // kdt.insertDataIntoTree(11.0, 12.0, "12");
+    // kdt.insertDataIntoTree(14.0, 18.0, "12");
+
+
+    string input_file_path = "/mnt/c/Users/sayef/IdeaProjects/traveler-integrated/data_handler/cgal_libs/cgal_server/location_data/";
+    fstream input_file(input_file_path + "9.location");
+    if (!input_file.is_open()) {
+        PRINTLOG("Failed to open input file");
+        return;
+    }
+    uint64_t start_time, end_time;
+    while(input_file >> start_time >> end_time) {
+        string primitive_name = "first";
+        if (start_time == 74755483) {
+            primitive_name = "second";
+        }
+        string interval_id = "100000";
+        if (start_time == 74755483) {
+            interval_id = "320000";
+        }
+        kdt->insertDataIntoTree(start_time, end_time, "9", primitive_name, interval_id);
+    }
+    input_file.close();
+
+    fstream input_file1(input_file_path + "1.location");
+    if (!input_file1.is_open()) {
+        PRINTLOG("Failed to open input file");
+        return;
+    }
+    while(input_file1 >> start_time >> end_time) {
+        kdt->insertDataIntoTree(start_time, end_time, "1", "first", "iid_1");
+    }
+    input_file1.close();
+
+    fstream input_file2(input_file_path + "14.location");
+    if (!input_file2.is_open()) {
+        PRINTLOG("Failed to open input file");
+        return;
+    }
+    while(input_file2 >> start_time >> end_time) {
+        string primitive_name = "first";
+        if (start_time == 74755483) {
+            primitive_name = "second";
+        }
+        kdt->insertDataIntoTree(start_time, end_time, "14", primitive_name, "iid_1");
+    }
+    input_file2.close();
+
+    kdt->buildKDT();
+    // kdt.printKDTDot();
+    // kdt.printKDTDot();
+    // kdt.binnedRangeQuery(1, 1200, 
+    //                     12, 12, 
+    //                     100);
+    // kdt->addPrimitiveFilter("first");
+    // kdt->addIDFilter("320000");
+    kdt->cleanNodesFromMemory(true);
+    kdt->reloadNodesFromFile(true);
+    kdt->openReadOnlyLMDB();
+    kdt->binnedRangeQuery(-1305029698, 2753780939, 
                             9, 9, 
                             10);
+    string i_id = kdt->findNearestEvent(83188393, 9);
+    kdt->closeReadOnlyLMDB();
+    cout << "Interval ID: " << i_id << endl;
+    // int cm;
+    // cin >> cm;
+    
+    // PRINTLOG("ESEman KDT cleaned from memory, now reloading from file");
+    // cin >> cm;
+    // PRINTLOG("Reloading finished");
+    // cin >> cm;
+    // kdt->binnedRangeQuery(1144746004, 1399938545, 
+    //                         9, 9, 
+    //                         10);
     // string cc_id = kdt->findNearestEvent(83188390, 9);
     // cout << "Interval ID: " << cc_id << endl;
 }
@@ -711,12 +714,17 @@ void test_KDT_build() {
 
 // }
 
+void test_lmdb() {
+
+}
+
 #ifdef TESTING
 int main() {
     PRINTLOG("hello inside eseman kdt");
     // test_event_tracks();
-    PRINTLOG("Printing resutls from RAM before cleaning");
+    // PRINTLOG("Printing resutls from RAM before cleaning");
     test_KDT_build();
+    // test_lmdb();
     // test_bitwise_insertion();
     PRINTLOG("Eseman KDT finished!");
     return 0;

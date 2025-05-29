@@ -784,15 +784,17 @@ int main(int argc, char *argv[])
 
     if( profiled_ds == ESEMAN && !is_build_dataset) {
         std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
-        if(esemanKDT->reloadNodesFromFile(true,-1,numeric_limits<int64_t>::max())) {
+        if(esemanKDT->reloadNodesFromFile(true)) {
             cout << "ESEMAN dataset loaded from disk" << endl;
             std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
             tree_build_time = std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count();
             std::cout << "EseMAN KDT load from disk time = " << tree_build_time << "[microseconds]" << std::endl;
+            esemanKDT->openReadOnlyLMDB();
             startServerListening(binnedKDT, Segment_tree_3, neighborKDT, Segment_tree_neighbor_3,
                                 agglomerateClusters, esemanKDT,
                                 tree_build_time, minId, maxId, minTime, maxTime,
                                 minLocation, maxLocation, primitiveMapping);
+            esemanKDT->closeReadOnlyLMDB();
         } else {
             cout << "ESEMAN dataset not found on disk" << endl;
         }
@@ -923,12 +925,12 @@ int main(int argc, char *argv[])
         tree_build_time = std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count();
         std::cout << "EseMAN KDT build time = " << tree_build_time << "[microseconds]" << std::endl;
 
-        // esemanKDT->cleanNodesFromMemory(true);
-        // if(esemanKDT->reloadNodesFromFile(true,-1,numeric_limits<int64_t>::max())) {
-        //     cout << "ESEMAN dataset loaded from disk after building" << endl;
-        // } else {
-        //     cout << "ESEMAN dataset not found on disk after building" << endl;
-        // }
+        esemanKDT->cleanNodesFromMemory(true);
+        if(esemanKDT->reloadNodesFromFile(true)) {
+            cout << "ESEMAN dataset loaded from disk after building" << endl;
+        } else {
+            cout << "ESEMAN dataset not found on disk after building" << endl;
+        }
     }
     // begin = std::chrono::steady_clock::now();
     // kdtree.build();
@@ -947,6 +949,7 @@ int main(int argc, char *argv[])
     // testSearchQueries(&kdtree, &Segment_tree_3, minId, maxId, urlparser.datasetId);
     // point_with_info_testing();
 
+    if(profiled_ds == ESEMAN) esemanKDT->openReadOnlyLMDB();
     startServerListening(
         binnedKDT, Segment_tree_3, 
         neighborKDT, Segment_tree_neighbor_3,
@@ -958,5 +961,6 @@ int main(int argc, char *argv[])
         minLocation, maxLocation, 
         primitiveMapping
     );
+    if(profiled_ds == ESEMAN) esemanKDT->closeReadOnlyLMDB();
     return EXIT_SUCCESS;
 }

@@ -23,6 +23,14 @@
 #include <chrono>
 #include <climits>
 #include <variant>
+#include <lmdb.h> 
+// using lmdb because
+// - it uses B+ tree
+// - memory mapped
+// - fast random access based on keys (RocksDB and others uses fast sequentail, slower on random)
+// - optimal space usage
+// - optimal for write once and read heavy queries
+// - only drawback is the database doesnt grow on demand, have to predefined the whole database size
 
 using namespace std;
 
@@ -31,6 +39,8 @@ using namespace std;
 #else
 #define PRINTLOG(x) std::cout << x << std::endl
 #endif
+
+#define LMDB_DATABASE_TOTAL_SIZE 20L*1024*1024*1024 //20 GB
 
 typedef unordered_map<string, size_t>                 String_to_index;
 typedef map<uint64_t, vector<double>>                 LocDict;
