@@ -20,16 +20,18 @@ public:
   size_t        end_track;
   string        left_child;
   string        right_child;
+  EsemanNode*   left_node;
+  EsemanNode*   right_node;
   AttributeList attribute_lists;
 
   EsemanNode()
         : uuid(""), start_time(0), end_time(0), start_track(0), end_track(0),
-          left_child(""), right_child("") {}
+          left_child(""), right_child(""), left_node(nullptr), right_node(nullptr) {}
 
     EsemanNode(double s_time, double e_time, size_t location)
         : uuid(generate_uuid()), start_time(s_time), end_time(e_time),
           start_track(location), end_track(location),
-          left_child(""), right_child("") {}
+          left_child(""), right_child(""), left_node(nullptr), right_node(nullptr) {}
 
   ~EsemanNode() {
     // Don't delete children here - let EseManKDT handle deletion
@@ -44,19 +46,19 @@ public:
   void addAttribute(const string& key, const int attr_index);
   bool hasLeftChild() { return !left_child.empty(); }
   bool hasRightChild() { return !right_child.empty(); }
-
+  bool isLeftChildCached() { return left_node != nullptr; }
+  bool isRightChildCached() { return right_node != nullptr; }
 };
 
 class EseManKDT {
 private:
   StringIndexMapper                event_tracks;
   vector<EventDictList>            event_data_values;
+  vector<EsemanNode*>              event_data_nodes;
   vector<string>                   eseman_node_uuids;
   AttributeDict                    event_data_attributes;
   string                           return_attribute_key = "";
   EventDictList                    filters;
-
-  int                              max_depth_to_load = 14;
 
   MDB_env                         *env;
   MDB_dbi                         dbi;
@@ -115,13 +117,21 @@ private:
   vector<double> binnedRangeQueryPerTrack(int64_t time_begin, 
                                       int64_t time_end,
                                       size_t track_index,
-                                      uint64_t bins);
-  void findClusters(int64_t start_t, int64_t end_t, int64_t bin_size, const string& uuid, vector<int64_t> &results, int depth);
-  void deleteTree(const string& uuid);
+                                      uint64_t bins,
+                                      EsemanNode* replace_node);
+  void findClusters(int64_t start_t, int64_t end_t, int64_t bin_size, 
+                    EsemanNode* c_node, EsemanNode* replace_node,
+                    vector<int64_t> &results, int depth);
+  void deleteTree(EsemanNode *node);
 
   void saveNodeToLMDB(const EsemanNode* node);
   EsemanNode* loadNodeFromLMDB(const string& uuid);
   void deleteFromLMDB(const string& uuid);
+
+  EsemanNode* findNodeInTimeRange(string uuid, double s_time, double e_time, EsemanNode* c_root);
+  EsemanNode* checkHotNodes(double start_time, double end_time, size_t track_index);
+  void checkNodeAvailability(EsemanNode* c_node, EsemanNode* replace_node);
+  void clearDeepNodesFromCache(EsemanNode* c_node);
 
 public:
   int horizontal_resolution_divisor = 1;
@@ -135,9 +145,13 @@ public:
   }
   
   ~EseManKDT() {
+    for(auto node : event_data_nodes) {
+      deleteTree(node);
+    }
     event_tracks.cleanMemory();
     filters.clear();
     event_data_values.clear();
+    event_data_nodes.clear();
     event_data_attributes.clear();
     eseman_node_uuids.clear();
   }

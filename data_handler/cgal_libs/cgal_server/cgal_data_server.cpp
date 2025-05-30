@@ -783,13 +783,14 @@ int main(int argc, char *argv[])
     uint64_t tree_build_time = 0;
 
     if( profiled_ds == ESEMAN && !is_build_dataset) {
+        esemanKDT->openReadOnlyLMDB();
         std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
         if(esemanKDT->reloadNodesFromFile(true)) {
             cout << "ESEMAN dataset loaded from disk" << endl;
             std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
             tree_build_time = std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count();
             std::cout << "EseMAN KDT load from disk time = " << tree_build_time << "[microseconds]" << std::endl;
-            esemanKDT->openReadOnlyLMDB();
+            
             startServerListening(binnedKDT, Segment_tree_3, neighborKDT, Segment_tree_neighbor_3,
                                 agglomerateClusters, esemanKDT,
                                 tree_build_time, minId, maxId, minTime, maxTime,
