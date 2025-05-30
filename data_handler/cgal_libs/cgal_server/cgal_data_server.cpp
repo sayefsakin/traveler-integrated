@@ -81,6 +81,7 @@ const string SGTREE("segment_tree");
 const string AGCLUSTER("agglomerative_clustering");
 const string ESEMAN("eseman_kdt");
 const string GETDATAINRANGE("GetDataInRange");
+const string SHUTDOWNSERVER("ShutDownServer");
 const string GETEVENTATTRIBUTE("GetEventAttribute");
 const string GETCHILDREN("GetChildren");
 
@@ -617,6 +618,19 @@ Document processReceivedRequest(BinnedKDT *binnedKDT,
         } else {
             if(DEBUG) cout << "invalid ds request" << endl;
         }
+    } else if(qCommand == SHUTDOWNSERVER) {
+        if(DEBUG) cout << "got shut down request" << endl;
+
+        Document document;
+        document.SetObject();
+        Document::AllocatorType& allocator = document.GetAllocator();
+        string new_result = qCommand;
+        if(new_result.length()>0) {
+            Value val(kObjectType);
+            val.SetString(new_result.c_str(), static_cast<SizeType>(new_result.length()), allocator);
+            document.AddMember("event_type", val, allocator);
+        }
+        return document;
     }
     return queryResults;
 }
@@ -704,6 +718,9 @@ void startServerListening(BinnedKDT *binnedKDT,
 
         // closing the connected socket
         close(new_socket);
+        if(queryResults.HasMember("event_type") && string(queryResults["event_type"].GetString()) == SHUTDOWNSERVER) {
+            break;
+        }
     }
 
     cout << "Server not listening and shut down" << endl;

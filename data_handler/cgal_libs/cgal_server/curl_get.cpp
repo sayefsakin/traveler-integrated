@@ -39,7 +39,13 @@
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/writer.h"
 
+#ifndef _DEBUG
 #define DEBUG 0
+#else
+#define DEBUG 0
+#endif
+
+
 
 using namespace std;
 using namespace rapidjson;

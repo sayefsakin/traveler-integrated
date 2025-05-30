@@ -230,7 +230,7 @@ void EseManKDT::findClusters(int64_t start_t, int64_t end_t, int64_t bin_size,
         } else {
             results.push_back(start_time);
             results.push_back(end_time);
-            clearDeepNodesFromCache(c_node);
+            // clearDeepNodesFromCache(c_node);
         }
         PRINTLOG("Cluster: " << " Start: " << start_time << ", End: " << end_time << ", Depth: " << depth);
         return;
@@ -385,18 +385,19 @@ EsemanNode* EseManKDT::checkHotNodes(double start_time, double end_time, size_t 
 
     // first check completely out of range check.
     EsemanNode *root = event_data_nodes[track_index];
-    double first_index_left = std::max(0.0, start_time - (end_time - start_time));
+    double first_index_left = std::max(0.0, start_time - 2*(end_time - start_time));
     double first_index = start_time;
     // double second_index = ((end_time - start_time) / 3) + start_time;
     // double third_index = (2 * (end_time - start_time) / 3) + start_time;
     double fourth_index = end_time;
-    double foruth_index_right = end_time + (end_time - start_time);
+    double foruth_index_right = end_time + 2*(end_time - start_time);
 
     // fourth case, jump to different range (from the utilization view), complete out of range
     if(fourth_index < root->start_time || root->end_time < first_index) {
         deleteTree(root);
         root = nullptr;
         event_data_nodes[track_index] = findNodeInTimeRange(eseman_node_uuids[track_index], first_index_left, foruth_index_right, nullptr);
+        cout << "fourth case" << endl;
     // } // second case, zoom out overlapping range
     // else if(first_index < root->start_time && root->end_time < fourth_index) {
     }// third case, partially overlapping range, either start or end overlaps
@@ -407,6 +408,7 @@ EsemanNode* EseManKDT::checkHotNodes(double start_time, double end_time, size_t 
         if(root->uuid == t_node->uuid) // already in the cache, nothing to do
             return nullptr;
         event_data_nodes[track_index] = t_node;
+        cout << "third case" << endl;
     } // first case, zoom in overlapping range
     else {
         // EsemanNode *t_node = findNodeInTimeRange(eseman_node_uuids[track_index], first_index_left, foruth_index_right, root);
