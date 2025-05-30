@@ -131,6 +131,25 @@ class DataQueriesInterface:
 
         client_socket.close()
         return ret
+    
+    def ShutdownCgalServer(self):
+        # print("inside the get attribute of event")
+
+        dictionary = {
+            "command": "ShutDownServer",
+            "db_store": "no-db"
+        }
+        # print(dictionary)
+
+        client_socket = socket.socket()
+        client_socket.connect((self.host, self.port))
+
+        self.sendOverTheSocket(client_socket, dictionary)
+        dataDict = self.recvOverTheSocket(client_socket)
+        # print("received data over socket in dict format")
+
+        client_socket.close()
+        return dataDict
 
     def GetDataForMatchedPattern(self, range, pattern_list):
         pass
