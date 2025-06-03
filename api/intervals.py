@@ -3,6 +3,7 @@ import copy
 import json
 import math
 import time
+import os
 
 from fastapi import APIRouter
 from starlette.responses import StreamingResponse
@@ -238,7 +239,10 @@ def intervalTrace(datasetId: str,
             yield '}}'
 
         timerEnd = round(time.time() * 1000000)
-        print(datasetId, str(begin), str(end), intervalId, str(0), str(timerEnd - timerStart), 'neighbor', sep=",")
+
+        query_type = os.getenv('QUERY_TYPE', 'window')
+        if query_type == 'children':
+            print(datasetId, str(begin), str(end), intervalId, str(0), str(timerEnd - timerStart), 'neighbor', sep=",")
         
 
     return StreamingResponse(intervalGenerator(), media_type='application/json')

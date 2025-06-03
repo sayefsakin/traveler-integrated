@@ -2,7 +2,7 @@
 # use shell script to write to file, to avoid csv file read write time overhead
 
 traveler_base_directory="/mnt/c/Users/sayef/IdeaProjects/traveler-integrated"
-profile_directory=$traveler_base_directory"/data_handler/ds_profiled_data"
+profile_directory="/mnt/d/ldav25_profiled_data"
 python_env_directory=$traveler_base_directory"/traveler39"
 export DATASET_LOCATION="/mnt/d/Projects/mosaic_testing/mosaic/data/traveler_data"
 
@@ -13,8 +13,10 @@ AGC="agglomerative_clustering"
 ESEMAN="eseman_kdt"
 DUCK_MIN_MAX="db_duck_min_max"
 DUCK_SKETCH="db_duck_sketch"
+DUCK_RAW="db_duck_raw"
 POSTGRES_MIN_MAX="db_postgres_min_max"
 POSTGRES_SKETCH="db_postgres_sketch"
+POSTGRES_RAW="db_postgres_raw"
 
 Q_WINDOW='window'
 Q_ATTRIBUTE='attribute'
@@ -36,20 +38,29 @@ KMEANS_LARGE_ID_N="908fc737-2cc7-41d8-8281-7dd9e83155ff"
 #DATASET_ID="DATASET_ID="$DGEM_ID
 LOCALHOST_URL="http://localhost:8000"
 LONEPEAK_URL="http://lonepeak2:8000"
-
-export DATASET_ID=$KMEANS_ID_N
-export TOTAL_SAMPLE=10
-export PROFILED_DS=$DUCK_SKETCH
-export QUERY_TYPE=$Q_WINDOW
 export BASE_URL=$LOCALHOST_URL
+
+#change these for each experiment
+export DATASET_ID=$KMEANS_ID_N
+export TOTAL_SAMPLE=5
+export PROFILED_DS=$ESEMAN
+export QUERY_TYPE=$Q_WINDOW
+if [[ $1 == "attribute" ]]; then
+  export QUERY_TYPE=$Q_ATTRIBUTE
+elif [[ $1 == "cond" ]]; then
+  export QUERY_TYPE=$Q_CONDW
+fi
 export HORIZONTAL_RESOLUTION_DIVISOR=1
 
-export TRAVELER_DATA_BACKUP_LOCATION="/mnt/d/traveler_dataset_backups"
+# this is where eseman stores lmdb files
+export LMDB_DATA_BACKUP_LOCATION="/mnt/d/traveler_dataset_backups"
 export LMDB_DATABASE_TOTAL_SIZE=20971520
+unset SELECTED_PRIMITIVE
 
 serve_watch=$profile_directory"/"$PROFILED_DS"_"$QUERY_TYPE"_serve_check"
 echo "Writing Traveler serve output to file: "$serve_watch
 source $python_env_directory"/bin/activate"
+
 # sudo apt-get install liblmdb-dev
 traveler(){
   if [[ $PROFILED_DS == db_postgres* ]] ; then
@@ -75,14 +86,14 @@ traveler(){
 
 cgal(){
   # run the cgal server
-  if [[ $PROFILED_DS != $KDT ]]; then
+  if [[ $PROFILED_DS != $KDT && $PROFILED_DS != $AGC && $PROFILED_DS != $ESEMAN ]]; then
     return 0;
   fi
   cgal_watch=$profile_directory"/"$PROFILED_DS"_"$QUERY_TYPE"_cgal_check"
   echo "Writing CGAL server output to file: "$cgal_watch
   cd $traveler_base_directory"/data_handler/cgal_libs/cgal_server"
   rm -f "cgal_server_check"
-  make > $cgal_watch &
+  ./cgal_data_server $DATASET_ID false > $cgal_watch &
   while true; do
     if [ -f "cgal_server_check" ]; then
         break;
@@ -91,32 +102,34 @@ cgal(){
     fi
   done
   echo "CGAL server is running";
-  export CGAL_PROCESS_ID=`ps -u $USER | grep make | awk '{print $1}'`
+  export CGAL_PROCESS_ID=`ps -u $USER | grep cgal_data_serve | awk '{print $1}'`
   sleep 1
 }
 
 profile_window_query(){
   selenium_watch=$profile_directory"/"$PROFILED_DS"_"$QUERY_TYPE"_selenium_check"
-  echo "Running the profiler. Please make sure the XMing is running"
-  cd $profile_directory
+  echo "Running the window profiler."
+  cd $traveler_base_directory"/data_handler/ds_profiled_data"
   export QUERY_TYPE=$Q_WINDOW
-  python3 headless_test.py > $selenium_watch &
+  python3 headless_test.py $profile_directory | tee $selenium_watch
 }
 
 profile_attribute_query(){
+  #comment out headlesss to output png with clicking
   selenium_watch=$profile_directory"/"$PROFILED_DS"_"$QUERY_TYPE"_selenium_check"
-  echo "Running the profiler. Please make sure the XMing is running"
-  cd $profile_directory
+  echo "Running the attribute profiler."
+  cd $traveler_base_directory"/data_handler/ds_profiled_data"
   export QUERY_TYPE=$Q_ATTRIBUTE
-  python3 headless_test.py > $selenium_watch
+  python3 headless_test.py $profile_directory | tee $selenium_watch
 }
 
 profile_cond_query(){
-  # selenium_watch=$profile_directory"/"$PROFILED_DS"_"$QUERY_TYPE"_selenium_check"
-  echo "Running the profiler. Please make sure the XMing is running"
-  cd $profile_directory
-  # export QUERY_TYPE=$Q_ATTRIBUTE
-  python3 headless_test.py &
+  selenium_watch=$profile_directory"/"$PROFILED_DS"_"$QUERY_TYPE"_selenium_check"
+  echo "Running the cond profiler."
+  cd $traveler_base_directory"/data_handler/ds_profiled_data"
+  export QUERY_TYPE=$Q_CONDW
+  export SELECTED_PRIMITIVE="/phylanx\$0/__add\$0/1\$45\$8"
+  python3 headless_test.py $profile_directory | tee $selenium_watch
 }
 
 prompt_help(){
@@ -134,17 +147,17 @@ prompt_help(){
 }
 
 killing_cgal(){
-  if [[ $PROFILED_DS != $KDT ]]; then
+  if [[ $PROFILED_DS != $KDT && $PROFILED_DS != $AGC && $PROFILED_DS != $ESEMAN ]]; then
     return 0;
   fi
-  if pgrep -x make >/dev/null; then
+  if pgrep -x cgal_data_serve >/dev/null; then
     export POST_CGAL_MEMORY_CHECK=`pmap $CGAL_PROCESS_ID | grep total | awk '{print $2}' | awk '{SUM += $1} END {print SUM/1024}'`
     echo "killing cgal data server";
-    killall make 2>/dev/null;
+    cd $traveler_base_directory;
+    python3 stopCgalServer.py;
   fi
   while true; do
-    if pgrep -x make >/dev/null; then
-#      echo "make is still running";
+    if pgrep -x cgal_data_serve >/dev/null; then
       sleep 1;
     else
       break
@@ -181,38 +194,31 @@ prepare_and_merge_files(){
   cd $profile_directory;
 #  rm -rf $DATASET_ID;
 
-  # dont merge selenium watch, problem with the get attribute query
   sed -i '/Serving on localhost:8000/d' $serve_watch;
-  
-  total_line=$(wc -l < $serve_watch);
-  last_line=$(expr $total_line - $TOTAL_SAMPLE);
-  sed -i "2,${last_line}d" "$serve_watch";
 
   mkdir -p $DATASET_ID;
-  cp $serve_watch $DATASET_ID;
+  cd $DATASET_ID;
+  rm -f "$PROFILED_DS"_"$QUERY_TYPE"_*;
+  cd ..;
 
-  if [[ $PROFILED_DS ==  $KDT ]]; then
+  cp $serve_watch $DATASET_ID;
+  mv *.png $DATASET_ID;
+
+  if [[ $PROFILED_DS == $KDT || $PROFILED_DS == $AGC || $PROFILED_DS == $ESEMAN ]]; then
     linenumber=$(grep -n "Server is now listening" "$cgal_watch" | head -n 1 | cut -d: -f1);
     sed -i "1,${linenumber}d" "$cgal_watch";
-    if [[ $IS_KILLED == 1 ]]; then
-      sed -i '$d' $cgal_watch;
-    fi
-    total_line=$(wc -l < $cgal_watch);
-    last_line=$(expr $total_line - $TOTAL_SAMPLE);
-    sed -i "2,${last_line}d" "$cgal_watch";
+    sed -i '$d' $cgal_watch;
     cp $cgal_watch $DATASET_ID;
-  fi
-
-  if [[ $QUERY_TYPE ==  $Q_WINDOW ]]; then
-    # sed -i '$d' $selenium_watch;
-    cp $selenium_watch $DATASET_ID;
   fi
 
   cd $DATASET_ID;
 #  rm -f *_selenium_check;
   paste -d , "$PROFILED_DS"_"$QUERY_TYPE"_* > "$PROFILED_DS"_"$QUERY_TYPE"_merged.csv;
-  echo "Initial memory: $PRE_MEMORY_CHECK MB" >> "$PROFILED_DS"_"$QUERY_TYPE"_merged.csv;
-  echo "Post run memory: $POST_MEMORY_CHECK MB" >> "$PROFILED_DS"_"$QUERY_TYPE"_merged.csv;
+  cp $selenium_watch ./;
+
+  echo "Initial serve memory: $PRE_MEMORY_CHECK MB" >> "$PROFILED_DS"_"$QUERY_TYPE"_merged.csv;
+  echo "Post serve memory: $POST_MEMORY_CHECK MB" >> "$PROFILED_DS"_"$QUERY_TYPE"_merged.csv;
+  echo "Post data serve memory: $POST_CGAL_MEMORY_CHECK MB" >> "$PROFILED_DS"_"$QUERY_TYPE"_merged.csv;
 
   if [[ $PROFILED_DS == db_postgres* ]] ; then
     echo "Post postgres memory: $POST_CGAL_MEMORY_CHECK MB" >> "$PROFILED_DS"_"$QUERY_TYPE"_merged.csv;
@@ -220,41 +226,59 @@ prepare_and_merge_files(){
   echo "Formatting all output files";
 }
 
-
 traveler
 cgal
-prompt_help
 
-export IS_KILLED=0
-while IFS= read -r line; do
-  if [[ $line ==  "exit" ]]; then
-    killing_all_processes;
-    break;
-  elif [[ $line ==  "traveler" ]]; then
-    killing_traveler;
-    traveler;
-    export IS_KILLED=0;
-  elif [[ $line ==  "restart" ]]; then
-    killing_all_processes;
-    traveler;
-    cgal;
-    export IS_KILLED=0;
-  elif [[ $line ==  "window" ]]; then
-    profile_window_query;
-  elif [[ $line ==  "attribute" ]]; then
-    profile_attribute_query;
-  elif [[ $line ==  "cond" ]]; then
-    profile_cond_query;
-  elif [[ $line ==  "kill" ]]; then
-    killing_all_processes;
-  elif [[ $line ==  "prepare" ]]; then
-    killing_all_processes;
-    prepare_and_merge_files;
-  else
-    $line
-  fi
+do_interactive_prompts(){
   prompt_help
-done
+  export IS_KILLED=0
+  while IFS= read -r line; do
+    if [[ $line ==  "exit" ]]; then
+      killing_all_processes;
+      break;
+    elif [[ $line ==  "traveler" ]]; then
+      killing_traveler;
+      traveler;
+      export IS_KILLED=0;
+    elif [[ $line ==  "restart" ]]; then
+      killing_all_processes;
+      traveler;
+      cgal;
+      export IS_KILLED=0;
+    elif [[ $line ==  "window" ]]; then
+      profile_window_query;
+    elif [[ $line ==  "attribute" ]]; then
+      profile_attribute_query;
+    elif [[ $line ==  "cond" ]]; then
+      profile_cond_query;
+    elif [[ $line ==  "kill" ]]; then
+      killing_all_processes;
+    elif [[ $line ==  "prepare" ]]; then
+      killing_all_processes;
+      prepare_and_merge_files;
+    else
+      $line
+    fi
+    prompt_help
+  done
+}
+
+if [[ $1 == "window" ]]; then
+  profile_window_query
+elif [[ $1 ==  "attribute" ]]; then
+  profile_attribute_query
+elif [[ $1 ==  "cond" ]]; then
+  profile_cond_query
+elif [[ $1 ==  "kill" ]]; then
+  killing_all_processes
+elif [[ $1 ==  "interactive" ]]; then
+  do_interactive_prompts
+fi
+
+if [[ $1 == "window" || $1 == "attribute" || $1 == "cond" ]]; then
+  killing_all_processes;
+  prepare_and_merge_files;
+fi
 
 deactivate
 echo "DS Profiler exited successfully"

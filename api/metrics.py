@@ -1,6 +1,7 @@
 import datetime
 import json
 import time
+import os
 
 from fastapi import APIRouter, HTTPException
 from starlette.responses import StreamingResponse
@@ -114,8 +115,10 @@ def get_utilization_histogram(datasetId: str,
                 if dsp.profiled_ds.startswith("db"):
                     if dsp.profiled_ds.endswith(dsp.DBTYPE_MIN_MAX):
                         ret['locations'][location] = dsp.db_wrapper.db_min_max_test(bins, begin, end, location, primitive)
-                    else:
+                    elif dsp.profiled_ds.endswith(dsp.DBTYPE_SKETCH):
                         ret['locations'][location] = dsp.db_wrapper.db_gantt_sketch(bins, begin, end, location, primitive)
+                    else:
+                        ret['locations'][location] = dsp.db_wrapper.db_gantt_raw(bins, begin, end, location, primitive)
                 else:
                     ret['locations'][location] = utilObject.calcUtilizationForLocation(bins, begin, end, location)
                     calcHistorgramTimer = calcHistorgramTimer + utilObject.utilLocationEstiamteTimer
@@ -128,6 +131,7 @@ def get_utilization_histogram(datasetId: str,
     api_fetch_text = str(fetchTimer - timerStart + calcHistorgramTimer)
     if primitive is not None:
         api_fetch_text = primitive
+
     if locations:
         print(datasetId, str(begin), str(end), str(bins), api_fetch_text, str(postProcessTimer - fetchTimer), ds_command, sep=",")
 

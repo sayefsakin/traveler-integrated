@@ -16,6 +16,7 @@ class DSProfiler:
         self.POSTGRES = "db_postgres"
         self.DBTYPE_MIN_MAX = "min_max"
         self.DBTYPE_SKETCH = "sketch"
+        self.DBTYPE_RAW = "raw"
         self.profiled_ds = os.getenv('PROFILED_DS', self.SAT)
         self.db_wrapper = None
         if self.profiled_ds.startswith(self.DUCK):

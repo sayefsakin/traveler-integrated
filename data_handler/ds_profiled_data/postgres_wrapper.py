@@ -170,6 +170,57 @@ class PostgresWrapper():
                     locDict[endingBin] = 0.5 if interval_time_end % bin_size else 1.0
         
         return locDict
+    
+    def db_gantt_raw(self, bins, begin, end, location, primitive):
+        total_rows = (int(bins) * 3) + 1
+        elements = str(int(min(total_rows / self.total_data * 100, 100))) # in percentage
+        primitive_filter_text = ""
+        if primitive is not None:
+            primitive_filter_text = " AND data->>'Primitive' = '" + primitive + "' "
+        gs_query = "SELECT data->'enter'->>'Timestamp' AS enter_timestamp, " \
+            + " data->'leave'->>'Timestamp' AS leave_timestamp, " \
+            + " data->>'Location' AS Location FROM mytr.traveler" \
+            + " WHERE data->>'Location' = '" + str(location) + "'" + primitive_filter_text \
+            + " AND (data->'leave'->>'Timestamp')::int8 >= " + str(begin) + " AND (data->'enter'->>'Timestamp')::int8 <= " + str(end)
+        
+        def getBinSize(time_begin: int, time_end: int, bins: int) -> int:
+            return int(math.floor((time_end - time_begin) / bins))
+        
+        def getBinNumber(time_begin: int, time_end: int, bins: int, ctime: int) -> int:
+            bin_size = getBinSize(time_begin, time_end, bins)
+            if ctime < time_begin or ctime > time_end:
+                return -1
+            return int(math.floor((ctime - time_begin) / bin_size))
+
+        locDict = [0.0] * bins
+        bin_size = getBinSize(begin, end, bins)
+
+        # print(gs_query)
+        with self.connection.cursor() as cur:
+            cur.execute(gs_query)
+            results = cur.fetchall()
+        
+            for item in results:
+                interval_time_start = int(item[0])
+                interval_time_end = int(item[1])
+                interval_location = int(item[2])
+
+                startingBin = getBinNumber(begin, end, bins, interval_time_start)
+                endingBin = getBinNumber(begin, end, bins, interval_time_end)
+                if startingBin < 0 or endingBin < 0:
+                    continue
+
+                for bin_it in range(startingBin + 1, min(endingBin, bins)):
+                    if locDict[bin_it] < 0.5:
+                        locDict[bin_it] = 1.0
+
+                if startingBin < bins and locDict[startingBin] < 0.5:
+                    locDict[startingBin] = 0.5 if interval_time_start % bin_size else 1.0
+
+                if endingBin < bins and locDict[endingBin] < 0.5:
+                    locDict[endingBin] = 0.5 if interval_time_end % bin_size else 1.0
+        
+        return locDict
 
     def db_get_attribute_of_event(self, c_time, location):
         attr_query = "SELECT data->>'intervalId' FROM mytr.traveler WHERE " \

@@ -208,12 +208,15 @@ Document kdTreeGetAttributeQuery(BinnedKDT *binnedKDT, BinnedKDT *neighborKDT, u
     return document;
 }
 
-Document agcGetAttributeQuery(AgglomerateClusters *agc, uint64_t cTime, uint64_t cLocation) {
+Document agcGetAttributeQuery(AgglomerateClusters *agc, uint64_t cTime, uint64_t cLocation, uint64_t tree_build_time) {
     std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
     string new_result = agc->findNearestEvent(cTime, cLocation);
     std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
-    cout << "AGC," << "ds_attribute," << cTime << "," << cLocation << "," << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() <<
-    endl;
+    cout << tree_build_time << "," << "AGC," << "ds_attribute," 
+        << cTime << "," << cLocation << "," 
+        << agc->horizontal_resolution_divisor << ","
+        << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() 
+        << endl;
 
     Document document;
     document.SetObject();
@@ -226,12 +229,17 @@ Document agcGetAttributeQuery(AgglomerateClusters *agc, uint64_t cTime, uint64_t
     return document;
 }
 
-Document esemanGetAttributeQuery(EseManKDT *emk, uint64_t cTime, uint64_t cLocation) {
+Document esemanGetAttributeQuery(EseManKDT *emk, uint64_t cTime, uint64_t cLocation, uint64_t tree_build_time) {
     std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
     string new_result = emk->findNearestEvent(cTime, cLocation);
     std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
-    cout << "ESEMAN," << "ds_attribute," << cTime << "," << cLocation << "," << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count() <<
-    endl;
+
+    if(!new_result.empty())
+        cout << tree_build_time << "," << "ESEMAN," << "ds_attribute," 
+            << cTime << "," << cLocation << ","
+            << emk->horizontal_resolution_divisor << ","
+            << std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count()
+            << endl;
 
     Document document;
     document.SetObject();
@@ -535,7 +543,7 @@ Document processReceivedRequest(BinnedKDT *binnedKDT,
                                 int64_t minId, int64_t maxId,
                                 int64_t minTime, int64_t maxTime,
                                 uint64_t minLocation, uint64_t maxLocation,
-                                Primtive_mapping pm) {
+                                Primtive_mapping pm, uint64_t tree_build_time) {
     Document queryResults;
     if(!(*d).HasMember("db_store")) {
         if(DEBUG) cout << "please provide db_store for ds request" << endl;
@@ -578,6 +586,7 @@ Document processReceivedRequest(BinnedKDT *binnedKDT,
             primitive = ((*d)["primitive"].GetString());
         }
 
+        cout << tree_build_time << ",";
         if(ds_request == KDTREE) {
             if(DEBUG) cout << "got KD Tree request" << endl;
             return binnedKDTreeSearchQuery(binnedKDT, time_begin, time_end, location_begin, location_end, bins, pm[primitive]);
@@ -611,10 +620,10 @@ Document processReceivedRequest(BinnedKDT *binnedKDT,
                                             minLocation, maxLocation);
         } else if(ds_request == AGCLUSTER) {
             if(DEBUG) cout << "got AGC request get attribute request" << endl;
-            return agcGetAttributeQuery(agglomerateClusters, cTime, cLocation);
+            return agcGetAttributeQuery(agglomerateClusters, cTime, cLocation, tree_build_time);
         } else if(ds_request == ESEMAN) {
             if(DEBUG) cout << "got ESEMAN get attribute request" << endl;
-            return esemanGetAttributeQuery(emk, cTime, cLocation);
+            return esemanGetAttributeQuery(emk, cTime, cLocation, tree_build_time);
         } else {
             if(DEBUG) cout << "invalid ds request" << endl;
         }
@@ -682,7 +691,7 @@ void startServerListening(BinnedKDT *binnedKDT,
     }
 
     cout << "Server is now listening" << endl;
-    cout << "tree build time (micros),ds type,ds query type,ds query begin,ds query end,ds query time (micros)" << endl;
+    cout << "tree build time (micros),ds type,ds query type,ds query begin,ds query end,hrd,ds query time (micros)" << endl;
     ofstream myfile ("cgal_server_check");
     if (myfile.is_open())
     {
@@ -698,7 +707,6 @@ void startServerListening(BinnedKDT *binnedKDT,
                 exit(EXIT_FAILURE);
             }
         
-        cout << tree_build_time << ",";
         Document d = rcvOverTheSocket(new_socket);
         Document queryResults = processReceivedRequest(
             binnedKDT, Segment_tree_3,
@@ -707,7 +715,7 @@ void startServerListening(BinnedKDT *binnedKDT,
             emk,
             &d, minId, maxId, 
             minTime, maxTime,
-            minLocation, maxLocation, pm
+            minLocation, maxLocation, pm, tree_build_time
         );
         if(DEBUG) cout << "received request processing done" << endl;
         StringBuffer qbuffer;
@@ -740,12 +748,12 @@ int main(int argc, char *argv[])
     urlparser.travelerApi = "intervals";//"primitives";
 
     if(argc>1) urlparser.datasetId = argv[1];
-    bool is_build_dataset = false;
+    bool is_build_dataset = true;
     if(argc>2) is_build_dataset = (string(argv[2]) == "true");
 
     char *pds = getenv("PROFILED_DS");
     char *pds2 = getenv("HORIZONTAL_RESOLUTION_DIVISOR");
-    char *pds3 = getenv("TRAVELER_DATA_BACKUP_LOCATION");
+    char *pds3 = getenv("LMDB_DATA_BACKUP_LOCATION");
     string profiled_ds = pds == NULL ? string("summed_area_table") : string(pds);
     int horizontal_resolution_divisor = pds2 == NULL ? 1 : atoi(pds2);
     string data_backup_location = pds3 == NULL ? string("/mnt/d/traveler_dataset_backups") : string(pds3);
@@ -944,11 +952,6 @@ int main(int argc, char *argv[])
         std::cout << "EseMAN KDT build time = " << tree_build_time << "[microseconds]" << std::endl;
 
         esemanKDT->cleanNodesFromMemory(true);
-        if(esemanKDT->reloadNodesFromFile(true)) {
-            cout << "ESEMAN dataset loaded from disk after building" << endl;
-        } else {
-            cout << "ESEMAN dataset not found on disk after building" << endl;
-        }
     }
     // begin = std::chrono::steady_clock::now();
     // kdtree.build();
@@ -967,7 +970,14 @@ int main(int argc, char *argv[])
     // testSearchQueries(&kdtree, &Segment_tree_3, minId, maxId, urlparser.datasetId);
     // point_with_info_testing();
 
-    if(profiled_ds == ESEMAN) esemanKDT->openReadOnlyLMDB();
+    if(profiled_ds == ESEMAN) {
+        esemanKDT->openReadOnlyLMDB();
+        if(esemanKDT->reloadNodesFromFile(true)) {
+            cout << "ESEMAN dataset loaded from disk after building" << endl;
+        } else {
+            cout << "ESEMAN dataset not found on disk after building" << endl;
+        }
+    }
     startServerListening(
         binnedKDT, Segment_tree_3, 
         neighborKDT, Segment_tree_neighbor_3,

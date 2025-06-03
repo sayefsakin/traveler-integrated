@@ -339,8 +339,11 @@ LocDict EseManKDT::binnedRangeQuery(int64_t time_begin,
     filters.clear(); // automatically clear filters after query
 
     cout << "ESEMAN," << "ds_window";
-    cout << "," << time_begin << "," << time_end << "," << chrono::duration_cast<chrono::microseconds>(clock_end - clock_begin).count() <<
-    endl;
+    if(filters.size() > 0) cout << "_cond";
+    cout << "," << time_begin << "," << time_end << "," 
+        << horizontal_resolution_divisor << ","
+        << chrono::duration_cast<chrono::microseconds>(clock_end - clock_begin).count()
+        << endl;
     return locDict;
 }
 

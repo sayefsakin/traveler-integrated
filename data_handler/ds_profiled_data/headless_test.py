@@ -199,7 +199,7 @@ def scrollToWindow(driver, timeout, p_freq):
             iteration_count = iteration_count + 1
         previous_handle = c_end
 
-def conductRandomClicking(driver, timeout, p_freq, TOTAL_SAMPLE):
+def conductRandomClicking(driver, timeout, p_freq, TOTAL_SAMPLE, base_params, qt):
     scrollToWindow(driver, timeout, p_freq)
     # zoom out in the gantt y axis to reveal all locations
     ganttYScroller = driver.find_element(By.CLASS_NAME, "yAxisScrollCapturer")
@@ -212,7 +212,10 @@ def conductRandomClicking(driver, timeout, p_freq, TOTAL_SAMPLE):
     click_offset = 5
     x_bounds = [0, int(ganttEventCapturerElement.rect['y'])-click_offset]
     y_bounds = [-int(ganttEventCapturerElement.rect['x'])+click_offset, int(ganttEventCapturerElement.rect['x'])-click_offset]
-    i = 0
+    i = 1
+
+    print("iteration,x,y,total drawing time (micros)")
+    isBlank = True
     while(True):
         if i >= TOTAL_SAMPLE:
             break
@@ -222,14 +225,23 @@ def conductRandomClicking(driver, timeout, p_freq, TOTAL_SAMPLE):
         nty = ty
         while(True):
             action.move_to_element_with_offset(ganttEventCapturerElement, ntx, nty).click().perform()
+            startTimer = round(time.time() * 1000000)
             WebDriverWait(driver, timeout=timeout, poll_frequency=p_freq).until(GanttLoadingVisible())
+            endTimer = round(time.time() * 1000000)            
             #i = i + 1
             #break
             if(checkClickValidity(driver, timeout, p_freq, ntx, nty)):
-                i = i + 1
+                if(isBlank is True):
+                    isBlank = False
+                    print(str(i), str(ntx), str(nty), str(endTimer - startTimer), sep=",")
+                    # if i == 1:
+                    #     time.sleep(3)
+                    #     conductPNGOutput(driver, base_params, qt)
+                    i = i + 1
                 break
             else:
-                # print("not found", ntx, nty)
+                # print("not found", ntx, nty, i)
+                isBlank = True
                 for ctr in range(8):
                     rtx, rty = getNextCircularPoint(ntx - tx, nty - ty)
                     ntx = tx + rtx
@@ -288,7 +300,7 @@ def conductBrushing(driver, timeout, p_freq, TOTAL_SAMPLE):
             endTimer = round(time.time() * 1000000)
             brush_percentage = int(abs(previous_handle - current_handle) / handleWindow * 100.0)
             print(str(iteration_count), str(brush_percentage), str(endTimer - startTimer), sep=",")
-            time.sleep(3000)
+            time.sleep(1)
             # print('Iteration', '{:2d}'.format(iteration_count), end=' ')
             # print('Brush percentage', '{:3d}%'.format(brush_percentage), end=' ')
             # print('Total drawing time:', '{:5d}'.format(endTimer - startTimer), 'ms')
@@ -297,7 +309,7 @@ def conductBrushing(driver, timeout, p_freq, TOTAL_SAMPLE):
 
     # print("successfully run the profiling on", driver.title)
 
-def conductPNGOutput(driver, params):
+def conductPNGOutput(driver, params, qt):
     loading_elem = driver.find_elements(By.XPATH, "//*[@class='scrollArea GLView SelectionInfoView']")
     json_data = {}
     for each_element in loading_elem:
@@ -309,13 +321,14 @@ def conductPNGOutput(driver, params):
             print("Failed to parse JSON:", e)
             return
     
-    time.sleep(3)
     # zoom out in the gantt y axis to reveal all locations
-    ganttYScroller = driver.find_element(By.CLASS_NAME, "yAxisScrollCapturer")
-    wheel_element(ganttYScroller, -150)
+    if qt != 'attribute':
+        time.sleep(3)
+        ganttYScroller = driver.find_element(By.CLASS_NAME, "yAxisScrollCapturer")
+        wheel_element(ganttYScroller, -150)
 
     element = WebDriverWait(driver, timeout=timeout, poll_frequency=p_freq).until(GanttLoadingVisible())
-    time.sleep(10)
+    time.sleep(3)
     if 'exportStartTime' in params:
         # element = WebDriverWait(driver, timeout=timeout, poll_frequency=p_freq).until(UtilizationLoadingVisible())
         hoverTarget = driver.find_elements(By.XPATH, "//*[@class='hoverTarget']")
@@ -355,7 +368,9 @@ def conductPNGOutput(driver, params):
     primitive_string = ''
     if 'SELECTED_PRIMITIVE' in params and params['SELECTED_PRIMITIVE'] != '':
         primitive_string = '_' + params['SELECTED_PRIMITIVE']
-    exported_file_name = params['exportLocation'] + "/" + params['dataset'] + primitive_string + "_gantt.png"
+        for char in '\/:*?"<>|':
+            primitive_string = primitive_string.replace(char, '_')
+    exported_file_name = params['exportLocation'] + "/" + params['dataset'] + "_" + qt + "_" + params['prfiledDS'] + "_" + params['hrd'] + primitive_string + "_gantt.png"
     ganttEventCapturerElement.screenshot(exported_file_name)
     print("Saved screenshot from of the Gantt chart at: ", exported_file_name)
 
@@ -440,16 +455,18 @@ if __name__ == '__main__':
     #options.add_argument("--incognito")
 
     DGEM_ID = 'a9bd20ca-c4f2-4b54-8c49-b968ae7e78be'#'589ca754-ef75-426c-8d51-841cc61dc84a'
-    KMEANS_ID = '8b3289c9-a740-4091-a56d-e4d55af526b5'#'faf17535-2f66-4621-995f-49c7dbd84e8b'
+    KMEANS_ID = 'faf17535-2f66-4621-995f-49c7dbd84e8b'
     LULESH_ID = '772c7330-d4eb-485b-866a-3b315063f9af'
 
     base_params = {
-        'dataset': os.getenv('DATASET_ID', DGEM_ID),
+        'dataset': os.getenv('DATASET_ID', KMEANS_ID),
         'baseUrl': os.getenv('BASE_URL', "http://localhost:8000"),
+        'prfiledDS': os.getenv('PROFILED_DS', "eseman_kdt"),
+        'hrd': os.getenv('HORIZONTAL_RESOLUTION_DIVISOR', "1"),
         'exportLocation': "."
     }
-    TOTAL_SAMPLE = int(os.getenv('TOTAL_SAMPLE', 20))
-    QUERY_TYPE = os.getenv('QUERY_TYPE', 'window')
+    TOTAL_SAMPLE = int(os.getenv('TOTAL_SAMPLE', 10))
+    QUERY_TYPE = os.getenv('QUERY_TYPE', 'attribute')
     if len(sys.argv) > 1:
         base_params['exportLocation'] = sys.argv[1]
     if len(sys.argv) > 2:
@@ -481,17 +498,18 @@ if __name__ == '__main__':
         endTimer = round(time.time() * 1000000)
         # timing = driver.execute_script("return window.performance.timing;")
         # print("Iniital Gantt Render time: ", timing["domContentLoadedEventEnd"] - timing["navigationStart"])
-        conductPNGOutput(driver, base_params)
+
         # canvas_elem = driver.find_elements(By.XPATH, "//canvas")
         # for parent_element in canvas_elem:
         #     print(parent_element.rect)
 
         # conductFixedScrolling(driver, timeout, p_freq, TOTAL_SAMPLE)
         # time.sleep(3000)
-        # if QUERY_TYPE == 'window':
-        #     conductBrushing(driver, timeout, p_freq, TOTAL_SAMPLE)
-        # elif QUERY_TYPE == 'attribute':
-        #     conductRandomClicking(driver, timeout, p_freq, TOTAL_SAMPLE)
+        if QUERY_TYPE == 'window' or QUERY_TYPE == 'cond':
+            conductPNGOutput(driver, base_params, QUERY_TYPE)
+            conductBrushing(driver, timeout, p_freq, TOTAL_SAMPLE)
+        elif QUERY_TYPE == 'attribute':
+            conductRandomClicking(driver, timeout, p_freq, TOTAL_SAMPLE, base_params, QUERY_TYPE)
         # elif QUERY_TYPE == 'cond':
         #     time.sleep(60)
         # print('Initial Gantt Loading Time: ', '{:9d}'.format(endTimer - startTimer), 'micros ')
