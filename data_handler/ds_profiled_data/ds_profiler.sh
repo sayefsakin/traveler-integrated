@@ -5,57 +5,52 @@ traveler_base_directory="/mnt/c/Users/sayef/IdeaProjects/traveler-integrated"
 profile_directory="/mnt/d/ldav25_profiled_data"
 python_env_directory=$traveler_base_directory"/traveler39"
 export DATASET_LOCATION="/mnt/d/Projects/mosaic_testing/mosaic/data/traveler_data"
-
-KDT="kd_tree"
-SGT="segment_tree"
-SAT="summed_area_table"
-AGC="agglomerative_clustering"
-ESEMAN="eseman_kdt"
-DUCK_MIN_MAX="db_duck_min_max"
-DUCK_SKETCH="db_duck_sketch"
-DUCK_RAW="db_duck_raw"
-POSTGRES_MIN_MAX="db_postgres_min_max"
-POSTGRES_SKETCH="db_postgres_sketch"
-POSTGRES_RAW="db_postgres_raw"
-
-Q_WINDOW='window'
-Q_ATTRIBUTE='attribute'
-Q_CHILDREN='children'
-Q_CONDW='cond'
-
-#for window and cond query
-DGEM_ID="589ca754-ef75-426c-8d51-841cc61dc84a"
-KMEANS_ID="8b3289c9-a740-4091-a56d-e4d55af526b5"
-LULESH_ID="772c7330-d4eb-485b-866a-3b315063f9af"
-KMEANS_LARGE_ID="c3d5e8fe-32df-4f4f-8cbb-4ba6fabd7d3d"
-
-#for attribute and child query
-DGEM_ID_N="a9bd20ca-c4f2-4b54-8c49-b968ae7e78be"
-KMEANS_ID_N="faf17535-2f66-4621-995f-49c7dbd84e8b"
-LULESH_ID_N="0deeca3b-8910-47ca-a3a1-f7bfefe64494"
-KMEANS_LARGE_ID_N="908fc737-2cc7-41d8-8281-7dd9e83155ff"
-
-#DATASET_ID="DATASET_ID="$DGEM_ID
 LOCALHOST_URL="http://localhost:8000"
 LONEPEAK_URL="http://lonepeak2:8000"
 export BASE_URL=$LOCALHOST_URL
-
-#change these for each experiment
-export DATASET_ID=$KMEANS_ID_N
-export TOTAL_SAMPLE=5
-export PROFILED_DS=$ESEMAN
-export QUERY_TYPE=$Q_WINDOW
-if [[ $1 == "attribute" ]]; then
-  export QUERY_TYPE=$Q_ATTRIBUTE
-elif [[ $1 == "cond" ]]; then
-  export QUERY_TYPE=$Q_CONDW
-fi
-export HORIZONTAL_RESOLUTION_DIVISOR=1
-
 # this is where eseman stores lmdb files
 export LMDB_DATA_BACKUP_LOCATION="/mnt/d/traveler_dataset_backups"
 export LMDB_DATABASE_TOTAL_SIZE=20971520
-unset SELECTED_PRIMITIVE
+
+source experiment_vars.sh
+
+#change these for each experiment
+
+export TOTAL_SAMPLE=5
+export HORIZONTAL_RESOLUTION_DIVISOR=1
+
+if [ -z "$1" ]; then
+  export QUERY_TYPE=$Q_WINDOW
+elif [[ $1 == "window" || $1 == "attribute" || $1 == "cond" ]]; then
+  export QUERY_TYPE=$1
+else
+  export QUERY_TYPE=$Q_WINDOW
+fi
+
+if [ -z "$2" ]; then
+  export DATASET_ID=$DGEM_ID_N
+else
+  export DATASET_ID=$2
+fi
+
+if [ -z "$3" ]; then
+  export PROFILED_DS=$ESEMAN
+else
+  export PROFILED_DS=$3
+fi
+
+echo "Running experiment on dataset: $DATASET_ID"
+echo "Running experiment on algorithm: $PROFILED_DS"
+echo "Running experiment on query: $QUERY_TYPE"
+
+if [ -z "$4" ]; then
+  export SELECTED_PRIMITIVE=''
+else
+  export SELECTED_PRIMITIVE=$4
+  echo "Running experiment on selected primitive: $SELECTED_PRIMITIVE"
+fi
+echo "Running experiment on hrd: $HORIZONTAL_RESOLUTION_DIVISOR"
+echo "======================================"
 
 serve_watch=$profile_directory"/"$PROFILED_DS"_"$QUERY_TYPE"_serve_check"
 echo "Writing Traveler serve output to file: "$serve_watch
