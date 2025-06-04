@@ -479,7 +479,7 @@ if __name__ == '__main__':
     p_freq = 0.001  # in seconds
 
     # Define paths
-    user_home_dir = os.path.expanduser("/home/sayefsakin/selenium_testing")
+    user_home_dir = os.path.expanduser("/uufs/chpc.utah.edu/common/home/u1447409/selenium_testing/newdrivertest")
     chrome_binary_path = os.path.join(user_home_dir, "chrome-linux64", "chrome")
     chromedriver_path = os.path.join(user_home_dir, "chromedriver-linux64", "chromedriver")
 

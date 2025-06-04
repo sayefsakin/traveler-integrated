@@ -7,17 +7,19 @@ CC = g++
 CFLAGS  = -g -Wall #-D_DEBUG
 
 AGC_CFLAGS = -Wall -g -DNO_INCLUDE_FENV
-LDFLAGS = -lstdc++ -llmdb
+LDFLAGS = -L /uufs/chpc.utah.edu/common/home/u1447409/lmdb_testing/lmdb/lib
 
 # The build target 
 TARGET = Server
 CGAL_SERVER = cgal_data_server
-INCLUDE = -I./rapidjson/include
+INCLUDE = -I./rapidjson/include -I/uufs/chpc.utah.edu/common/home/u1447409/cgal/local/usr/local/include -I/uufs/chpc.utah.edu/common/home/u1447409/lmdb_testing/lmdb/include
+
 CLIENT = Client
 CGET = curl_get
 OBKDT = optimized_binned_kdt
 AGC = agglomerate_clustering
 ESEMAN = eseman_kdt
+
 DGEM_ID = 589ca754-ef75-426c-8d51-841cc61dc84a
 KMEANS_ID = 8b3289c9-a740-4091-a56d-e4d55af526b5
 LULESH_ID = 772c7330-d4eb-485b-866a-3b315063f9af
@@ -26,8 +28,8 @@ DATASET_ID ?= $(KMEANS_ID)
 
 all: $(CGAL_SERVER).cpp $(AGC).cpp $(ESEMAN).cpp fastcluster.o
 	$(RM) $(CGAL_SERVER)
-	$(CC) $(CFLAGS) -o $(CGAL_SERVER) $(CGAL_SERVER).cpp $(CGET).cpp $(OBKDT).cpp $(AGC).cpp $(ESEMAN).cpp fastcluster.o $(INCLUDE) -lcurl -llmdb
-	./$(CGAL_SERVER) $(DATASET_ID) false
+	$(CC) $(CFLAGS) -o $(CGAL_SERVER) $(CGAL_SERVER).cpp $(CGET).cpp $(OBKDT).cpp $(AGC).cpp $(ESEMAN).cpp fastcluster.o $(INCLUDE) $(LDFLAGS) -lcurl -llmdb -lgmp
+#	./$(CGAL_SERVER) $(DATASET_ID) false
 
 $(AGC): $(AGC).cpp fastcluster.o
 	$(RM) $(AGC)
