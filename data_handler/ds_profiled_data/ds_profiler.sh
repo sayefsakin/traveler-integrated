@@ -1,15 +1,19 @@
 #!/bin/bash
 # use shell script to write to file, to avoid csv file read write time overhead
 
-traveler_base_directory="/mnt/c/Users/sayef/IdeaProjects/traveler-integrated"
-profile_directory="/mnt/d/ldav25_profiled_data"
-python_env_directory=$traveler_base_directory"/traveler39"
-export DATASET_LOCATION="/mnt/d/Projects/mosaic_testing/mosaic/data/traveler_data"
+traveler_base_directory="/uufs/chpc.utah.edu/common/home/u1447409/Documents/traveler-integrated"
+profile_directory="/uufs/chpc.utah.edu/common/home/u1447409/Documents/LDAV25Data"
+python_env_directory="/uufs/chpc.utah.edu/common/home/u1447409/public_html/traveler-integrated/env"
+export DATASET_LOCATION="/uufs/chpc.utah.edu/common/home/u1447409/all_data/json_data"
+traveler_discache_location="/uufs/chpc.utah.edu/common/home/u1447409/all_data/kmeans"
+
 LOCALHOST_URL="http://localhost:8000"
-LONEPEAK_URL="http://lonepeak2:8000"
-export BASE_URL=$LOCALHOST_URL
+# LONEPEAK_URL="http://lonepeak2:8000"
+LONEPEAK_URL="http://"$(hostname)":8000"
+export BASE_URL=$LONEPEAK_URL
+
 # this is where eseman stores lmdb files
-export LMDB_DATA_BACKUP_LOCATION="/mnt/d/traveler_dataset_backups"
+export LMDB_DATA_BACKUP_LOCATION="/uufs/chpc.utah.edu/common/home/u1447409/Documents/lmdb_dataset_backups"
 export LMDB_DATABASE_TOTAL_SIZE=20971520
 
 source experiment_vars.sh
@@ -28,7 +32,7 @@ else
 fi
 
 if [ -z "$2" ]; then
-  export DATASET_ID=$DGEM_ID_N
+  export DATASET_ID=$KMEANS_ID_N
 else
   export DATASET_ID=$2
 fi
@@ -63,8 +67,8 @@ traveler(){
     sudo service postgresql start;
   fi
   # run traveler first
-  cd /mnt/c/Users/sayef/IdeaProjects/traveler-integrated
-  python3 serve.py > $serve_watch &
+  cd $traveler_base_directory
+  python3 serve.py --db_dir $traveler_discache_location > $serve_watch &
 
   while true; do
     if curl -I "http://localhost:8000/static/interface.html" 2>&1 | grep -w "200\|301" ; then
@@ -88,7 +92,7 @@ cgal(){
   echo "Writing CGAL server output to file: "$cgal_watch
   cd $traveler_base_directory"/data_handler/cgal_libs/cgal_server"
   rm -f "cgal_server_check"
-  ./cgal_data_server $DATASET_ID false > $cgal_watch &
+  LD_LIBRARY_PATH=~/lmdb_testing/lmdb/lib ./cgal_data_server $DATASET_ID false > $cgal_watch &
   while true; do
     if [ -f "cgal_server_check" ]; then
         break;
@@ -162,14 +166,14 @@ killing_cgal(){
 }
 
 killing_traveler(){
-  if pgrep -x python3 >/dev/null; then
+  if [ -n "$PYTHON_PROCESS_ID" ] && ps -p $PYTHON_PROCESS_ID > /dev/null; then
     export POST_MEMORY_CHECK=`pmap $PYTHON_PROCESS_ID | grep total | awk '{print $2}' | awk '{SUM += $1} END {print SUM/1024}'`
     echo "killing Traveler";
-    killall python3 2>/dev/null;
+    kill $PYTHON_PROCESS_ID;
   fi
   while true; do
-    if pgrep -x python3 >/dev/null; then
-#      echo "Traveler is still running";
+    if [ -n "$PYTHON_PROCESS_ID" ] && ps -p $PYTHON_PROCESS_ID > /dev/null; then
+      echo "Traveler is still running";
       sleep 2;
     else
       break
@@ -215,9 +219,6 @@ prepare_and_merge_files(){
   echo "Post serve memory: $POST_MEMORY_CHECK MB" >> "$PROFILED_DS"_"$QUERY_TYPE"_merged.csv;
   echo "Post data serve memory: $POST_CGAL_MEMORY_CHECK MB" >> "$PROFILED_DS"_"$QUERY_TYPE"_merged.csv;
 
-  if [[ $PROFILED_DS == db_postgres* ]] ; then
-    echo "Post postgres memory: $POST_CGAL_MEMORY_CHECK MB" >> "$PROFILED_DS"_"$QUERY_TYPE"_merged.csv;
-  fi
   echo "Formatting all output files";
 }
 
