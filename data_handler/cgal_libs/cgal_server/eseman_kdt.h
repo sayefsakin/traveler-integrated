@@ -132,6 +132,7 @@ private:
   EsemanNode* checkHotNodes(double start_time, double end_time, size_t track_index);
   void checkNodeAvailability(EsemanNode* c_node, EsemanNode* replace_node);
   void clearDeepNodesFromCache(EsemanNode* c_node);
+  void writeNodeUuidAtIndex(string uuid, size_t index);
 
 public:
   int horizontal_resolution_divisor = 1;

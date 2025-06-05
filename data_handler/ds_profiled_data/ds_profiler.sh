@@ -1,27 +1,7 @@
 #!/bin/bash
 # use shell script to write to file, to avoid csv file read write time overhead
 
-traveler_base_directory="/uufs/chpc.utah.edu/common/home/u1447409/Documents/traveler-integrated"
-profile_directory="/uufs/chpc.utah.edu/common/home/u1447409/Documents/LDAV25Data"
-python_env_directory="/uufs/chpc.utah.edu/common/home/u1447409/public_html/traveler-integrated/env"
-export DATASET_LOCATION="/uufs/chpc.utah.edu/common/home/u1447409/all_data/json_data"
-traveler_discache_location="/uufs/chpc.utah.edu/common/home/u1447409/all_data/kmeans"
-
-LOCALHOST_URL="http://localhost:8000"
-# LONEPEAK_URL="http://lonepeak2:8000"
-LONEPEAK_URL="http://"$(hostname)":8000"
-export BASE_URL=$LONEPEAK_URL
-
-# this is where eseman stores lmdb files
-export LMDB_DATA_BACKUP_LOCATION="/uufs/chpc.utah.edu/common/home/u1447409/Documents/lmdb_dataset_backups"
-export LMDB_DATABASE_TOTAL_SIZE=20971520
-
 source experiment_vars.sh
-
-#change these for each experiment
-
-export TOTAL_SAMPLE=5
-export HORIZONTAL_RESOLUTION_DIVISOR=1
 
 if [ -z "$1" ]; then
   export QUERY_TYPE=$Q_WINDOW
@@ -32,16 +12,20 @@ else
 fi
 
 if [ -z "$2" ]; then
-  export DATASET_ID=$KMEANS_ID_N
+  export DATASET_ID=$DGEM_ID_N
 else
   export DATASET_ID=$2
 fi
 
 if [ -z "$3" ]; then
-  export PROFILED_DS=$ESEMAN
+  export PROFILED_DS=$SAT
 else
   export PROFILED_DS=$3
 fi
+
+#change these for each experiment
+export TOTAL_SAMPLE=10
+export HORIZONTAL_RESOLUTION_DIVISOR=1
 
 echo "Running experiment on dataset: $DATASET_ID"
 echo "Running experiment on algorithm: $PROFILED_DS"
@@ -54,7 +38,24 @@ else
   echo "Running experiment on selected primitive: $SELECTED_PRIMITIVE"
 fi
 echo "Running experiment on hrd: $HORIZONTAL_RESOLUTION_DIVISOR"
+echo "Running experiment with iterations: $TOTAL_SAMPLE"
 echo "======================================"
+
+
+traveler_base_directory="/uufs/chpc.utah.edu/common/home/u1447409/Documents/traveler-integrated"
+profile_directory="/uufs/chpc.utah.edu/common/home/u1447409/Documents/LDAV25Data"
+python_env_directory="/uufs/chpc.utah.edu/common/home/u1447409/public_html/traveler-integrated/env"
+export DATASET_LOCATION="/uufs/chpc.utah.edu/common/home/u1447409/all_data/json_data"
+traveler_discache_location="/uufs/chpc.utah.edu/common/home/u1447409/all_data/"${dataset_names[$DATASET_ID]}
+
+LOCALHOST_URL="http://localhost:8000"
+# LONEPEAK_URL="http://lonepeak2:8000"
+LONEPEAK_URL="http://"$(hostname)":8000"
+export BASE_URL=$LONEPEAK_URL
+
+# this is where eseman stores lmdb files
+export LMDB_DATA_BACKUP_LOCATION="/uufs/chpc.utah.edu/common/home/u1447409/Documents/lmdb_dataset_backups"
+export LMDB_DATABASE_TOTAL_SIZE=20971520
 
 serve_watch=$profile_directory"/"$PROFILED_DS"_"$QUERY_TYPE"_serve_check"
 echo "Writing Traveler serve output to file: "$serve_watch
@@ -64,7 +65,7 @@ source $python_env_directory"/bin/activate"
 traveler(){
   if [[ $PROFILED_DS == db_postgres* ]] ; then
     echo "starting postgres server";
-    sudo service postgresql start;
+    # service postgresql start;
   fi
   # run traveler first
   cd $traveler_base_directory
@@ -101,6 +102,19 @@ cgal(){
     fi
   done
   echo "CGAL server is running";
+  export CGAL_PROCESS_ID=`ps -u $USER | grep cgal_data_serve | awk '{print $1}'`
+  sleep 1
+}
+
+build_lmdb(){
+  # run the cgal server
+  if [[ $PROFILED_DS != $ESEMAN ]]; then
+    return 0;
+  fi
+  cgal_watch=$profile_directory"/"$PROFILED_DS"_"$DATASET_ID"_cgal_check_build"
+  echo "Writing CGAL server output to file: "$cgal_watch
+  cd $traveler_base_directory"/data_handler/cgal_libs/cgal_server"
+  LD_LIBRARY_PATH=~/lmdb_testing/lmdb/lib ./cgal_data_server $DATASET_ID true > $cgal_watch
   export CGAL_PROCESS_ID=`ps -u $USER | grep cgal_data_serve | awk '{print $1}'`
   sleep 1
 }
@@ -173,7 +187,7 @@ killing_traveler(){
   fi
   while true; do
     if [ -n "$PYTHON_PROCESS_ID" ] && ps -p $PYTHON_PROCESS_ID > /dev/null; then
-      echo "Traveler is still running";
+      # echo "Traveler is still running";
       sleep 2;
     else
       break
@@ -223,7 +237,12 @@ prepare_and_merge_files(){
 }
 
 traveler
-cgal
+if [[ $1 == "build_lmdb" ]]; then
+  build_lmdb;
+  killing_traveler;
+else
+  cgal
+fi
 
 do_interactive_prompts(){
   prompt_help
@@ -259,6 +278,19 @@ do_interactive_prompts(){
   done
 }
 
+do_make_json(){
+  curl -H "Accept: application/json" -X GET http://localhost:8000/datasets/$DATASET_ID/intervals -o ~/$DATASET_ID.json
+
+  jq . ~/$DATASET_ID.json 1> /dev/null
+  if [ $? -eq 0 ]; then
+    echo "JSON file format is correct"
+    mv ~/$DATASET_ID.json $DATASET_LOCATION/
+  else
+    echo "Wrong JSON format"
+  fi
+  killing_all_processes
+}
+
 if [[ $1 == "window" ]]; then
   profile_window_query
 elif [[ $1 ==  "attribute" ]]; then
@@ -269,6 +301,8 @@ elif [[ $1 ==  "kill" ]]; then
   killing_all_processes
 elif [[ $1 ==  "interactive" ]]; then
   do_interactive_prompts
+elif [[ $1 ==  "make_json" ]]; then
+  do_make_json
 fi
 
 if [[ $1 == "window" || $1 == "attribute" || $1 == "cond" ]]; then

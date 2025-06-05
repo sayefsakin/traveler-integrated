@@ -757,6 +757,9 @@ int main(int argc, char *argv[])
     string profiled_ds = pds == NULL ? string("summed_area_table") : string(pds);
     int horizontal_resolution_divisor = pds2 == NULL ? 1 : atoi(pds2);
     string data_backup_location = pds3 == NULL ? string("/mnt/d/traveler_dataset_backups") : string(pds3);
+
+    char *pds4 = getenv("BASE_URL");
+    urlparser.baseUrl = pds4 == NULL ? string("http://localhost:8000") : string(pds4);
 /*
     urlparser.urlParameters.Parse(R""""({
                                       "begin":"813481624",
@@ -944,6 +947,19 @@ int main(int argc, char *argv[])
         std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
         tree_build_time = std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count();
         std::cout << "Agglomerate Cluster build time = " << tree_build_time << "[microseconds]" << std::endl;
+        cout << "Tree build done" << endl << "Total interval count: " << totalIntervals <<  ", Primitive count: " << cPrimitiveNumber << endl;
+
+        startServerListening(
+            binnedKDT, Segment_tree_3, 
+            neighborKDT, Segment_tree_neighbor_3,
+            agglomerateClusters,
+            esemanKDT,
+            tree_build_time, 
+            minId, maxId, 
+            minTime, maxTime,
+            minLocation, maxLocation, 
+            primitiveMapping
+        );
     } else if(profiled_ds == ESEMAN) {
         std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
         esemanKDT->buildKDT();
@@ -951,7 +967,8 @@ int main(int argc, char *argv[])
         tree_build_time = std::chrono::duration_cast<std::chrono::microseconds>(end - begin).count();
         std::cout << "EseMAN KDT build time = " << tree_build_time << "[microseconds]" << std::endl;
 
-        esemanKDT->cleanNodesFromMemory(true);
+        // esemanKDT->cleanNodesFromMemory(true);
+        cout << "Tree build done" << endl << "Total interval count: " << totalIntervals <<  ", Primitive count: " << cPrimitiveNumber << endl;
     }
     // begin = std::chrono::steady_clock::now();
     // kdtree.build();
@@ -966,29 +983,7 @@ int main(int argc, char *argv[])
         std::cout << "Segment Tree build time = " << tree_build_time << "[microseconds]" << std::endl;
         Segment_tree_neighbor_3->make_tree(NeighborInputList.begin(),NeighborInputList.end());
     }
-    cout << "Tree build done" << endl << "Total interval count: " << totalIntervals <<  ", Primitive count: " << cPrimitiveNumber << endl;
     // testSearchQueries(&kdtree, &Segment_tree_3, minId, maxId, urlparser.datasetId);
     // point_with_info_testing();
-
-    if(profiled_ds == ESEMAN) {
-        esemanKDT->openReadOnlyLMDB();
-        if(esemanKDT->reloadNodesFromFile(true)) {
-            cout << "ESEMAN dataset loaded from disk after building" << endl;
-        } else {
-            cout << "ESEMAN dataset not found on disk after building" << endl;
-        }
-    }
-    startServerListening(
-        binnedKDT, Segment_tree_3, 
-        neighborKDT, Segment_tree_neighbor_3,
-        agglomerateClusters,
-        esemanKDT,
-        tree_build_time, 
-        minId, maxId, 
-        minTime, maxTime,
-        minLocation, maxLocation, 
-        primitiveMapping
-    );
-    if(profiled_ds == ESEMAN) esemanKDT->closeReadOnlyLMDB();
     return EXIT_SUCCESS;
 }

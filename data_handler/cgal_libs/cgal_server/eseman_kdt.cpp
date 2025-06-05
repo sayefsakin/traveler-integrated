@@ -457,9 +457,11 @@ void EseManKDT::printKDTDot() {
 void EseManKDT::buildKDT() {
     string commands_remove_dir = "cd " + node_storage_base_path + " && mkdir -p " + dataset_id;
     system(commands_remove_dir.c_str());
-    eseman_node_uuids.clear();
-    
-    openWritePermLMDB();
+    eseman_node_uuids = vector<string>(event_data_values.size(), "");
+
+    cleanNodesFromMemory(true);
+    reloadNodesFromFile(false);
+
     for (size_t i = 0; i < event_data_values.size(); ++i) {
         if (event_data_values[i].empty()) continue;
 
@@ -469,15 +471,43 @@ void EseManKDT::buildKDT() {
         //         return stod(a.at("time")) < stod(b.at("time"));
         //     });
         if(is_vertical_split == false) {
-            eseman_node_uuids.push_back(constructKDTPerTrack(0, event_data_values[i].size() - 1, i));
+            openWritePermLMDB();
+            writeNodeUuidAtIndex(constructKDTPerTrack(0, event_data_values[i].size() - 1, i), i);
+            closeWritePermLMDB();
         }
         PRINTLOG("Constructing KDT for track index: " << event_tracks[i]);
         event_data_values[i].clear();
     }
-    closeWritePermLMDB();
     event_data_values.clear();
     // if(is_vertical_split)
     //     event_data_nodes[0] = constructKDTPerTrack(0, event_data_values[i].size() - 1, i);
+}
+
+void EseManKDT::writeNodeUuidAtIndex(string new_uuid, size_t index) {
+    string dataset_path = node_storage_base_path + "/" + dataset_id;
+    eseman_node_uuids.clear();
+    ifstream uuid_file(dataset_path + "/eseman_node_uuids.dat");
+    if (uuid_file.is_open()) {
+        int uuid_count;
+        uuid_file >> uuid_count;
+        for (int i = 0; i < uuid_count; i++) {
+            string nuid;
+            uuid_file >> nuid;
+            eseman_node_uuids.push_back(nuid);
+        }
+        uuid_file.close();
+    }
+    if(!eseman_node_uuids.size()) eseman_node_uuids = vector<string>(event_data_values.size(), "");
+    eseman_node_uuids[index] = new_uuid;
+
+    ofstream w_uuid_file(dataset_path + "/eseman_node_uuids.dat");
+    if (w_uuid_file.is_open()) {
+        w_uuid_file << eseman_node_uuids.size() << "\n";
+        for (const auto& cuid : eseman_node_uuids) {
+            w_uuid_file << cuid << "\n";
+        }
+        w_uuid_file.close();
+    }
 }
 
 void EseManKDT::deleteFromLMDB(const string& uuid) {
@@ -599,6 +629,7 @@ EsemanNode* EseManKDT::loadNodeFromLMDB(const string& uuid) {
 
 void EseManKDT::cleanNodesFromMemory(bool is_store_existing) {
     if (is_store_existing) {
+        PRINTLOG("eseman uuid size " << eseman_node_uuids.size());
         // since removing the directory is expensive operation, dont do it here.
         // string commands_remove_dir = "cd " + node_storage_base_path + " && rm -rf " + dataset_id + " && mkdir -p " + dataset_id;
         string commands_remove_dir = "cd " + node_storage_base_path + " && mkdir -p " + dataset_id;
@@ -646,66 +677,68 @@ void EseManKDT::cleanNodesFromMemory(bool is_store_existing) {
 
 bool EseManKDT::reloadNodesFromFile(bool is_load_attributes) {
     try {
-        if(is_load_attributes) {
-            string dataset_path = node_storage_base_path + "/" + dataset_id;
-            // Load event_data_attributes from file
-            event_data_attributes.clear();
-            ifstream attr_file(dataset_path + "/event_data_attributes.dat");
-            if (attr_file.is_open()) {
-                int attr_count;
-                attr_file >> attr_count;
-                for (int i = 0; i < attr_count; i++) {
-                    string key;
-                    int track_count;
-                    attr_file >> key >> track_count;
-                    event_data_attributes.insert(make_pair(key, StringIndexMapper()));
-                    for (int j = 0; j < track_count; j++) {
-                        string track;
-                        attr_file >> track;
-                        event_data_attributes[key].insert(track);
-                    }
-                }
-                attr_file.close();
-            }
-
-            event_tracks.cleanMemory();
-            // Load event_tracks from file
-            ifstream tracks_file(dataset_path + "/event_tracks.dat");
-            if (tracks_file.is_open()) {
+        
+        PRINTLOG("clearing memoery and reloading");
+        string dataset_path = node_storage_base_path + "/" + dataset_id;
+        // Load event_data_attributes from file
+        event_data_attributes.clear();
+        ifstream attr_file(dataset_path + "/event_data_attributes.dat");
+        if (attr_file.is_open()) {
+            int attr_count;
+            attr_file >> attr_count;
+            for (int i = 0; i < attr_count; i++) {
+                string key;
                 int track_count;
-                tracks_file >> track_count;
-                for (int i = 0; i < track_count; i++) {
+                attr_file >> key >> track_count;
+                event_data_attributes.insert(make_pair(key, StringIndexMapper()));
+                for (int j = 0; j < track_count; j++) {
                     string track;
-                    tracks_file >> track;
-                    event_tracks.insert(track);
+                    attr_file >> track;
+                    event_data_attributes[key].insert(track);
                 }
-                tracks_file.close();
             }
-
-            // Load eseman_node_uuids from file
-            eseman_node_uuids.clear();
-            ifstream uuid_file(dataset_path + "/eseman_node_uuids.dat");
-            if (uuid_file.is_open()) {
-                int uuid_count;
-                uuid_file >> uuid_count;
-                for (int i = 0; i < uuid_count; i++) {
-                    string uuid;
-                    uuid_file >> uuid;
-                    eseman_node_uuids.push_back(uuid);
-                }
-                uuid_file.close();
-            }
+            attr_file.close();
         }
 
-        // Load each node from file
-        event_data_nodes.clear();
-        for (string node_uid : eseman_node_uuids) {
-            EsemanNode* node = findNodeInTimeRange(node_uid, -1, numeric_limits<int64_t>::max(), nullptr);
-            if (node) {
-                event_data_nodes.push_back(node);
-                PRINTLOG("Loaded node with Grand root UUID: " << node_uid << " and current UUID: " << node->uuid);
-            } else {
-                PRINTLOG("Failed to load node with UUID: " << node_uid << " and current UUID: " << node->uuid);
+        event_tracks.cleanMemory();
+        // Load event_tracks from file
+        ifstream tracks_file(dataset_path + "/event_tracks.dat");
+        if (tracks_file.is_open()) {
+            int track_count;
+            tracks_file >> track_count;
+            for (int i = 0; i < track_count; i++) {
+                string track;
+                tracks_file >> track;
+                event_tracks.insert(track);
+            }
+            tracks_file.close();
+        }
+
+        // Load eseman_node_uuids from file
+        eseman_node_uuids.clear();
+        ifstream uuid_file(dataset_path + "/eseman_node_uuids.dat");
+        if (uuid_file.is_open()) {
+            int uuid_count;
+            uuid_file >> uuid_count;
+            for (int i = 0; i < uuid_count; i++) {
+                string uuid;
+                uuid_file >> uuid;
+                eseman_node_uuids.push_back(uuid);
+            }
+            uuid_file.close();
+        }
+
+        if(is_load_attributes) {
+            // Load each node from file
+            event_data_nodes.clear();
+            for (string node_uid : eseman_node_uuids) {
+                EsemanNode* node = findNodeInTimeRange(node_uid, -1, numeric_limits<int64_t>::max(), nullptr);
+                if (node) {
+                    event_data_nodes.push_back(node);
+                    PRINTLOG("Loaded node with Grand root UUID: " << node_uid << " and current UUID: " << node->uuid);
+                } else {
+                    PRINTLOG("Failed to load node with UUID: " << node_uid << " and current UUID: " << node->uuid);
+                }
             }
         }
         return true;
