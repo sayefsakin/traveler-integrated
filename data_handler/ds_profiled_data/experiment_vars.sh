@@ -24,7 +24,19 @@ LULESH_ID="772c7330-d4eb-485b-866a-3b315063f9af"
 KMEANS_LARGE_ID="c3d5e8fe-32df-4f4f-8cbb-4ba6fabd7d3d"
 
 #for attribute and child query
-DGEM_ID_N="a9bd20ca-c4f2-4b54-8c49-b968ae7e78be"
+DGEM_ID_N="ecc21d0a-112a-4b52-8cdd-6aca80adde93"
 KMEANS_ID_N="faf17535-2f66-4621-995f-49c7dbd84e8b"
 LULESH_ID_N="0deeca3b-8910-47ca-a3a1-f7bfefe64494"
 KMEANS_LARGE_ID_N="908fc737-2cc7-41d8-8281-7dd9e83155ff"
+
+
+declare -A primitives
+primitives[$DGEM_ID_N]="halide_hpx_for"
+primitives[$KMEANS_ID_N]="/phylanx\$0/__add\$0/1\$45\$8"
+primitives[$KMEANS_LARGE_ID_N]="/phylanx\$0/__add\$0/1\$45\$8"
+
+declare -A dataset_names
+dataset_names[$KMEANS_ID_N]="kmeans"
+dataset_names[$DGEM_ID_N]="dgemm"
+dataset_names[$LULESH_ID]="lulesh"
+dataset_names[$KMEANS_LARGE_ID_N]="kmeans_large"

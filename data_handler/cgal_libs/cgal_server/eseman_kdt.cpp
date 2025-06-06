@@ -457,19 +457,31 @@ void EseManKDT::printKDTDot() {
 void EseManKDT::buildKDT() {
     string commands_remove_dir = "cd " + node_storage_base_path + " && mkdir -p " + dataset_id;
     system(commands_remove_dir.c_str());
-    eseman_node_uuids = vector<string>(event_data_values.size(), "");
 
     cleanNodesFromMemory(true);
     reloadNodesFromFile(false);
+    if(eseman_node_uuids.empty()) eseman_node_uuids = vector<string>(event_data_values.size(), "");
 
-    for (size_t i = 0; i < event_data_values.size(); ++i) {
+    char* ntask_str = getenv("ESEMAN_TASK_COUNT");
+    int ntask = ntask_str ? atoi(ntask_str) : 0;
+
+    char* procid_str = getenv("ESEMAN_TASK_ID");
+    int procid = procid_str ? atoi(procid_str) : 0;
+
+    size_t starting_chunk_index = 0;
+    size_t ending_chunk_index = event_data_values.size() - 1;
+    if(ntask) {
+        size_t chunk_size = (event_data_values.size() + ntask - 1) / ntask;  // ceiling division
+        starting_chunk_index = procid * chunk_size;
+        ending_chunk_index = min((procid + 1) * chunk_size - 1, event_data_values.size() - 1);
+    }
+    PRINTLOG("Building KDT with (ntask, procid, start, end) : (" 
+        << ntask << ","<< procid << ","
+        << starting_chunk_index << "," << ending_chunk_index << ")");
+
+    for (size_t i = starting_chunk_index; i <= ending_chunk_index; ++i) {
         if (event_data_values[i].empty()) continue;
 
-        // No need to sort, cosidering the data will be come in order of time.
-        // sort(event_data_values[i].begin(), event_data_values[i].end(), 
-        //     [](const EventDict& a, const EventDict& b) {
-        //         return stod(a.at("time")) < stod(b.at("time"));
-        //     });
         if(is_vertical_split == false) {
             openWritePermLMDB();
             writeNodeUuidAtIndex(constructKDTPerTrack(0, event_data_values[i].size() - 1, i), i);
@@ -623,7 +635,7 @@ EsemanNode* EseManKDT::loadNodeFromLMDB(const string& uuid) {
 
     node->left_child = left_uuid;
     node->right_child = right_uuid;
-    PRINTLOG("Loaded from LMDB with uuid: " << uuid);
+    // PRINTLOG("Loaded from LMDB with uuid: " << uuid);
     return node;
 }
 
@@ -659,20 +671,20 @@ void EseManKDT::cleanNodesFromMemory(bool is_store_existing) {
             }
             tracks_file.close();
         }
-        // Save eseman_node_uuids to file
-        ofstream uuid_file(dataset_path + "/eseman_node_uuids.dat");
-        if (uuid_file.is_open()) {
-            uuid_file << eseman_node_uuids.size() << "\n";
-            for (const auto& uuid : eseman_node_uuids) {
-                uuid_file << uuid << "\n";
-            }
-            uuid_file.close();
-        }
+        // // Save eseman_node_uuids to file
+        // ofstream uuid_file(dataset_path + "/eseman_node_uuids.dat");
+        // if (uuid_file.is_open()) {
+        //     uuid_file << eseman_node_uuids.size() << "\n";
+        //     for (const auto& uuid : eseman_node_uuids) {
+        //         uuid_file << uuid << "\n";
+        //     }
+        //     uuid_file.close();
+        // }
     }
     event_data_nodes.clear();
     event_data_attributes.clear();
     event_tracks.cleanMemory();
-    eseman_node_uuids.clear();
+    // eseman_node_uuids.clear();
 }
 
 bool EseManKDT::reloadNodesFromFile(bool is_load_attributes) {

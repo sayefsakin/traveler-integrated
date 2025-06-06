@@ -1,7 +1,7 @@
 import csv
 import os
 from .duck_wrapper import DuckWrapper
-# from .postgres_wrapper import PostgresWrapper
+from .postgres_wrapper import PostgresWrapper
 
 
 class DSProfiler:
@@ -21,5 +21,5 @@ class DSProfiler:
         self.db_wrapper = None
         if self.profiled_ds.startswith(self.DUCK):
             self.db_wrapper = DuckWrapper()
-        # elif self.profiled_ds.startswith(self.POSTGRES):
-        #     self.db_wrapper = PostgresWrapper()
+        elif self.profiled_ds.startswith(self.POSTGRES):
+            self.db_wrapper = PostgresWrapper()

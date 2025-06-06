@@ -257,8 +257,8 @@ def conductBrushing(driver, timeout, p_freq, TOTAL_SAMPLE):
     time.sleep(3)
     domain_window = 90
     # zoom out in the gantt y axis to reveal all locations
-    ganttYScroller = driver.find_element(By.CLASS_NAME, "yAxisScrollCapturer")
-    wheel_element(ganttYScroller, -150)
+    # ganttYScroller = driver.find_element(By.CLASS_NAME, "yAxisScrollCapturer")
+    # wheel_element(ganttYScroller, -150)
 
     # element = WebDriverWait(driver, timeout=timeout, poll_frequency=p_freq).until(UtilizationLoadingVisible())
     hoverTarget = driver.find_elements(By.XPATH, "//*[@class='hoverTarget']")

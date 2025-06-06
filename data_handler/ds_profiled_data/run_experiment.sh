@@ -8,11 +8,6 @@ query_list=($Q_WINDOW $Q_ATTRIBUTE $Q_CONDW)
 dataset_list=($DGEM_ID_N $KMEANS_ID_N)
 
 
-declare -A primitives
-
-primitives[$DGEM_ID_N]="halide_hpx_for"
-primitives[$KMEANS_ID_N]="/phylanx\$0/__add\$0/1\$45\$8"
-
 for key in "${!primitives[@]}"; do
   echo "Key: $key, Value: ${primitives[$key]}"
 done

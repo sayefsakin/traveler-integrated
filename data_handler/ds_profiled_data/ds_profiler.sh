@@ -18,7 +18,7 @@ else
 fi
 
 if [ -z "$3" ]; then
-  export PROFILED_DS=$SAT
+  export PROFILED_DS=$ESEMAN
 else
   export PROFILED_DS=$3
 fi
@@ -55,7 +55,8 @@ export BASE_URL=$LONEPEAK_URL
 
 # this is where eseman stores lmdb files
 export LMDB_DATA_BACKUP_LOCATION="/uufs/chpc.utah.edu/common/home/u1447409/Documents/lmdb_dataset_backups"
-export LMDB_DATABASE_TOTAL_SIZE=20971520
+export LMDB_DATABASE_TOTAL_SIZE=$((50*1000*1000*1000))
+# 20971520, 50GB
 
 serve_watch=$profile_directory"/"$PROFILED_DS"_"$QUERY_TYPE"_serve_check"
 echo "Writing Traveler serve output to file: "$serve_watch
@@ -65,6 +66,8 @@ source $python_env_directory"/bin/activate"
 traveler(){
   if [[ $PROFILED_DS == db_postgres* ]] ; then
     echo "starting postgres server";
+    export PGDATA=$HOME/postgres_data;
+    pg_ctl start -l ~/postgres_logs;
     # service postgresql start;
   fi
   # run traveler first
@@ -111,7 +114,7 @@ build_lmdb(){
   if [[ $PROFILED_DS != $ESEMAN ]]; then
     return 0;
   fi
-  cgal_watch=$profile_directory"/"$PROFILED_DS"_"$DATASET_ID"_cgal_check_build"
+  cgal_watch=$profile_directory"/"$PROFILED_DS"_"$DATASET_ID"_cgal_check_build_"$ESEMAN_TASK_ID
   echo "Writing CGAL server output to file: "$cgal_watch
   cd $traveler_base_directory"/data_handler/cgal_libs/cgal_server"
   LD_LIBRARY_PATH=~/lmdb_testing/lmdb/lib ./cgal_data_server $DATASET_ID true > $cgal_watch
@@ -194,6 +197,10 @@ killing_traveler(){
     fi
   done
   echo "killed Traveler"
+  if [[ $PROFILED_DS == db_postgres* ]] ; then
+    pg_ctl stop -l ~/postgres_logs;
+    echo "stopping postgres server";
+  fi
 }
 
 killing_all_processes(){

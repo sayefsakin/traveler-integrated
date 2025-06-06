@@ -53,8 +53,8 @@ class PostgresWrapper():
         try:
             conn = psycopg2.connect(
                 dbname="traveler",
-                user="sayefsakin",
-                password="sayefsakin",
+                # user="sayefsakin",
+                # password="sayefsakin",
                 host="localhost",
                 port="5432"
             )
@@ -173,7 +173,6 @@ class PostgresWrapper():
     
     def db_gantt_raw(self, bins, begin, end, location, primitive):
         total_rows = (int(bins) * 3) + 1
-        elements = str(int(min(total_rows / self.total_data * 100, 100))) # in percentage
         primitive_filter_text = ""
         if primitive is not None:
             primitive_filter_text = " AND data->>'Primitive' = '" + primitive + "' "
