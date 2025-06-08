@@ -1,5 +1,6 @@
 import json
 import socket
+import os
 
 from data_store.sparseUtilizationList import SparseUtilizationList
 
@@ -11,7 +12,7 @@ class DataQueriesInterface:
     ## https://stackoverflow.com/questions/30329726/fastest-save-and-load-options-for-a-numpy-array
     # https://github.com/grantjenks/python-diskcache/pull/74
 
-    host = "127.0.0.1"
+    host = os.getenv('ESEMAN_SERVER_HOST', "127.0.0.1")
     port = 8080
 
     def byte_length(self, i):

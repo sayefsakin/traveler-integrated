@@ -59,6 +59,7 @@ private:
   AttributeDict                    event_data_attributes;
   string                           return_attribute_key = "";
   EventDictList                    filters;
+  int                              max_depth_reached;
 
   MDB_env                         *env;
   MDB_dbi                         dbi;

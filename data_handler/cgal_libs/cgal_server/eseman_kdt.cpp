@@ -131,15 +131,52 @@ string EseManKDT::constructKDTPerTrack(size_t start_index, size_t end_index, siz
         return result_uuid;
     }
 
-    // sliding midpoint of max distance rule
-    double max_distance = 0;
+    string splitting_rule("MAX-DISTANCE");
+    char* ntask_str = getenv("ESEMAN_SPLITTING_RULE");
+    if(ntask_str != NULL) splitting_rule = string(ntask_str);
+
     size_t mid_index = start_index+2;
-    for(size_t i = start_index+1; i < end_index; i+=2) {
-        if(getEventTime(data_vector[i+1]) - getEventTime(data_vector[i]) > max_distance) {
-            max_distance = getEventTime(data_vector[i+1]) - getEventTime(data_vector[i]);
-            mid_index = i+1;
+    if(splitting_rule == "MIDPOINT") {
+        // sliding midpoint rule
+        double mid_point = getEventTime(data_vector[start_index]) + (getEventTime(data_vector[end_index]) - getEventTime(data_vector[start_index])) / 2.0;
+        mid_index = upper_bound(data_vector.begin() + start_index, data_vector.begin() + end_index + 1, 
+            mid_point,
+            [](double val, const EventDict& dict) {
+            return val < getEventTime(dict);
+            }) - data_vector.begin();
+        if(mid_index%2 == 1)
+            mid_index--;
+        if(mid_index == start_index) mid_index = start_index + 2;
+        if(mid_index >= end_index) {
+            saveNodeToLMDB(cur_node);
+            result_uuid = cur_node->uuid;
+            delete cur_node;
+            return result_uuid;
         }
+        PRINTLOG("MIDPOINT Rule");
+    } else if(splitting_rule == "MAX-DISTANCE") {
+        // sliding midpoint of max distance rule
+        double max_distance = 0;   
+        for(size_t i = start_index+1; i < end_index; i+=2) {
+            if(getEventTime(data_vector[i+1]) - getEventTime(data_vector[i]) > max_distance) {
+                max_distance = getEventTime(data_vector[i+1]) - getEventTime(data_vector[i]);
+                mid_index = i+1;
+            }
+        }
+        PRINTLOG("MAX-DISTANCE Rule");
+    } else if(splitting_rule == "FAIR") {
+        mid_index = start_index + (end_index + 1 - start_index) / 2;
+        if (mid_index % 2 == 1) mid_index--;
+        if(mid_index == start_index) mid_index = start_index + 2;
+        if(mid_index >= end_index) {
+            saveNodeToLMDB(cur_node);
+            result_uuid = cur_node->uuid;
+            delete cur_node;
+            return result_uuid;
+        }
+        PRINTLOG("Fair Rule");
     }
+
     cur_node->left_child = constructKDTPerTrack(start_index, mid_index-1, track_index);
     cur_node->right_child = constructKDTPerTrack(mid_index, end_index, track_index);
 
@@ -213,7 +250,7 @@ void EseManKDT::findClusters(int64_t start_t, int64_t end_t, int64_t bin_size,
                             vector<int64_t> &results, int depth) {
 
     if(c_node == nullptr || !checkFiltersSatisfied(c_node)) return;
-
+    if(depth > 8) return;
     int64_t start_time = (int64_t)c_node->start_time;
     int64_t end_time = (int64_t)c_node->end_time;
     if(start_time >= end_t || end_time <= start_t) return;
@@ -232,6 +269,7 @@ void EseManKDT::findClusters(int64_t start_t, int64_t end_t, int64_t bin_size,
             results.push_back(end_time);
             // clearDeepNodesFromCache(c_node);
         }
+        max_depth_reached = std::max(max_depth_reached, depth);
         PRINTLOG("Cluster: " << " Start: " << start_time << ", End: " << end_time << ", Depth: " << depth);
         return;
     }
@@ -252,6 +290,7 @@ void EseManKDT::findClusters(int64_t start_t, int64_t end_t, int64_t bin_size,
             results.push_back(start_time);
             results.push_back(end_time);
         }
+        max_depth_reached = std::max(max_depth_reached, depth);
         PRINTLOG("Cluster-Leaf: " << " Start: " << start_time << ", End: " << end_time << ", Depth: " << depth);
         return;
     }
@@ -322,6 +361,7 @@ LocDict EseManKDT::binnedRangeQuery(int64_t time_begin,
         PRINTLOG("Error in converting filter attributes to indices");
     }
 
+    max_depth_reached = 0;
     chrono::steady_clock::time_point clock_begin = chrono::steady_clock::now();
     for (uint64_t c_loc = location_begin; c_loc <= location_end; c_loc++) {
         string c_loc_str = to_string(c_loc);
@@ -330,8 +370,8 @@ LocDict EseManKDT::binnedRangeQuery(int64_t time_begin,
             PRINTLOG("Track not found in event tracks " << c_loc_str);
             continue;
         }
-        EsemanNode* t_node = checkHotNodes(time_begin, time_end, track_index);
-        locDict[c_loc] = binnedRangeQueryPerTrack(time_begin, time_end, track_index, bins, t_node);
+        // EsemanNode* t_node = checkHotNodes(time_begin, time_end, track_index);
+        locDict[c_loc] = binnedRangeQueryPerTrack(time_begin, time_end, track_index, bins, nullptr);
         PRINTLOG("Track index: " << track_index << " " << event_tracks[track_index]);
     }
     chrono::steady_clock::time_point clock_end = chrono::steady_clock::now();
@@ -341,7 +381,7 @@ LocDict EseManKDT::binnedRangeQuery(int64_t time_begin,
     cout << "ESEMAN," << "ds_window";
     if(filters.size() > 0) cout << "_cond";
     cout << "," << time_begin << "," << time_end << "," 
-        << horizontal_resolution_divisor << ","
+        << horizontal_resolution_divisor << "," << max_depth_reached << ","
         << chrono::duration_cast<chrono::microseconds>(clock_end - clock_begin).count()
         << endl;
     return locDict;
@@ -397,7 +437,7 @@ EsemanNode* EseManKDT::checkHotNodes(double start_time, double end_time, size_t 
 
     // fourth case, jump to different range (from the utilization view), complete out of range
     if(fourth_index < root->start_time || root->end_time < first_index) {
-        deleteTree(root);
+        // deleteTree(root);
         root = nullptr;
         event_data_nodes[track_index] = findNodeInTimeRange(eseman_node_uuids[track_index], first_index_left, foruth_index_right, nullptr);
         cout << "fourth case" << endl;
