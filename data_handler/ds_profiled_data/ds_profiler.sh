@@ -24,7 +24,7 @@ else
 fi
 
 #change these for each experiment
-export TOTAL_SAMPLE=10
+export TOTAL_SAMPLE=20
 export HORIZONTAL_RESOLUTION_DIVISOR=1
 
 echo "Running experiment on dataset: $DATASET_ID"

@@ -27,6 +27,284 @@ import json
 #    with webdriver.Chrome(service=ChromeService(ChromeDriverManager().install())) as driver:
 #        driver.get(url)
 
+class INPMeasurer:
+    def __init__(self, driver):
+        self.driver = driver
+        self.inp_values = []
+        
+    def setup_inp_observer(self):
+        """Setup multiple methods to capture INP measurements"""
+        script = """
+        window.inpValues = [];
+        window.inpObserver = null;
+        window.manualTimings = [];
+        
+        // Method 1: Try Performance Observer for event timing
+        function setupEventObserver() {
+            if ('PerformanceObserver' in window && PerformanceObserver.supportedEntryTypes.includes('event')) {
+                const observer = new PerformanceObserver((list) => {
+                    for (const entry of list.getEntries()) {
+                        console.log('Event entry captured:', entry);
+                        const inp = {
+                            method: 'PerformanceObserver',
+                            name: entry.name,
+                            startTime: entry.startTime,
+                            processingStart: entry.processingStart || entry.startTime,
+                            processingEnd: entry.processingEnd || entry.startTime + entry.duration,
+                            duration: entry.duration,
+                            target: entry.target ? entry.target.tagName : 'unknown'
+                        };
+                        window.inpValues.push(inp);
+                    }
+                });
+                
+                try {
+                    observer.observe({type: 'event', buffered: true});
+                    window.inpObserver = observer;
+                    console.log('Event observer setup successful');
+                    return true;
+                } catch (e) {
+                    console.log('Event observer failed:', e);
+                    return false;
+                }
+            }
+            return false;
+        }
+        
+        // Method 2: Manual timing with event listeners
+        function setupManualTiming() {
+            const interactionTypes = ['click', 'mousedown', 'keydown', 'pointerdown', 'touchstart'];
+            
+            interactionTypes.forEach(eventType => {
+                document.addEventListener(eventType, function(event) {
+                    const startTime = performance.now();
+                    
+                    // Use requestAnimationFrame to measure till next paint
+                    requestAnimationFrame(() => {
+                        requestAnimationFrame(() => {
+                            const endTime = performance.now();
+                            const duration = endTime - startTime;
+                            
+                            const inp = {
+                                method: 'ManualTiming',
+                                name: eventType,
+                                startTime: startTime * 1000, // Convert to microseconds
+                                processingStart: startTime * 1000,
+                                processingEnd: endTime * 1000,
+                                duration: duration * 1000, // Convert to microseconds
+                                target: event.target ? event.target.tagName : 'unknown'
+                            };
+                            
+                            window.inpValues.push(inp);
+                            window.manualTimings.push(inp);
+                            console.log('Manual timing captured:', inp);
+                        });
+                    });
+                }, true);
+            });
+            
+            console.log('Manual timing setup complete');
+            return true;
+        }
+        
+        // Method 3: Use Long Task API as fallback
+        function setupLongTaskObserver() {
+            if ('PerformanceObserver' in window && PerformanceObserver.supportedEntryTypes.includes('longtask')) {
+                const observer = new PerformanceObserver((list) => {
+                    for (const entry of list.getEntries()) {
+                        console.log('Long task detected:', entry);
+                        // Long tasks can indicate slow interactions
+                        const inp = {
+                            method: 'LongTask',
+                            name: 'longtask',
+                            startTime: entry.startTime * 1000, // Convert to microseconds
+                            processingStart: entry.startTime * 1000,
+                            processingEnd: (entry.startTime + entry.duration) * 1000,
+                            duration: entry.duration * 1000, // Convert to microseconds
+                            target: 'unknown'
+                        };
+                        window.inpValues.push(inp);
+                    }
+                });
+                
+                try {
+                    observer.observe({type: 'longtask', buffered: true});
+                    console.log('Long task observer setup successful');
+                    return true;
+                } catch (e) {
+                    console.log('Long task observer failed:', e);
+                    return false;
+                }
+            }
+            return false;
+        }
+        
+        // Setup all methods
+        const eventObserver = setupEventObserver();
+        const manualTiming = setupManualTiming();
+        const longTaskObserver = setupLongTaskObserver();
+        
+        return {
+            eventObserver: eventObserver,
+            manualTiming: manualTiming,
+            longTaskObserver: longTaskObserver,
+            supportedTypes: PerformanceObserver.supportedEntryTypes || []
+        };
+        """
+        
+        result = self.driver.execute_script(script)
+        # print(f"Setup result: {result}")
+        if not any(result.values()):
+            # print("Warning: No INP measurement methods available")
+            return False
+        return True
+    
+    def get_inp_values(self):
+        """Retrieve collected INP values"""
+        script = "return window.inpValues || [];"
+        return self.driver.execute_script(script)
+    
+    def clear_inp_values(self):
+        """Clear collected INP values"""
+        self.driver.execute_script("window.inpValues = [];")
+    
+    def measure_interaction_inp(self, interaction_func, interaction_name=""):
+        """Measure INP for a specific interaction with multiple methods"""
+        # print(f"\n--- Measuring INP for: {interaction_name} ---")
+        
+        # Clear previous values
+        self.clear_inp_values()
+        
+        # Record timestamp before interaction
+        start_time = time.time()
+        js_start_time = self.driver.execute_script("return performance.now();")
+        
+        # Pre-interaction state
+        pre_values = self.get_inp_values()
+        # print(f"Pre-interaction INP values: {len(pre_values)}")
+        
+        # Perform the interaction
+        try:
+            interaction_func()
+            # print(f"Interaction '{interaction_name}' executed successfully")
+        except Exception as e:
+            # print(f"Error during interaction: {e}")
+            return None
+        
+        # Wait for processing and painting
+        time.sleep(0.5)  # Increased wait time
+        
+        # Get INP values after interaction
+        inp_data = self.get_inp_values()
+        # print(f"Post-interaction INP values: {len(inp_data)}")
+        
+        # Debug: Print all captured values
+        # for i, inp in enumerate(inp_data):
+        #     print(f"  [{i}] {inp['method']}: {inp['name']} - {inp['duration']:.0f}μs")
+        
+        # Filter values that occurred after our interaction started
+        recent_interactions = [
+            inp for inp in inp_data 
+            if inp['startTime'] >= (js_start_time * 1000) - 100000  # Convert to microseconds with buffer
+        ]
+        
+        # print(f"Recent interactions found: {len(recent_interactions)}")
+        
+        if recent_interactions:
+            # Get the most recent interaction
+            latest_inp = max(recent_interactions, key=lambda x: x['startTime'])
+            # print(f"✅ INP for {interaction_name}: {latest_inp['duration']:.0f}μs (method: {latest_inp['method']})")
+            return latest_inp
+        else:
+            # print(f"❌ No INP data captured for {interaction_name}")
+            
+            # Try to get any available data as fallback
+            if inp_data:
+                latest_any = inp_data[-1]  # Get the most recent one
+                # print(f"📊 Using latest available data: {latest_any['duration']:.0f}μs")
+                return latest_any
+            
+            return None
+    
+    def debug_performance_support(self):
+        """Check what performance APIs are supported"""
+        script = """
+        const support = {
+            performanceObserver: 'PerformanceObserver' in window,
+            supportedEntryTypes: PerformanceObserver.supportedEntryTypes || [],
+            performanceNow: 'performance' in window && 'now' in performance,
+            userAgent: navigator.userAgent,
+            webdriver: navigator.webdriver
+        };
+        return support;
+        """
+        return self.driver.execute_script(script)
+    
+    def force_interaction_timing(self, element, interaction_type='click'):
+        """Manually measure interaction timing"""
+        script = f"""
+        const element = arguments[0];
+        const interactionType = arguments[1];
+        
+        return new Promise((resolve) => {{
+            const startTime = performance.now();
+            
+            // Create and dispatch event
+            let event;
+            if (interactionType === 'click') {{
+                event = new MouseEvent('click', {{
+                    view: window,
+                    bubbles: true,
+                    cancelable: true
+                }});
+            }} else if (interactionType === 'keydown') {{
+                event = new KeyboardEvent('keydown', {{
+                    key: 'Enter',
+                    bubbles: true,
+                    cancelable: true
+                }});
+            }}
+            
+            // Listen for next frame after interaction
+            requestAnimationFrame(() => {{
+                requestAnimationFrame(() => {{
+                    const endTime = performance.now();
+                    const duration = endTime - startTime;
+                    
+                    resolve({{
+                        method: 'ForceManual',
+                        name: interactionType,
+                        startTime: startTime,
+                        processingStart: startTime,
+                        processingEnd: endTime,
+                        duration: duration,
+                        target: element.tagName
+                    }});
+                }});
+            }});
+            
+            // Trigger the event
+            element.dispatchEvent(event);
+        }});
+        """
+        
+        return self.driver.execute_async_script(script, element, interaction_type)
+        """Get the current INP value (75th percentile of all interactions)"""
+        script = """
+        // Calculate INP as 75th percentile of interaction latencies (in microseconds)
+        if (window.inpValues && window.inpValues.length > 0) {
+            const durations = window.inpValues.map(inp => inp.duration).sort((a, b) => a - b);
+            const index = Math.ceil(durations.length * 0.75) - 1;
+            return {
+                inp: durations[index], // Already in microseconds
+                totalInteractions: durations.length,
+                allDurations: durations
+            };
+        }
+        return null;
+        """
+        return self.driver.execute_script(script)
+
 
 def getUrlStringFromDict(params):
     url_string = ''
@@ -276,7 +554,10 @@ def conductBrushing(driver, timeout, p_freq, TOTAL_SAMPLE):
     iteration_count = 1
     previous_handle = rightHandleLocation
 
-    print("iteration,brush percentage,total drawing time (micros)")
+    inp_measurer = INPMeasurer(driver)
+    inp_measurer.setup_inp_observer()
+
+    print("iteration,brush percentage,total drawing time (micros), inp (micros)")
     random.seed(10)
     for i in range(int(TOTAL_SAMPLE/2)):
         # c_begin = random.randint(leftHandleLocation, int(handleWindow * (domain_window / 100)) + leftHandleLocation)
@@ -294,12 +575,27 @@ def conductBrushing(driver, timeout, p_freq, TOTAL_SAMPLE):
                 drag_offset = c_end - start['x']
                 previous_handle = c_begin
                 current_handle = c_end
-            ActionChains(driver).drag_and_drop_by_offset(each_hover, drag_offset, 0).perform()
+
+            # Perform brushing
+            def click_navigation():
+                try:
+                    ActionChains(driver).drag_and_drop_by_offset(each_hover, drag_offset, 0).perform()
+                except:
+                    pass
+            inp_measurer.measure_interaction_inp(click_navigation, "Navigation Click")
+
             startTimer = round(time.time() * 1000000)
             WebDriverWait(driver, timeout=timeout, poll_frequency=p_freq).until(GanttLoadingVisible())
             endTimer = round(time.time() * 1000000)
             brush_percentage = int(abs(previous_handle - current_handle) / handleWindow * 100.0)
-            print(str(iteration_count), str(brush_percentage), str(endTimer - startTimer), sep=",")
+
+            all_inp_values = inp_measurer.get_inp_values()
+            inp_results = ''
+            for inp in all_inp_values:
+                if inp['name'] == 'pointerdown':
+                    inp_results = inp['duration']
+
+            print(str(iteration_count), str(brush_percentage), str(endTimer - startTimer), str(int(inp_results)), sep=",")
             time.sleep(1)
             # print('Iteration', '{:2d}'.format(iteration_count), end=' ')
             # print('Brush percentage', '{:3d}%'.format(brush_percentage), end=' ')
@@ -453,6 +749,9 @@ if __name__ == '__main__':
     # options.add_argument("--no-sandbox") # Bypass OS security model
     # options.add_argument("--remote-debugging-port=9222")
     #options.add_argument("--incognito")
+    options.add_argument('--disable-blink-features=AutomationControlled')
+    options.add_argument('--enable-logging')
+    options.add_argument('--log-level=0')
 
     DGEM_ID = 'a9bd20ca-c4f2-4b54-8c49-b968ae7e78be'#'589ca754-ef75-426c-8d51-841cc61dc84a'
     KMEANS_ID = 'faf17535-2f66-4621-995f-49c7dbd84e8b'
@@ -506,7 +805,7 @@ if __name__ == '__main__':
         # conductFixedScrolling(driver, timeout, p_freq, TOTAL_SAMPLE)
         # time.sleep(3000)
         if QUERY_TYPE == 'window' or QUERY_TYPE == 'cond':
-            conductPNGOutput(driver, base_params, QUERY_TYPE)
+            # conductPNGOutput(driver, base_params, QUERY_TYPE)
             conductBrushing(driver, timeout, p_freq, TOTAL_SAMPLE)
         elif QUERY_TYPE == 'attribute':
             conductRandomClicking(driver, timeout, p_freq, TOTAL_SAMPLE, base_params, QUERY_TYPE)

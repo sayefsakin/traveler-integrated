@@ -29,6 +29,9 @@ KMEANS_ID_N="faf17535-2f66-4621-995f-49c7dbd84e8b"
 LULESH_ID_N="0deeca3b-8910-47ca-a3a1-f7bfefe64494"
 KMEANS_LARGE_ID_N="908fc737-2cc7-41d8-8281-7dd9e83155ff"
 
+# export ESEMAN_SPLITTING_RULE="MAX-DISTANCE"
+# export ESEMAN_SPLITTING_RULE="MIDPOINT"
+export ESEMAN_SPLITTING_RULE="FAIR"
 
 declare -A primitives
 primitives[$DGEM_ID_N]="halide_hpx_for"
