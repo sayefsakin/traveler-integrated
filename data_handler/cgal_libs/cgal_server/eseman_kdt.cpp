@@ -269,7 +269,7 @@ void EseManKDT::findClusters(int64_t start_t, int64_t end_t, int64_t bin_size,
         int64_t end_time = (int64_t)c_node->end_time;
         if (start_time >= end_t || end_time <= start_t) continue;
 
-        // checkNodeAvailability(c_node, replace_node);
+        checkNodeAvailability(c_node, replace_node);
 
         if (bin_size >= (end_time - start_time + 1)) {
             if (has_return_attribute_key) {
@@ -476,7 +476,7 @@ EsemanNode* EseManKDT::checkHotNodes(double start_time, double end_time, size_t 
         // deleteTree(root);
         root = nullptr;
         event_data_nodes[track_index] = findNodeInTimeRange(eseman_node_uuids[track_index], first_index_left, foruth_index_right, nullptr);
-        cout << "fourth case" << endl;
+        // cout << "fourth case" << endl;
     // } // second case, zoom out overlapping range
     // else if(first_index < root->start_time && root->end_time < fourth_index) {
     }// third case, partially overlapping range, either start or end overlaps
@@ -487,7 +487,7 @@ EsemanNode* EseManKDT::checkHotNodes(double start_time, double end_time, size_t 
         if(root->uuid == t_node->uuid) // already in the cache, nothing to do
             return nullptr;
         event_data_nodes[track_index] = t_node;
-        cout << "third case" << endl;
+        // cout << "third case" << endl;
     } // first case, zoom in overlapping range
     else {
         // EsemanNode *t_node = findNodeInTimeRange(eseman_node_uuids[track_index], first_index_left, foruth_index_right, root);
@@ -532,7 +532,11 @@ void EseManKDT::printKDTDot() {
 
 void EseManKDT::buildKDT() {
     string commands_remove_dir = "cd " + node_storage_base_path + " && mkdir -p " + dataset_id;
-    system(commands_remove_dir.c_str());
+    int result = system(commands_remove_dir.c_str());
+    if (result != 0) {
+        PRINTLOG("Failed to create directory: " << dataset_path);
+        return;
+    }
 
     cleanNodesFromMemory(true);
     reloadNodesFromFile(false);
@@ -722,7 +726,11 @@ void EseManKDT::cleanNodesFromMemory(bool is_store_existing) {
         // string commands_remove_dir = "cd " + node_storage_base_path + " && rm -rf " + dataset_id + " && mkdir -p " + dataset_id;
         string commands_remove_dir = "cd " + node_storage_base_path + " && mkdir -p " + dataset_id;
         string dataset_path = node_storage_base_path + "/" + dataset_id;
-        system(commands_remove_dir.c_str());
+        int result = system(commands_remove_dir.c_str());
+        if (result != 0) {
+            PRINTLOG("Failed to create directory: " << dataset_path);
+            return;
+        }
         // Save event_data_attributes to file
         ofstream attr_file(dataset_path + "/event_data_attributes.dat");
         if (attr_file.is_open()) {
@@ -828,6 +836,15 @@ bool EseManKDT::reloadNodesFromFile(bool is_load_attributes) {
                     PRINTLOG("Failed to load node with UUID: " << node_uid << " and current UUID: " << node->uuid);
                 }
             }
+
+            // Iterate over event_tracks vector
+            for(size_t i = 0; i < event_tracks.size(); i++) {
+                binnedRangeQueryPerTrack(event_data_nodes[i]->start_time,
+                                        event_data_nodes[i]->end_time,
+                                        i,
+                                        4000,
+                                        nullptr);
+            }
         }
         return true;
     } catch (const exception& e) {
@@ -838,34 +855,76 @@ bool EseManKDT::reloadNodesFromFile(bool is_load_attributes) {
 
 EsemanNode* EseManKDT::findNodeInTimeRange(string uuid, double s_time, double e_time, EsemanNode* c_root) {
     EsemanNode* root = c_root;
-    if(!c_root || c_root->uuid != uuid) root = loadNodeFromLMDB(uuid);
-    if (!root) return root;
-    
-    if(root->hasLeftChild() && !root->isLeftChildCached()) root->left_node = loadNodeFromLMDB(root->left_child);
-    if(root->hasRightChild() && !root->isRightChildCached()) root->right_node = loadNodeFromLMDB(root->right_child);
-    
-    if (root->hasLeftChild() && root->left_node->end_time > s_time && root->hasRightChild() && root->right_node->start_time < e_time) {
-        return root;
-    } else if (root->hasRightChild() && root->right_node->start_time > e_time) {
-        string nc = root->left_child;
-        EsemanNode* jump_node = root->left_node;
-        if(root != c_root) {
-            jump_node = nullptr;
-            delete root;
-        }
-        return findNodeInTimeRange(nc, s_time, e_time, jump_node);
-    } else if (root->hasLeftChild() && root->left_node->end_time < s_time) {
-        string nc = root->right_child;
-        EsemanNode* jump_node = root->right_node;
-        if(root != c_root) {
-            jump_node = nullptr;
-            delete root;
-        }
-        return findNodeInTimeRange(nc, s_time, e_time, jump_node);
-    } else if (s_time < root->start_time && root->end_time < e_time) {
-        return root;
+    if(!c_root || c_root->uuid != uuid) {
+        root = loadNodeFromLMDB(uuid);
     }
-    return root;
+    if (!root) return root;
+
+    struct StackItem {
+        EsemanNode* node;
+        string next_uuid;
+        bool is_root;
+    };
+    stack<StackItem> nodeStack;
+    nodeStack.push({root, "", true});
+
+    EsemanNode* result = nullptr;
+    while (!nodeStack.empty()) {
+        auto current = nodeStack.top();
+        nodeStack.pop();
+        EsemanNode* currentNode = current.node;
+
+        if(currentNode->hasLeftChild() && !currentNode->isLeftChildCached()) 
+            currentNode->left_node = loadNodeFromLMDB(currentNode->left_child);
+        if(currentNode->hasRightChild() && !currentNode->isRightChildCached()) 
+            currentNode->right_node = loadNodeFromLMDB(currentNode->right_child);
+
+        if (currentNode->hasLeftChild() && currentNode->left_node->end_time > s_time && 
+            currentNode->hasRightChild() && currentNode->right_node->start_time < e_time) {
+            result = currentNode;
+            break;
+        } 
+        else if (currentNode->hasRightChild() && currentNode->right_node->start_time > e_time) {
+            string next_uuid = currentNode->left_child;
+            EsemanNode* next_node = currentNode->left_node;
+            
+            if(currentNode != c_root && !current.is_root) {
+                next_node = nullptr;
+                delete currentNode;
+            }
+            
+            if(next_node) {
+                nodeStack.push({next_node, "", false});
+            } else {
+                nodeStack.push({loadNodeFromLMDB(next_uuid), "", false});
+            }
+        }
+        else if (currentNode->hasLeftChild() && currentNode->left_node->end_time < s_time) {
+            string next_uuid = currentNode->right_child;
+            EsemanNode* next_node = currentNode->right_node;
+            
+            if(currentNode != c_root && !current.is_root) {
+                next_node = nullptr;
+                delete currentNode;
+            }
+            
+            if(next_node) {
+                nodeStack.push({next_node, "", false});
+            } else {
+                nodeStack.push({loadNodeFromLMDB(next_uuid), "", false});
+            }
+        }
+        else if (s_time < currentNode->start_time && currentNode->end_time < e_time) {
+            result = currentNode;
+            break;
+        }
+        else {
+            result = currentNode;
+            break;
+        }
+    }
+
+    return result;
 }
 
  // four scenarios

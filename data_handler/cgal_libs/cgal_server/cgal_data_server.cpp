@@ -174,18 +174,33 @@ void sendOverTheSocket(int new_socket, const char *json){
 Document rcvOverTheSocket(int new_socket){
     char *buffer;
     buffer = (char *)malloc(MSG_SIZE_IN_BYTE);
-    read(new_socket, buffer, MSG_SIZE_IN_BYTE);
+    ssize_t bytes_read = read(new_socket, buffer, MSG_SIZE_IN_BYTE);
+    if (bytes_read < 0) {
+        free(buffer);
+        if(DEBUG) printf("read failed");
+        Document d;
+        return d;
+    }
+    
     int msg_size = atoi(buffer);
+    free(buffer);
+    
     if(DEBUG) printf("%d\n", msg_size);
     Document d;
     if(!msg_size) return d;
+    
     buffer = (char *)malloc(msg_size+1);
     memset(buffer, 0, msg_size+1);
-    read(new_socket, buffer, msg_size);
+    bytes_read = read(new_socket, buffer, msg_size);
+    if (bytes_read < 0) {
+        free(buffer);
+        if(DEBUG) printf("read failed");
+        return d;
+    }
+    
     if(DEBUG) printf("%s\n", buffer);
     d.Parse(buffer);
-    memset(buffer, 0, msg_size+1);
-    buffer = NULL;
+    free(buffer);
     return d;
 }
 
