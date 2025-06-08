@@ -23,6 +23,7 @@
 #include <chrono>
 #include <climits>
 #include <variant>
+#include <stack>
 #include <lmdb.h> 
 // using lmdb because
 // - it uses B+ tree

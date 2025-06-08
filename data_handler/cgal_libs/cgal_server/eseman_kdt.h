@@ -42,12 +42,14 @@ public:
   }
 
   vector<string> getAttributeKeys();
-  bool hasAttribute(const string& key) const;
+  inline bool hasAttribute(const string& key) const {
+    return attribute_lists.find(key) != attribute_lists.end();
+  }
   void addAttribute(const string& key, const int attr_index);
-  bool hasLeftChild() { return !left_child.empty(); }
-  bool hasRightChild() { return !right_child.empty(); }
-  bool isLeftChildCached() { return left_node != nullptr; }
-  bool isRightChildCached() { return right_node != nullptr; }
+  inline bool hasLeftChild() { return !left_child.empty(); }
+  inline bool hasRightChild() { return !right_child.empty(); }
+  inline bool isLeftChildCached() { return left_node != nullptr; }
+  inline bool isRightChildCached() { return right_node != nullptr; }
 };
 
 class EseManKDT {
@@ -58,8 +60,11 @@ private:
   vector<string>                   eseman_node_uuids;
   AttributeDict                    event_data_attributes;
   string                           return_attribute_key = "";
+  bool                             has_return_attribute_key = false;
+  bool                             has_filter_query = false;
   EventDictList                    filters;
   int                              max_depth_reached;
+  int                              leafs_read;
 
   MDB_env                         *env;
   MDB_dbi                         dbi;

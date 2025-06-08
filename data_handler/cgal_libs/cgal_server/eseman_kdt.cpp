@@ -39,10 +39,6 @@ vector<string> EsemanNode::getAttributeKeys() {
     return keys;
 }
 
-bool EsemanNode::hasAttribute(const string& key) const {
-    return attribute_lists.find(key) != attribute_lists.end();
-}
-
 void EsemanNode::addAttribute(const string& key, const int attr_index) {
     if(!hasAttribute(key)) {
       attribute_lists[key] = unordered_set<size_t>();
@@ -94,7 +90,7 @@ void EseManKDT::deleteTree(EsemanNode *node) {
     delete node;
 }
 
-bool EseManKDT::checkFilterSatisfied(const EsemanNode* node, const EventDict& filter) {
+inline bool EseManKDT::checkFilterSatisfied(const EsemanNode* node, const EventDict& filter) {
     try {
         for (const auto& [key, value] : filter) {
             if (!(node->hasAttribute(key))) return false;
@@ -105,7 +101,7 @@ bool EseManKDT::checkFilterSatisfied(const EsemanNode* node, const EventDict& fi
     }
     return true;
 }
-bool EseManKDT::checkFiltersSatisfied(const EsemanNode* node) {
+inline bool EseManKDT::checkFiltersSatisfied(const EsemanNode* node) {
     for (const auto& filter : filters) {
         if (!checkFilterSatisfied(node, filter)) return false;
     }
@@ -245,59 +241,86 @@ void EseManKDT::clearDeepNodesFromCache(EsemanNode* c_node) {
 // if bin size is less than cluster length, then go down
 // else return the start end point of the current cluster
 // dfs on the start and end time query
+// Stack-based iterative version of findClusters
 void EseManKDT::findClusters(int64_t start_t, int64_t end_t, int64_t bin_size, 
-                            EsemanNode* c_node, EsemanNode* replace_node,
+                            EsemanNode* root, EsemanNode* replace_node,
                             vector<int64_t> &results, int depth) {
 
-    if(c_node == nullptr || !checkFiltersSatisfied(c_node)) return;
-    if(depth > 8) return;
-    int64_t start_time = (int64_t)c_node->start_time;
-    int64_t end_time = (int64_t)c_node->end_time;
-    if(start_time >= end_t || end_time <= start_t) return;
+    if (!root) return;
 
-    checkNodeAvailability(c_node, replace_node);
+    // Create a stack to store nodes with their depth
+    struct StackItem {
+        EsemanNode* node;
+        int depth;
+    };
+    stack<StackItem> nodeStack;
+    nodeStack.push({root, depth});
 
-    if(bin_size >= (end_time - start_time + 1)) {
-        if(return_attribute_key != "") {
-            if(!c_node->hasAttribute(return_attribute_key)) {
-                PRINTLOG("Attribute not found for key: " << return_attribute_key);
-                return;
+    while (!nodeStack.empty()) {
+        auto current = nodeStack.top();
+        nodeStack.pop();
+        EsemanNode* c_node = current.node;
+        int current_depth = current.depth;
+
+        leafs_read++;
+        if (has_filter_query && !checkFiltersSatisfied(c_node)) continue;
+
+        int64_t start_time = (int64_t)c_node->start_time;
+        int64_t end_time = (int64_t)c_node->end_time;
+        if (start_time >= end_t || end_time <= start_t) continue;
+
+        // checkNodeAvailability(c_node, replace_node);
+
+        if (bin_size >= (end_time - start_time + 1)) {
+            if (has_return_attribute_key) {
+                if (!c_node->hasAttribute(return_attribute_key)) {
+                    PRINTLOG("Attribute not found for key: " << return_attribute_key);
+                    continue;
+                }
+                results.push_back((int64_t)(*c_node->attribute_lists.at(return_attribute_key).begin()));
+            } else {
+                results.push_back(start_time);
+                results.push_back(end_time);
             }
-            results.push_back((int64_t)(*c_node->attribute_lists.at(return_attribute_key).begin()));
-        } else {
-            results.push_back(start_time);
-            results.push_back(end_time);
-            // clearDeepNodesFromCache(c_node);
+            max_depth_reached = std::max(max_depth_reached, current_depth);
+            PRINTLOG("Cluster: " << " Start: " << start_time << ", End: " << end_time << ", Depth: " << current_depth);
+            continue;
         }
-        max_depth_reached = std::max(max_depth_reached, depth);
-        PRINTLOG("Cluster: " << " Start: " << start_time << ", End: " << end_time << ", Depth: " << depth);
-        return;
-    }
-    if(!c_node->hasLeftChild() && !c_node->hasRightChild()) {
-        if(start_time < start_t) {
-            start_time = start_t;
-        }
-        if(end_time > end_t) {
-            end_time = end_t;
-        }
-        if(return_attribute_key != "") {
-            if(!c_node->hasAttribute(return_attribute_key)) {
-                PRINTLOG("Attribute not found for key: " << return_attribute_key);
-                return;
+
+        if (!c_node->hasLeftChild() && !c_node->hasRightChild()) {
+            if (start_time < start_t) {
+                start_time = start_t;
             }
-            results.push_back((int64_t)(*c_node->attribute_lists.at(return_attribute_key).begin()));
-        } else {
-            results.push_back(start_time);
-            results.push_back(end_time);
+            if (end_time > end_t) {
+                end_time = end_t;
+            }
+            if (has_return_attribute_key) {
+                if (!c_node->hasAttribute(return_attribute_key)) {
+                    PRINTLOG("Attribute not found for key: " << return_attribute_key);
+                    continue;
+                }
+                results.push_back((int64_t)(*c_node->attribute_lists.at(return_attribute_key).begin()));
+            } else {
+                results.push_back(start_time);
+                results.push_back(end_time);
+            }
+            max_depth_reached = std::max(max_depth_reached, current_depth);
+            PRINTLOG("Cluster-Leaf: " << " Start: " << start_time << ", End: " << end_time << ", Depth: " << current_depth);
+            continue;
         }
-        max_depth_reached = std::max(max_depth_reached, depth);
-        PRINTLOG("Cluster-Leaf: " << " Start: " << start_time << ", End: " << end_time << ", Depth: " << depth);
-        return;
+
+        // Load children if not already loaded
+        if (!c_node->right_node) c_node->right_node = loadNodeFromLMDB(c_node->right_child);
+        if (!c_node->left_node) c_node->left_node = loadNodeFromLMDB(c_node->left_child);
+
+        // Push right child first (so left child gets processed first when popped)
+        if (c_node->right_node) {
+            nodeStack.push({c_node->right_node, current_depth + 1});
+        }
+        if (c_node->left_node) {
+            nodeStack.push({c_node->left_node, current_depth + 1});
+        }
     }
-    if(!c_node->left_node)c_node->left_node = loadNodeFromLMDB(c_node->left_child);
-    if(!c_node->right_node)c_node->right_node = loadNodeFromLMDB(c_node->right_child);
-    findClusters(start_t, end_t, bin_size, c_node->left_node, replace_node, results, depth+1);
-    findClusters(start_t, end_t, bin_size, c_node->right_node, replace_node, results, depth+1);
 }
 
 vector<double> EseManKDT::binnedRangeQueryPerTrack(int64_t time_begin, 
@@ -351,9 +374,11 @@ LocDict EseManKDT::binnedRangeQuery(int64_t time_begin,
     LocDict locDict;
     PRINTLOG("Got EseMan KDT binned range query");
 
+    has_filter_query = false;
     try {
         for (size_t i = 0; i < filters.size(); i++) {
             for (const auto& [key, value] : filters[i]) {
+                has_filter_query = true;
                 filters[i][key] = event_data_attributes[key].get_track_index(get<string>(value));
             }
         }
@@ -362,6 +387,7 @@ LocDict EseManKDT::binnedRangeQuery(int64_t time_begin,
     }
 
     max_depth_reached = 0;
+    has_return_attribute_key = false;
     chrono::steady_clock::time_point clock_begin = chrono::steady_clock::now();
     for (uint64_t c_loc = location_begin; c_loc <= location_end; c_loc++) {
         string c_loc_str = to_string(c_loc);
@@ -371,12 +397,20 @@ LocDict EseManKDT::binnedRangeQuery(int64_t time_begin,
             continue;
         }
         // EsemanNode* t_node = checkHotNodes(time_begin, time_end, track_index);
+        leafs_read = 0;
+#ifdef _DEBUG
+            chrono::steady_clock::time_point track_clock_begin = chrono::steady_clock::now();
+#endif
         locDict[c_loc] = binnedRangeQueryPerTrack(time_begin, time_end, track_index, bins, nullptr);
-        PRINTLOG("Track index: " << track_index << " " << event_tracks[track_index]);
+#ifdef _DEBUG
+        chrono::steady_clock::time_point track_clock_end = chrono::steady_clock::now();
+#endif
+        PRINTLOG("Track index: " << track_index << " " << event_tracks[track_index] << " " << leafs_read << " " << chrono::duration_cast<chrono::microseconds>(track_clock_end - track_clock_begin).count());
     }
     chrono::steady_clock::time_point clock_end = chrono::steady_clock::now();
 
     filters.clear(); // automatically clear filters after query
+    has_filter_query = false;
 
     cout << "ESEMAN," << "ds_window";
     if(filters.size() > 0) cout << "_cond";
@@ -395,6 +429,7 @@ string EseManKDT::findNearestEvent(uint64_t cTime, uint64_t cLocation) {
 
   int64_t result = -1;
   return_attribute_key = "ID";
+  has_return_attribute_key = true;
   vector<int64_t> data_short_list;
 
   uint64_t bin_size(getBinSize(cTime, cTime+1, 1));
@@ -403,6 +438,7 @@ string EseManKDT::findNearestEvent(uint64_t cTime, uint64_t cLocation) {
   if(result >= 0) ret_result = event_data_attributes["ID"][result];
   data_short_list.clear();
   return_attribute_key = "";
+  has_return_attribute_key = false;
   return ret_result;
 }
 
@@ -675,7 +711,7 @@ EsemanNode* EseManKDT::loadNodeFromLMDB(const string& uuid) {
 
     node->left_child = left_uuid;
     node->right_child = right_uuid;
-    // PRINTLOG("Loaded from LMDB with uuid: " << uuid);
+    PRINTLOG("Loaded from LMDB with uuid: " << uuid);
     return node;
 }
 
@@ -841,22 +877,22 @@ EsemanNode* EseManKDT::findNodeInTimeRange(string uuid, double s_time, double e_
 void test_cases_for_memory_check(EseManKDT *kdt) {
     // exact same range
     cout << "=========== TESTING EXACT SAME RANGE =================" << endl;
-    // kdt->binnedRangeQuery(-1305029698, 2753780939, 
-    //                         9, 9, 
-    //                         100);
-    // kdt->binnedRangeQuery(-1305029698, 2753780939, 
-    //                         9, 9, 
-    //                         100);
+    kdt->binnedRangeQuery(-1305029698, 2753780939, 
+                            9, 9, 
+                            4000);
+    kdt->binnedRangeQuery(-1305029698, 2753780939, 
+                            9, 9, 
+                            4000);
     cout << "======================================================" << endl;
 
     // first, zoom in overlapping range
     cout << "=========== TESTING ZOOM IN AND PANNING =================" << endl;
     kdt->binnedRangeQuery(1332325382,1333479725, 
                             9, 9, 
-                            100);
+                            4000);
     kdt->binnedRangeQuery(1332308652,1333462998,
                             9, 9, 
-                            100);
+                            4000);
     cout << "======================================================" << endl;
 
     // // second, zoom out overlapping range
