@@ -302,8 +302,7 @@ void AgglomerateClusters::buildAllAggClusters() {
 
 LocDict AgglomerateClusters::binnedRangeQuery(int64_t time_begin, 
                                               int64_t time_end, 
-                                              uint64_t location_begin, 
-                                              uint64_t location_end, 
+                                              vector<string> &locations,
                                               uint64_t bins){
   LocDict locDict;
   PRINTLOG("Got AGC binned range query");
@@ -320,15 +319,14 @@ LocDict AgglomerateClusters::binnedRangeQuery(int64_t time_begin,
 
   
   chrono::steady_clock::time_point clock_begin = chrono::steady_clock::now();
-  for (uint64_t c_loc = location_begin; c_loc <= location_end; c_loc++) {
-    string c_loc_str = to_string(c_loc);
+  for (const string& c_loc_str : locations) {
     if(agglomerate_clusters.find(c_loc_str) == agglomerate_clusters.end()) {
       PRINTLOG("Track not found in agglomerate clusters " << c_loc_str);
       continue;
     }
     
     if(filters.size() > 0) agglomerate_clusters[c_loc_str].filters = filters;
-    locDict[c_loc] = agglomerate_clusters[c_loc_str].binnedRangeQuery(time_begin, time_end, bins, horizontal_resolution_divisor);
+    locDict[stol(c_loc_str)] = agglomerate_clusters[c_loc_str].binnedRangeQuery(time_begin, time_end, bins, horizontal_resolution_divisor);
   }
   chrono::steady_clock::time_point clock_end = chrono::steady_clock::now();
   // for (const auto& myPair : locDict) {

@@ -257,12 +257,12 @@ void EseManKDT::findClusters(int64_t start_t, int64_t end_t, int64_t bin_size,
     nodeStack.push({root, depth});
 
     while (!nodeStack.empty()) {
+        nodes_visited++;
         auto current = nodeStack.top();
         nodeStack.pop();
         EsemanNode* c_node = current.node;
         int current_depth = current.depth;
 
-        leafs_read++;
         if (has_filter_query && !checkFiltersSatisfied(c_node)) continue;
 
         int64_t start_time = (int64_t)c_node->start_time;
@@ -367,9 +367,8 @@ vector<double> EseManKDT::binnedRangeQueryPerTrack(int64_t time_begin,
 }
 
 LocDict EseManKDT::binnedRangeQuery(int64_t time_begin, 
-                                    int64_t time_end, 
-                                    uint64_t location_begin, 
-                                    uint64_t location_end, 
+                                    int64_t time_end,
+                                    vector<string> &locations,
                                     uint64_t bins){
     LocDict locDict;
     PRINTLOG("Got EseMan KDT binned range query");
@@ -386,25 +385,27 @@ LocDict EseManKDT::binnedRangeQuery(int64_t time_begin,
         PRINTLOG("Error in converting filter attributes to indices");
     }
 
+    int total_nodes_visited = 0;
     max_depth_reached = 0;
+    leafs_read = 0;
     has_return_attribute_key = false;
     chrono::steady_clock::time_point clock_begin = chrono::steady_clock::now();
-    for (uint64_t c_loc = location_begin; c_loc <= location_end; c_loc++) {
-        string c_loc_str = to_string(c_loc);
-        size_t track_index = event_tracks.get_track_index(c_loc_str);
+    for (const string& loc : locations) {
+        size_t track_index = event_tracks.get_track_index(loc);
         if(track_index == event_tracks.size()) {
             PRINTLOG("Track not found in event tracks " << c_loc_str);
             continue;
         }
+        nodes_visited = 0;
         // EsemanNode* t_node = checkHotNodes(time_begin, time_end, track_index);
-        leafs_read = 0;
 #ifdef _DEBUG
             chrono::steady_clock::time_point track_clock_begin = chrono::steady_clock::now();
 #endif
-        locDict[c_loc] = binnedRangeQueryPerTrack(time_begin, time_end, track_index, bins, nullptr);
+        locDict[stol(loc)] = binnedRangeQueryPerTrack(time_begin, time_end, track_index, bins, nullptr);
 #ifdef _DEBUG
         chrono::steady_clock::time_point track_clock_end = chrono::steady_clock::now();
 #endif
+        total_nodes_visited = std::max(total_nodes_visited, nodes_visited);
         PRINTLOG("Track index: " << track_index << " " << event_tracks[track_index] << " " << leafs_read << " " << chrono::duration_cast<chrono::microseconds>(track_clock_end - track_clock_begin).count());
     }
     chrono::steady_clock::time_point clock_end = chrono::steady_clock::now();
@@ -415,7 +416,7 @@ LocDict EseManKDT::binnedRangeQuery(int64_t time_begin,
     cout << "ESEMAN," << "ds_window";
     if(filters.size() > 0) cout << "_cond";
     cout << "," << time_begin << "," << time_end << "," 
-        << horizontal_resolution_divisor << "," << max_depth_reached << ","
+        << horizontal_resolution_divisor << ","
         << chrono::duration_cast<chrono::microseconds>(clock_end - clock_begin).count()
         << endl;
     return locDict;
@@ -715,6 +716,7 @@ EsemanNode* EseManKDT::loadNodeFromLMDB(const string& uuid) {
 
     node->left_child = left_uuid;
     node->right_child = right_uuid;
+    leafs_read++;
     PRINTLOG("Loaded from LMDB with uuid: " << uuid);
     return node;
 }
@@ -936,21 +938,22 @@ EsemanNode* EseManKDT::findNodeInTimeRange(string uuid, double s_time, double e_
 void test_cases_for_memory_check(EseManKDT *kdt) {
     // exact same range
     cout << "=========== TESTING EXACT SAME RANGE =================" << endl;
+    vector<string> locations = {"9"};
     kdt->binnedRangeQuery(-1305029698, 2753780939, 
-                            9, 9, 
+                            locations,
                             4000);
     kdt->binnedRangeQuery(-1305029698, 2753780939, 
-                            9, 9, 
+                            locations,
                             4000);
     cout << "======================================================" << endl;
 
     // first, zoom in overlapping range
     cout << "=========== TESTING ZOOM IN AND PANNING =================" << endl;
     kdt->binnedRangeQuery(1332325382,1333479725, 
-                            9, 9, 
+                            locations,
                             4000);
     kdt->binnedRangeQuery(1332308652,1333462998,
-                            9, 9, 
+                            locations,
                             4000);
     cout << "======================================================" << endl;
 

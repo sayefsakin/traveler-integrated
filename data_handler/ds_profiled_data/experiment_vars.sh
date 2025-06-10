@@ -36,6 +36,7 @@ export ESEMAN_SPLITTING_RULE="FAIR"
 declare -A primitives
 primitives[$DGEM_ID_N]="halide_hpx_for"
 primitives[$KMEANS_ID_N]="/phylanx\$0/__add\$0/1\$45\$8"
+primitives[$LULESH_ID]="run_on_completed_on_new_thread"
 primitives[$KMEANS_LARGE_ID_N]="/phylanx\$0/__add\$0/1\$45\$8"
 
 declare -A dataset_names

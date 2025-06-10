@@ -82,8 +82,7 @@ class AgglomerateClusters {
     void buildAllAggClusters();
     LocDict binnedRangeQuery(int64_t time_begin, 
       int64_t time_end, 
-      uint64_t location_begin, 
-      uint64_t location_end, 
+      vector<string> &locations,
       uint64_t bins);
     string findNearestEvent(uint64_t cTime, uint64_t cLocation);
     

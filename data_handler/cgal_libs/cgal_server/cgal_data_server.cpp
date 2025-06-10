@@ -150,7 +150,7 @@ void testSearchQueries(Kdtree *kdtree, Segment_tree_3_type *Segment_tree_2, int 
 }
 
 void sendOverTheSocket(int new_socket, const char *json){
-    int64_t maxSocketBuffer = 100000;
+    int64_t maxSocketBuffer = 1000000;
     int64_t cJsonSize = strlen(json);
     int cstart = 0;
     char t[30];
@@ -305,14 +305,13 @@ Document binnedKDTreeSearchQuery( BinnedKDT *tree,
 Document binnedAGCSearchQuery( AgglomerateClusters *agc,
     int64_t time_begin,
     int64_t time_end,
-    uint64_t location_begin,
-    uint64_t location_end,
+    vector<string> &locations,
     uint64_t bins, string primitive) {
 
     if(primitive.length()>0) {
         agc->addPrimitiveFilter(primitive);
     }
-    LocDict lResults = agc->binnedRangeQuery(time_begin, time_end, location_begin, location_end, bins);
+    LocDict lResults = agc->binnedRangeQuery(time_begin, time_end, locations, bins);
     Document d = convertLocDictToDocument(lResults);
     lResults.clear();
     return d;
@@ -321,14 +320,13 @@ Document binnedAGCSearchQuery( AgglomerateClusters *agc,
 Document binnedESEMANSearchQuery( EseManKDT *emk,
     int64_t time_begin,
     int64_t time_end,
-    uint64_t location_begin,
-    uint64_t location_end,
+    vector<string> &locations,
     uint64_t bins, string primitive) {
 
     if(primitive.length()>0) {
         emk->addPrimitiveFilter(primitive);
     }
-    LocDict lResults = emk->binnedRangeQuery(time_begin, time_end, location_begin, location_end, bins);
+    LocDict lResults = emk->binnedRangeQuery(time_begin, time_end, locations, bins);
     Document d = convertLocDictToDocument(lResults);
     lResults.clear();
     return d;
@@ -580,19 +578,13 @@ Document processReceivedRequest(BinnedKDT *binnedKDT,
         uint64_t location_begin = minLocation;
         uint64_t location_end = maxLocation;
         uint64_t bins = 1;
-        vector<uint64_t> locationsList;
+        vector<string> locationsList;
         string primitive("");
         if((*d).HasMember("locations")) {
             for (SizeType i = 0; i < (*d)["locations"].Size(); i++){
-                locationsList.push_back(stol((*d)["locations"][i].GetString()));
+                locationsList.push_back((*d)["locations"][i].GetString());
             }
             if(DEBUG) cout << locationsList.size() << endl;
-            sort(locationsList.begin(), locationsList.end());
-            location_begin = locationsList[0];
-            location_end = locationsList[locationsList.size()-1];
-        }
-        if((*d).HasMember("location_end")) {
-            location_end = stoul(((*d)["location_end"].GetString()));
         }
         if((*d).HasMember("bins")) {
             bins = stoul(((*d)["bins"].GetString()));
@@ -610,10 +602,10 @@ Document processReceivedRequest(BinnedKDT *binnedKDT,
             return sgmntTreeSearchQuery(Segment_tree_3, time_begin, time_end, location_begin, location_end, bins, pm[primitive], maxId);
         } else if(ds_request == AGCLUSTER) {
             if(DEBUG) cout << "got agglomerate cluster request" << endl;
-            return binnedAGCSearchQuery(agglomerateClusters, time_begin, time_end, location_begin, location_end, bins, primitive);
+            return binnedAGCSearchQuery(agglomerateClusters, time_begin, time_end, locationsList, bins, primitive);
         } else if(ds_request == ESEMAN) {
             if(DEBUG) cout << "got eseman cluster request" << endl;
-            return binnedESEMANSearchQuery(emk, time_begin, time_end, location_begin, location_end, bins, primitive);
+            return binnedESEMANSearchQuery(emk, time_begin, time_end, locationsList, bins, primitive);
         } else {
             if(DEBUG) cout << "invalid ds request" << endl;
         }

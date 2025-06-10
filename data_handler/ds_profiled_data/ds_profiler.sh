@@ -55,7 +55,7 @@ export BASE_URL=$LONEPEAK_URL
 
 # this is where eseman stores lmdb files
 export LMDB_DATA_BACKUP_LOCATION="/uufs/chpc.utah.edu/common/home/u1447409/Documents/lmdb_dataset_backups"
-export LMDB_DATABASE_TOTAL_SIZE=$((50*1000*1000*1000))
+export LMDB_DATABASE_TOTAL_SIZE=$((2*1000*1000*1000))
 # 20971520, 50GB
 
 serve_watch=$profile_directory"/"$PROFILED_DS"_"$QUERY_TYPE"_serve_check"
