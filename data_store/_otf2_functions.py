@@ -67,6 +67,7 @@ def processEvent(self, datasetId, event):
 async def processOtf2(self, datasetId, file, log=logToConsole):
     # Run each substep, with manual calls to python's garbage collector in
     # between
+    priorBuildTime = round(time.time() * 1000)
     await self.processRawTrace(datasetId, file, log)
     gc.collect()
     await self.combineIntervals(datasetId, log)
@@ -76,10 +77,14 @@ async def processOtf2(self, datasetId, file, log=logToConsole):
     await self.connectIntervals(datasetId, log)
     gc.collect()
     await self.buildSparseUtilizationLists(datasetId, log)
-    gc.collect()
-    await self.buildDependencyTree(datasetId, log)
+    # gc.collect()
+    # await self.buildDependencyTree(datasetId, log)
     gc.collect()
     self.finishLoadingSourceFile(datasetId, file.name)
+
+    postBuildTime = round(time.time() * 1000)
+    totalBuildTime = postBuildTime - priorBuildTime
+    print('Construction time: ', totalBuildTime, 'ms')
 
 async def processRawTrace(self, datasetId, file, log):
     # Set up database file for procMetrics

@@ -374,6 +374,17 @@ class GanttLoadingVisible():
                     return each_element
         return False
 
+class HoverTargetVisible():
+    def __init__(self):
+        pass
+
+    def __call__(self, web_driver):
+        hoverTarget = driver.find_elements(By.XPATH, "//*[@class='hoverTarget']")        
+        for each_hover in hoverTarget:
+            parent_element = each_hover.find_element(By.XPATH, "..")
+            if parent_element.get_attribute("class") == 'rightHandle':
+                return each_hover
+        return False
 
 class MozSketchLoadingVisible():
     def __init__(self):
@@ -438,6 +449,7 @@ def getNextCircularPoint(tx, ty):
     return dx, dy
 
 def scrollToWindow(driver, timeout, p_freq):
+    WebDriverWait(driver, timeout=timeout, poll_frequency=p_freq).until(HoverTargetVisible())
     hoverTarget = driver.find_elements(By.XPATH, "//*[@class='hoverTarget']")
     rightHandleLocation = 0
     leftHandleLocation = 0
@@ -454,8 +466,8 @@ def scrollToWindow(driver, timeout, p_freq):
     previous_handle = rightHandleLocation
 
     for i in range(2): # for kmeans
-        c_begin = int(handleWindow * (85 / 100)) + leftHandleLocation
-        c_end = int(handleWindow * (86 / 100)) + leftHandleLocation
+        c_begin = int(handleWindow * (84 / 100)) + leftHandleLocation
+        c_end = int(handleWindow * (85 / 100)) + leftHandleLocation
         for each_hover in hoverTarget:
             parent_element = each_hover.find_element(By.XPATH, "..")
             start = each_hover.location
@@ -469,7 +481,7 @@ def scrollToWindow(driver, timeout, p_freq):
             startTimer = round(time.time() * 1000000)
             WebDriverWait(driver, timeout=timeout, poll_frequency=p_freq).until(GanttLoadingVisible())
             endTimer = round(time.time() * 1000000)
-            brush_percentage = int(abs(previous_handle - current_handle) / handleWindow * 100.0)
+            # brush_percentage = int(abs(previous_handle - current_handle) / handleWindow * 100.0)
             # print(str(iteration_count), str(brush_percentage), str(endTimer - startTimer), sep=",")
             # print('Iteration', '{:2d}'.format(iteration_count), end=' ')
             # print('Brush percentage', '{:3d}%'.format(brush_percentage), end=' ')
@@ -480,8 +492,7 @@ def scrollToWindow(driver, timeout, p_freq):
 def conductRandomClicking(driver, timeout, p_freq, TOTAL_SAMPLE, base_params, qt):
     scrollToWindow(driver, timeout, p_freq)
     # zoom out in the gantt y axis to reveal all locations
-    ganttYScroller = driver.find_element(By.CLASS_NAME, "yAxisScrollCapturer")
-    wheel_element(ganttYScroller, -150)
+    # ganttYScroller = driver.find_element(By.CLASS_NAME, "yAxisScrollCapturer")
     # wheel_element(ganttYScroller, -150)
 
     ganttEventCapturerElement = driver.find_elements(By.XPATH, "//*[@class='eventCapturer']")[0]
@@ -493,43 +504,35 @@ def conductRandomClicking(driver, timeout, p_freq, TOTAL_SAMPLE, base_params, qt
     i = 1
 
     print("iteration,x,y,total drawing time (micros)")
-    isBlank = True
     while(True):
-        if i >= TOTAL_SAMPLE:
+        if i > TOTAL_SAMPLE:
             break
         tx = random.randint(x_bounds[0], x_bounds[1])
         ty = random.randint(y_bounds[0], y_bounds[1])
         ntx = tx
         nty = ty
-        while(True):
+        for ctr in range(8):
             action.move_to_element_with_offset(ganttEventCapturerElement, ntx, nty).click().perform()
             startTimer = round(time.time() * 1000000)
             WebDriverWait(driver, timeout=timeout, poll_frequency=p_freq).until(GanttLoadingVisible())
-            endTimer = round(time.time() * 1000000)            
-            #i = i + 1
-            #break
+            endTimer = round(time.time() * 1000000)
+            time.sleep(2)
             if(checkClickValidity(driver, timeout, p_freq, ntx, nty)):
-                if(isBlank is True):
-                    isBlank = False
-                    print(str(i), str(ntx), str(nty), str(endTimer - startTimer), sep=",")
-                    # if i == 1:
-                    #     time.sleep(3)
-                    #     conductPNGOutput(driver, base_params, qt)
-                    i = i + 1
+                print(str(i), str(ntx), str(nty), str(endTimer - startTimer), sep=",")
+                if i == 1:
+                    conductPNGOutput(driver, base_params, qt)
+                i = i + 1
                 break
             else:
                 # print("not found", ntx, nty, i)
-                isBlank = True
-                for ctr in range(8):
-                    rtx, rty = getNextCircularPoint(ntx - tx, nty - ty)
-                    ntx = tx + rtx
-                    nty = ty + rty
-                    if x_bounds[0] <= ntx <= x_bounds[1] and y_bounds[0] <= nty <= y_bounds[1]:
-                        break
-                break
+                rtx, rty = getNextCircularPoint(ntx - tx, nty - ty)
+                ntx = tx + rtx
+                nty = ty + rty
+                if x_bounds[0] <= ntx <= x_bounds[1] and y_bounds[0] <= nty <= y_bounds[1]:
+                    break
                     
 
-    print("successfully run the profiling on", driver.title)
+    # print("successfully run the profiling on", driver.title)
 
 def conductBrushing(driver, timeout, p_freq, TOTAL_SAMPLE):
     time.sleep(3)
@@ -668,7 +671,7 @@ def conductPNGOutput(driver, params, qt):
             primitive_string = primitive_string.replace(char, '_')
     exported_file_name = params['exportLocation'] + "/" + params['dataset'] + "_" + qt + "_" + params['prfiledDS'] + "_" + params['hrd'] + primitive_string + "_gantt.png"
     ganttEventCapturerElement.screenshot(exported_file_name)
-    print("Saved screenshot from of the Gantt chart at: ", exported_file_name)
+    # print("Saved screenshot from of the Gantt chart at: ", exported_file_name)
 
 def conductFixedScrolling(driver, timeout, p_freq, TOTAL_SAMPLE):
     time.sleep(3)
@@ -805,7 +808,7 @@ if __name__ == '__main__':
         # conductFixedScrolling(driver, timeout, p_freq, TOTAL_SAMPLE)
         # time.sleep(3000)
         if QUERY_TYPE == 'window' or QUERY_TYPE == 'cond':
-            # conductPNGOutput(driver, base_params, QUERY_TYPE)
+            conductPNGOutput(driver, base_params, QUERY_TYPE)
             conductBrushing(driver, timeout, p_freq, TOTAL_SAMPLE)
         elif QUERY_TYPE == 'attribute':
             conductRandomClicking(driver, timeout, p_freq, TOTAL_SAMPLE, base_params, QUERY_TYPE)

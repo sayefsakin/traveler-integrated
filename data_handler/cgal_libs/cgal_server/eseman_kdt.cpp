@@ -159,6 +159,12 @@ string EseManKDT::constructKDTPerTrack(size_t start_index, size_t end_index, siz
                 mid_index = i+1;
             }
         }
+        if(mid_index >= end_index) {
+            saveNodeToLMDB(cur_node);
+            result_uuid = cur_node->uuid;
+            delete cur_node;
+            return result_uuid;
+        }
         PRINTLOG("MAX-DISTANCE Rule");
     } else if(splitting_rule == "FAIR") {
         mid_index = start_index + (end_index + 1 - start_index) / 2;
@@ -397,11 +403,11 @@ LocDict EseManKDT::binnedRangeQuery(int64_t time_begin,
             continue;
         }
         nodes_visited = 0;
-        // EsemanNode* t_node = checkHotNodes(time_begin, time_end, track_index);
+        EsemanNode* t_node = checkHotNodes(time_begin, time_end, track_index);
 #ifdef _DEBUG
             chrono::steady_clock::time_point track_clock_begin = chrono::steady_clock::now();
 #endif
-        locDict[stol(loc)] = binnedRangeQueryPerTrack(time_begin, time_end, track_index, bins, nullptr);
+        locDict[stol(loc)] = binnedRangeQueryPerTrack(time_begin, time_end, track_index, bins, t_node);
 #ifdef _DEBUG
         chrono::steady_clock::time_point track_clock_end = chrono::steady_clock::now();
 #endif

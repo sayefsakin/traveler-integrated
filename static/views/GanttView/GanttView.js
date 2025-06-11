@@ -389,82 +389,90 @@ class GanttView extends ZoomableTimelineView { // abstracts a lot of common logi
       var sUtilGrayCount = 0;
       var tUtilBlackCount = 0;
       var tUtilGrayCount = 0;
-      var isGrayDraw = false;
-      var isBlackDraw = false;
-      var isPendingBlackDraw = -1;
       let blackStack = [];
+      let grayStack = [];
+      let yellowStack = [];
+      let lightYellowStack = [];
+      
       for (const [binNo, tUtil] of data.entries()) {
         const sUtil = selectionUtilization?.locations?.[location]?.[binNo];
-        // Which border to draw (if any)?
+
         if (sUtil > 0) {
           sUtilGrayCount += 1;
-          isGrayDraw = true;
-        } else if (tUtil > 0) {
-          tUtilGrayCount += 1;
-          isGrayDraw = true;
         } else {
-          if (isGrayDraw) {
-            drawGrayBars (binNo, y0, bandwidth, sUtilGrayCount, tUtilGrayCount, false);
-            if(isPendingBlackDraw > -1) {
-              blackStack.push([isPendingBlackDraw, sUtilBlackCount, tUtilBlackCount]);
-              isPendingBlackDraw = -1;
-              sUtilBlackCount = 0;
-              tUtilBlackCount = 0;
-            }
-            while (blackStack.length > 0) {
-              const [a, b, c] = blackStack.pop();
-              drawGrayBars (a, y0, bandwidth, b, c, true);
-            }
-            isGrayDraw = false;
+          if(sUtilGrayCount > 0) {
+            lightYellowStack.push([binNo, sUtilGrayCount, 0]);
             sUtilGrayCount = 0;
+          }
+        }
+
+        if (tUtil > 0) {
+          tUtilGrayCount += 1;
+        } else {
+          if(tUtilGrayCount > 0) {
+            grayStack.push([binNo, 0, tUtilGrayCount]);
             tUtilGrayCount = 0;
           }
         }
 
-        // Which fill to draw (if any)?
         if (sUtil >= 1) {
-          if(isPendingBlackDraw > -1) {
-            blackStack.push([isPendingBlackDraw, sUtilBlackCount, tUtilBlackCount]);
-            isPendingBlackDraw = -1;
-            sUtilBlackCount = 0;
-            tUtilBlackCount = 0;
-          }
           sUtilBlackCount += 1;
-          isBlackDraw = true;
-        } else if (tUtil >= 1) {
-          if(isPendingBlackDraw > -1) {
-            blackStack.push([isPendingBlackDraw, sUtilBlackCount, tUtilBlackCount]);
-            isPendingBlackDraw = -1;
-            sUtilBlackCount = 0;
-            tUtilBlackCount = 0;
-          }
-          tUtilBlackCount += 1;
-          isBlackDraw = true;
         } else {
-          if (isBlackDraw) {
-            isPendingBlackDraw = binNo;
-            isBlackDraw = false;
+          if(sUtilBlackCount > 0) {
+            yellowStack.push([binNo, sUtilBlackCount, 0]);
+            sUtilBlackCount = 0;
+          }
+        }
+
+        if (tUtil >= 1) {
+          tUtilBlackCount += 1;
+        } else {
+          if(tUtilBlackCount > 0) {
+            blackStack.push([binNo, 0, tUtilBlackCount]);
+            tUtilBlackCount = 0;
           }
         }
       }
-      if (isGrayDraw) {
-        drawGrayBars (data.length, y0, bandwidth, sUtilGrayCount, tUtilGrayCount, false);
-        if(isPendingBlackDraw > -1) {
-          blackStack.push([isPendingBlackDraw, sUtilBlackCount, tUtilBlackCount]);
-          isPendingBlackDraw = -1;
-          sUtilBlackCount = 0;
-          tUtilBlackCount = 0;
-        }
-        while (blackStack.length > 0) {
-          const [a, b, c] = blackStack.pop();
-          drawGrayBars (a, y0, bandwidth, b, c, true);
-        }
-        isGrayDraw = false;
+
+      let binNo = data.length;
+      if(sUtilGrayCount > 0) {
+        lightYellowStack.push([binNo, sUtilGrayCount, 0]);
         sUtilGrayCount = 0;
+      }
+
+      if(tUtilGrayCount > 0) {
+        grayStack.push([binNo, 0, tUtilGrayCount]);
         tUtilGrayCount = 0;
       }
-      if (isBlackDraw) {
-        drawGrayBars (data.length, y0, bandwidth, sUtilBlackCount, tUtilBlackCount, true);
+
+      if(sUtilBlackCount > 0) {
+        yellowStack.push([binNo, sUtilBlackCount, 0]);
+        sUtilBlackCount = 0;
+      }
+
+      if(tUtilBlackCount > 0) {
+        blackStack.push([binNo, 0, tUtilBlackCount]);
+        tUtilBlackCount = 0;
+      }
+
+      while (grayStack.length > 0) {
+        const [a, b, c] = grayStack.pop();
+        drawGrayBars (a, y0, bandwidth, b, c, false);
+      }
+
+      while (lightYellowStack.length > 0) {
+        const [a, b, c] = lightYellowStack.pop();
+        drawGrayBars (a, y0, bandwidth, b, c, false);
+      }
+
+      while (blackStack.length > 0) {
+        const [a, b, c] = blackStack.pop();
+        drawGrayBars (a, y0, bandwidth, b, c, true);
+      }
+
+      while (yellowStack.length > 0) {
+        const [a, b, c] = yellowStack.pop();
+        drawGrayBars (a, y0, bandwidth, b, c, true);
       }
     }
   }
