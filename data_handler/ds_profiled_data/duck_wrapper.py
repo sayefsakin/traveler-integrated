@@ -2,6 +2,7 @@ import json
 import math
 import os
 import duckdb
+import time
 
 class DuckWrapper():
     def __init__(self):
@@ -13,6 +14,7 @@ class DuckWrapper():
             " CAST(enter.Timestamp AS BIGINT) AS enter_timestamp, CAST(leave.Timestamp AS BIGINT) AS leave_timestamp, intervalId, parent, children, 'Parent GUID' AS pg, Location, GUID, Primitive" \
             " FROM read_json(\'" + self.dataset_location + "/" + self.dataset_id + \
             ".json\', auto_detect=true, format=\'array\', maximum_depth=-1, maximum_object_size=2147483648)"
+        priorDBTime = round(time.time() * 1000)
         self.connection.sql(qry)
         # print("Fetching data from DuckDB")
         self.connection.sql("CREATE INDEX IF NOT EXISTS et_idx ON intervals (enter_timestamp)")
@@ -22,6 +24,8 @@ class DuckWrapper():
         # self.connection.sql("SET max_temp_directory_size = '100GB';")
         # print("duckdb database created: " + qry)
         # self.db_agg_test("202591429", "278066359", "5", "50")
+        postDBTimer = round(time.time() * 1000)
+        print("DuckDB database created in " + str(postDBTimer - priorDBTime) + " ms")
 
     def closeConnection(self):
         self.connection.close()

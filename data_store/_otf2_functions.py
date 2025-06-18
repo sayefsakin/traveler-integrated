@@ -73,9 +73,10 @@ async def processOtf2(self, datasetId, file, log=logToConsole):
     await self.combineIntervals(datasetId, log)
     gc.collect()
     await self.buildIntervalTree(datasetId, log)
+    # gc.collect()
+    # await self.connectIntervals(datasetId, log)
     gc.collect()
-    await self.connectIntervals(datasetId, log)
-    gc.collect()
+    priorSparseTime = round(time.time() * 1000)
     await self.buildSparseUtilizationLists(datasetId, log)
     # gc.collect()
     # await self.buildDependencyTree(datasetId, log)
@@ -83,8 +84,10 @@ async def processOtf2(self, datasetId, file, log=logToConsole):
     self.finishLoadingSourceFile(datasetId, file.name)
 
     postBuildTime = round(time.time() * 1000)
-    totalBuildTime = postBuildTime - priorBuildTime
+    totalBuildTime = priorSparseTime - priorBuildTime
+    totalSATBuildTime = postBuildTime - priorBuildTime
     print('Construction time: ', totalBuildTime, 'ms')
+    print('SAT Construction time: ', totalSATBuildTime, 'ms')
 
 async def processRawTrace(self, datasetId, file, log):
     # Set up database file for procMetrics
@@ -158,8 +161,8 @@ async def processRawTrace(self, datasetId, file, log):
                 # Add to primitive / guid counts
                 newR += counts[0]
                 seenR += counts[1]
-                if numEvents > 1000000:# 502174: # 8000000:
-                    break
+                # if numEvents > 1000000:# 502174: # 8000000:
+                #     break
             currentEvent = {'metrics': {}}
             currentEvent['Event'] = eventLineMatch.group(1)
             currentEvent['Location'] = eventLineMatch.group(2)
