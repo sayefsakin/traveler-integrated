@@ -4,15 +4,15 @@ CC = g++
 # compiler flags:
 #  -g     - this flag adds debugging information to the executable file
 #  -Wall  - this flag is used to turn on most compiler warnings
-CFLAGS  = -g -Wall -Ofast -march=native -mtune=native -flto -funroll-loops -fno-plt #-O3 #-D_DEBUG
+CFLAGS  = -g -Wall -Ofast -march=native -mtune=native -flto=auto -funroll-loops -fno-plt #-O3 #-D_DEBUG
 
 AGC_CFLAGS = -Wall -g -DNO_INCLUDE_FENV
-LDFLAGS = -lstdc++ -llmdb
+LDFLAGS = -L /uufs/chpc.utah.edu/common/home/u1447409/lmdb_testing/lmdb/lib
 
 # The build target 
 TARGET = Server
 CGAL_SERVER = cgal_data_server
-INCLUDE = -I./rapidjson/include
+INCLUDE = -I./rapidjson/include -I/uufs/chpc.utah.edu/common/home/u1447409/lmdb_testing/lmdb/include
 
 CLIENT = Client
 CGET = curl_get
@@ -28,7 +28,7 @@ DATASET_ID ?= $(KMEANS_ID)
 
 all: $(CGAL_SERVER).cpp $(AGC).cpp $(ESEMAN).cpp fastcluster.o
 	$(RM) $(CGAL_SERVER)
-	$(CC) $(CFLAGS) -o $(CGAL_SERVER) $(CGAL_SERVER).cpp $(CGET).cpp $(OBKDT).cpp $(AGC).cpp $(ESEMAN).cpp fastcluster.o $(INCLUDE) -lcurl -llmdb
+	$(CC) $(CFLAGS) -o $(CGAL_SERVER) $(CGAL_SERVER).cpp $(CGET).cpp $(AGC).cpp $(ESEMAN).cpp fastcluster.o $(INCLUDE) $(LDFLAGS) -lcurl -llmdb
 #	./$(CGAL_SERVER) $(DATASET_ID) false
 
 $(AGC): $(AGC).cpp fastcluster.o
