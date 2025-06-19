@@ -42,11 +42,11 @@ echo "Running experiment with iterations: $TOTAL_SAMPLE"
 echo "======================================"
 
 
-traveler_base_directory="/uufs/chpc.utah.edu/common/home/u1447409/Documents/traveler-integrated"
-profile_directory="/uufs/chpc.utah.edu/common/home/u1447409/Documents/LDAV25Data"
-python_env_directory="/uufs/chpc.utah.edu/common/home/u1447409/public_html/traveler-integrated/env"
-export DATASET_LOCATION="/uufs/chpc.utah.edu/common/home/u1447409/all_data/json_data"
-traveler_discache_location="/uufs/chpc.utah.edu/common/home/u1447409/all_data/"${dataset_names[$DATASET_ID]}
+traveler_base_directory="/home/sci/sayefsakin/traveler-integrated"
+profile_directory="/home/sci/sayefsakin/traveler-benchmarks"
+python_env_directory="/home/sci/sayefsakin/installed_programs/env"
+export DATASET_LOCATION="/home/sci/sayefsakin/all_data/json_data"
+traveler_discache_location="/home/sci/sayefsakin/all_data/"${dataset_names[$DATASET_ID]}
 
 LOCALHOST_URL="http://localhost:8000"
 # LONEPEAK_URL="http://lonepeak2:8000"
@@ -54,7 +54,7 @@ LONEPEAK_URL="http://"$(hostname)":8000"
 export BASE_URL=$LONEPEAK_URL
 
 # this is where eseman stores lmdb files
-export LMDB_DATA_BACKUP_LOCATION="/uufs/chpc.utah.edu/common/home/u1447409/Documents/lmdb_dataset_backups"
+export LMDB_DATA_BACKUP_LOCATION="/home/sci/sayefsakin/lmdb_dataset_backups"
 export LMDB_DATABASE_TOTAL_SIZE=$((2*1000*1000*1000))
 # 20971520, 50GB
 
@@ -96,7 +96,7 @@ cgal(){
   echo "Writing CGAL server output to file: "$cgal_watch
   cd $traveler_base_directory"/data_handler/cgal_libs/cgal_server"
   rm -f "cgal_server_check"
-  LD_LIBRARY_PATH=~/lmdb_testing/lmdb/lib ./cgal_data_server $DATASET_ID false > $cgal_watch &
+  LD_LIBRARY_PATH=~/installed_programs/lmdb/lib ./cgal_data_server $DATASET_ID false > $cgal_watch &
   while true; do
     if [ -f "cgal_server_check" ]; then
         break;
@@ -117,7 +117,7 @@ build_lmdb(){
   cgal_watch=$profile_directory"/"$PROFILED_DS"_"$DATASET_ID"_cgal_check_build_"$ESEMAN_TASK_ID
   echo "Writing CGAL server output to file: "$cgal_watch
   cd $traveler_base_directory"/data_handler/cgal_libs/cgal_server"
-  LD_LIBRARY_PATH=~/lmdb_testing/lmdb/lib ./cgal_data_server $DATASET_ID true > $cgal_watch
+  LD_LIBRARY_PATH=~/installed_programs/lmdb/lib ./cgal_data_server $DATASET_ID true > $cgal_watch
   export CGAL_PROCESS_ID=`ps -u $USER | grep cgal_data_serve | awk '{print $1}'`
   sleep 1
 }
@@ -222,7 +222,6 @@ prepare_and_merge_files(){
   cd ..;
 
   cp $serve_watch $DATASET_ID;
-  mv *.png $DATASET_ID;
 
   if [[ $PROFILED_DS == $KDT || $PROFILED_DS == $AGC || $PROFILED_DS == $ESEMAN ]]; then
     linenumber=$(grep -n "Server is now listening" "$cgal_watch" | head -n 1 | cut -d: -f1);

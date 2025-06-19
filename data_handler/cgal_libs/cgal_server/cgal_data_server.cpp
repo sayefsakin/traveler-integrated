@@ -55,8 +55,7 @@ void sendOverTheSocket(int new_socket, const char *json){
 }
 
 Document rcvOverTheSocket(int new_socket){
-    char *buffer;
-    buffer = (char *)malloc(MSG_SIZE_IN_BYTE);
+    char* buffer = new char[MSG_SIZE_IN_BYTE];
     ssize_t bytes_read = read(new_socket, buffer, MSG_SIZE_IN_BYTE);
     if (bytes_read < 0) {
         free(buffer);

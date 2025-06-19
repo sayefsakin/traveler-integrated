@@ -20,6 +20,9 @@ from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 import requests
 import json
 
+from skimage.io import imread
+from skimage.metrics import structural_similarity as ssim
+
 #if __name__ == '__main__':
 #
 #    url = "https://scrapeme.live/shop/" 
@@ -426,6 +429,42 @@ class SelectionEelmentNotStale():
             return False
         return False
 
+def compare_images(imageA, imageB):
+    # Load the two PNG images (convert to grayscale for SSIM)
+    image1 = imread(imageA, as_gray=True)
+    image2 = imread(imageB, as_gray=True)
+
+    # Compute SSIM
+    score, diff = ssim(image1, image2, full=True, data_range=1.0)
+    return score
+
+def getPNGFileName(params, qt, iteration, isRaw=False):
+    primitive_string = ''
+    if 'SELECTED_PRIMITIVE' in params and params['SELECTED_PRIMITIVE'] != '':
+        primitive_string = '_' + params['SELECTED_PRIMITIVE']
+        for char in '\/:*?"<>|':
+            primitive_string = primitive_string.replace(char, '_')
+
+    ds_name = params['prfiledDS']
+    if isRaw:
+        ds_name = "db_duck_raw"
+    exported_file_name = params['exportLocation'] + "/" + params['dataset'] + "/figures/" \
+                        + str(iteration) \
+                        + "_" + params['dataset'] \
+                        + "_" + qt \
+                        + "_" + ds_name \
+                        + "_" + params['hrd'] \
+                        + primitive_string + "_gantt.png"
+    return exported_file_name
+
+def calcSSIM(params, qt, iteration):
+    exported_file_name_1 = getPNGFileName(params, qt, iteration, False)
+    exported_file_name_2 = getPNGFileName(params, qt, iteration, True)
+    if not os.path.exists(exported_file_name_1) or not os.path.exists(exported_file_name_2):
+        print("PNG files do not exist for SSIM calculation:", exported_file_name_1, exported_file_name_2)
+        return -1.0
+    return compare_images(exported_file_name_1, exported_file_name_2)
+
 def checkClickValidity(driver, timeout, p_freq, tx, ty):
     selection_text = WebDriverWait(driver, timeout=timeout, poll_frequency=p_freq).until(SelectionEelmentNotStale())
     if selection_text == "Interval Selection:":
@@ -534,14 +573,34 @@ def conductRandomClicking(driver, timeout, p_freq, TOTAL_SAMPLE, base_params, qt
 
     # print("successfully run the profiling on", driver.title)
 
-def conductBrushing(driver, timeout, p_freq, TOTAL_SAMPLE):
-    time.sleep(3)
-    domain_window = 90
-    # zoom out in the gantt y axis to reveal all locations
-    # ganttYScroller = driver.find_element(By.CLASS_NAME, "yAxisScrollCapturer")
-    # wheel_element(ganttYScroller, -150)
+def increaseGanttWindow(driver, timeout, p_freq):
+    utilView = driver.find_elements(By.XPATH, "//*[@class='GLView UtilizationView']")
+    height = 100
+    if utilView:
+        height = utilView[0].size['height']
+    else:
+        return
+    height = 2 / 3 * height * (-1)
+    dragTarget = driver.find_elements(By.XPATH, "//*[@class='lm_splitter lm_vertical']")
+    for drag_target in dragTarget:
+        action = ActionChains(driver)
+        action.click_and_hold(drag_target)\
+              .move_by_offset(0, height)\
+              .release()\
+              .perform()
+        time.sleep(5)
+        WebDriverWait(driver, timeout=timeout, poll_frequency=p_freq).until(GanttLoadingVisible())
 
-    # element = WebDriverWait(driver, timeout=timeout, poll_frequency=p_freq).until(UtilizationLoadingVisible())
+def conductBrushing(driver, timeout, p_freq, TOTAL_SAMPLE, qt):
+    time.sleep(3)
+    increaseGanttWindow(driver, timeout, p_freq)
+    
+    # zoom out in the gantt y axis to reveal all locations
+    ganttYScroller = driver.find_element(By.CLASS_NAME, "yAxisScrollCapturer")
+    wheel_element(ganttYScroller, -150)
+    time.sleep(5)
+    WebDriverWait(driver, timeout=timeout, poll_frequency=p_freq).until(GanttLoadingVisible())
+
     hoverTarget = driver.find_elements(By.XPATH, "//*[@class='hoverTarget']")
     rightHandleLocation = 0
     leftHandleLocation = 0
@@ -560,7 +619,7 @@ def conductBrushing(driver, timeout, p_freq, TOTAL_SAMPLE):
     inp_measurer = INPMeasurer(driver)
     inp_measurer.setup_inp_observer()
 
-    print("iteration,brush percentage,total drawing time (micros), inp (micros)")
+    print("iteration,brush percentage,total drawing time (micros),inp (micros),ssim")
     random.seed(10)
     for i in range(int(TOTAL_SAMPLE/2)):
         # c_begin = random.randint(leftHandleLocation, int(handleWindow * (domain_window / 100)) + leftHandleLocation)
@@ -598,7 +657,9 @@ def conductBrushing(driver, timeout, p_freq, TOTAL_SAMPLE):
                 if inp['name'] == 'pointerdown':
                     inp_results = inp['duration']
 
-            print(str(iteration_count), str(brush_percentage), str(endTimer - startTimer), str(int(inp_results)), sep=",")
+            conductPNGOutput(driver, base_params, qt, iteration_count)
+            ssim = calcSSIM(base_params, qt, iteration_count)
+            print(str(iteration_count), str(brush_percentage), str(endTimer - startTimer), str(int(inp_results)), f"{ssim:.3f}", sep=",")
             time.sleep(1)
             # print('Iteration', '{:2d}'.format(iteration_count), end=' ')
             # print('Brush percentage', '{:3d}%'.format(brush_percentage), end=' ')
@@ -608,7 +669,7 @@ def conductBrushing(driver, timeout, p_freq, TOTAL_SAMPLE):
 
     # print("successfully run the profiling on", driver.title)
 
-def conductPNGOutput(driver, params, qt):
+def conductPNGOutput(driver, params, qt, iteration=1):
     loading_elem = driver.find_elements(By.XPATH, "//*[@class='scrollArea GLView SelectionInfoView']")
     json_data = {}
     for each_element in loading_elem:
@@ -664,12 +725,7 @@ def conductPNGOutput(driver, params, qt):
             WebDriverWait(driver, timeout=timeout, poll_frequency=p_freq).until(GanttLoadingVisible())
 
     ganttEventCapturerElement = driver.find_elements(By.XPATH, "//*[@class='GLView ZoomableTimelineView']")[0]
-    primitive_string = ''
-    if 'SELECTED_PRIMITIVE' in params and params['SELECTED_PRIMITIVE'] != '':
-        primitive_string = '_' + params['SELECTED_PRIMITIVE']
-        for char in '\/:*?"<>|':
-            primitive_string = primitive_string.replace(char, '_')
-    exported_file_name = params['exportLocation'] + "/" + params['dataset'] + "_" + qt + "_" + params['prfiledDS'] + "_" + params['hrd'] + primitive_string + "_gantt.png"
+    exported_file_name = getPNGFileName(params, qt, iteration, False)
     ganttEventCapturerElement.screenshot(exported_file_name)
     # print("Saved screenshot from of the Gantt chart at: ", exported_file_name)
 
@@ -744,31 +800,32 @@ if __name__ == '__main__':
     url = "https://stackoverflow.com"
     options = webdriver.ChromeOptions()
     options.add_argument('--headless')
+    options.add_argument("--window-size=3840,2160")
     options.add_argument("--start-maximized") # open Browser in maximized mode
     #options.add_argument("disable-infobars") # disabling infobars
     # options.add_argument("--disable-extensions") # disabling extensions
     # options.add_argument("--disable-gpu") # applicable to windows os only
     # options.add_argument("--disable-dev-shm-usage") # overcome limited resource problems
-    # options.add_argument("--no-sandbox") # Bypass OS security model
+    options.add_argument("--no-sandbox") # Bypass OS security model
     # options.add_argument("--remote-debugging-port=9222")
     #options.add_argument("--incognito")
     options.add_argument('--disable-blink-features=AutomationControlled')
     options.add_argument('--enable-logging')
     options.add_argument('--log-level=0')
 
-    DGEM_ID = 'a9bd20ca-c4f2-4b54-8c49-b968ae7e78be'#'589ca754-ef75-426c-8d51-841cc61dc84a'
+    DGEM_ID = 'ecc21d0a-112a-4b52-8cdd-6aca80adde93'#'589ca754-ef75-426c-8d51-841cc61dc84a'
     KMEANS_ID = 'faf17535-2f66-4621-995f-49c7dbd84e8b'
     LULESH_ID = '772c7330-d4eb-485b-866a-3b315063f9af'
 
     base_params = {
-        'dataset': os.getenv('DATASET_ID', KMEANS_ID),
+        'dataset': os.getenv('DATASET_ID', DGEM_ID),
         'baseUrl': os.getenv('BASE_URL', "http://localhost:8000"),
-        'prfiledDS': os.getenv('PROFILED_DS', "eseman_kdt"),
+        'prfiledDS': os.getenv('PROFILED_DS', "summed_area_table"),
         'hrd': os.getenv('HORIZONTAL_RESOLUTION_DIVISOR', "1"),
         'exportLocation': "."
     }
     TOTAL_SAMPLE = int(os.getenv('TOTAL_SAMPLE', 10))
-    QUERY_TYPE = os.getenv('QUERY_TYPE', 'attribute')
+    QUERY_TYPE = os.getenv('QUERY_TYPE', 'window')
     if len(sys.argv) > 1:
         base_params['exportLocation'] = sys.argv[1]
     if len(sys.argv) > 2:
@@ -781,7 +838,7 @@ if __name__ == '__main__':
     p_freq = 0.001  # in seconds
 
     # Define paths
-    user_home_dir = os.path.expanduser("/uufs/chpc.utah.edu/common/home/u1447409/selenium_testing/newdrivertest")
+    user_home_dir = os.path.expanduser("/home/sci/sayefsakin/installed_programs/selenium_driver")
     chrome_binary_path = os.path.join(user_home_dir, "chrome-linux64", "chrome")
     chromedriver_path = os.path.join(user_home_dir, "chromedriver-linux64", "chromedriver")
 
@@ -808,8 +865,7 @@ if __name__ == '__main__':
         # conductFixedScrolling(driver, timeout, p_freq, TOTAL_SAMPLE)
         # time.sleep(3000)
         if QUERY_TYPE == 'window' or QUERY_TYPE == 'cond':
-            conductPNGOutput(driver, base_params, QUERY_TYPE)
-            conductBrushing(driver, timeout, p_freq, TOTAL_SAMPLE)
+            conductBrushing(driver, timeout, p_freq, TOTAL_SAMPLE, QUERY_TYPE)
         elif QUERY_TYPE == 'attribute':
             conductRandomClicking(driver, timeout, p_freq, TOTAL_SAMPLE, base_params, QUERY_TYPE)
         # elif QUERY_TYPE == 'cond':
