@@ -448,7 +448,10 @@ def getPNGFileName(params, qt, iteration, isRaw=False):
     ds_name = params['prfiledDS']
     if isRaw:
         ds_name = "db_duck_raw"
-    exported_file_name = params['exportLocation'] + "/" + params['dataset'] + "/figures/" \
+    hrds = ''
+    if params['hrd'] != '1':
+        hrds = params['hrd'] + "_"
+    exported_file_name = params['exportLocation'] + "/" + hrds + params['dataset'] + "/figures/" \
                         + str(iteration) \
                         + "_" + params['dataset'] \
                         + "_" + qt \
@@ -839,6 +842,7 @@ if __name__ == '__main__':
 
     # Define paths
     user_home_dir = os.path.expanduser("/home/sci/sayefsakin/installed_programs/selenium_driver")
+    # user_home_dir = os.path.expanduser("/home/sayefsakin/selenium_testing")
     chrome_binary_path = os.path.join(user_home_dir, "chrome-linux64", "chrome")
     chromedriver_path = os.path.join(user_home_dir, "chromedriver-linux64", "chromedriver")
 

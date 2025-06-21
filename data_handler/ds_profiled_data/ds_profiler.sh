@@ -123,6 +123,17 @@ build_lmdb(){
 }
 
 profile_window_query(){
+  cd $profile_directory;
+
+  HRDS='';
+  if [[ $HORIZONTAL_RESOLUTION_DIVISOR -ne 1 ]]; then
+    HRDS=$HORIZONTAL_RESOLUTION_DIVISOR"_";
+  fi
+  NDDIR=$HRDS$DATASET_ID;
+  mkdir -p $NDDIR;
+  cd $NDDIR;
+  mkdir -p "figures";
+
   selenium_watch=$profile_directory"/"$PROFILED_DS"_"$QUERY_TYPE"_selenium_check"
   echo "Running the window profiler."
   cd $traveler_base_directory"/data_handler/ds_profiled_data"
@@ -140,11 +151,21 @@ profile_attribute_query(){
 }
 
 profile_cond_query(){
+  cd $profile_directory;
+  
+  HRDS='';
+  if [[ $HORIZONTAL_RESOLUTION_DIVISOR -ne 1 ]]; then
+    HRDS=$HORIZONTAL_RESOLUTION_DIVISOR"_";
+  fi
+  NDDIR=$HRDS$DATASET_ID;
+  mkdir -p $NDDIR;
+  cd $NDDIR;
+  mkdir -p "figures";
+
   selenium_watch=$profile_directory"/"$PROFILED_DS"_"$QUERY_TYPE"_selenium_check"
   echo "Running the cond profiler."
   cd $traveler_base_directory"/data_handler/ds_profiled_data"
   export QUERY_TYPE=$Q_CONDW
-  export SELECTED_PRIMITIVE="/phylanx\$0/__add\$0/1\$45\$8"
   python3 headless_test.py $profile_directory | tee $selenium_watch
 }
 
@@ -212,25 +233,30 @@ killing_all_processes(){
 
 prepare_and_merge_files(){
   cd $profile_directory;
-#  rm -rf $DATASET_ID;
+  
+  HRDS='';
+  if [[ $HORIZONTAL_RESOLUTION_DIVISOR -ne 1 ]]; then
+    HRDS=$HORIZONTAL_RESOLUTION_DIVISOR"_";
+  fi
+  NDDIR=$HRDS$DATASET_ID;
 
   sed -i '/Serving on localhost:8000/d' $serve_watch;
 
-  mkdir -p $DATASET_ID;
-  cd $DATASET_ID;
+  mkdir -p $NDDIR;
+  cd $NDDIR;
   rm -f "$PROFILED_DS"_"$QUERY_TYPE"_*;
   cd ..;
 
-  cp $serve_watch $DATASET_ID;
+  cp $serve_watch $NDDIR;
 
   if [[ $PROFILED_DS == $KDT || $PROFILED_DS == $AGC || $PROFILED_DS == $ESEMAN ]]; then
     linenumber=$(grep -n "Server is now listening" "$cgal_watch" | head -n 1 | cut -d: -f1);
     sed -i "1,${linenumber}d" "$cgal_watch";
     sed -i '$d' $cgal_watch;
-    cp $cgal_watch $DATASET_ID;
+    cp $cgal_watch $NDDIR;
   fi
 
-  cd $DATASET_ID;
+  cd $NDDIR;
 #  rm -f *_selenium_check;
   paste -d , "$PROFILED_DS"_"$QUERY_TYPE"_* > "$PROFILED_DS"_"$QUERY_TYPE"_merged.csv;
   cp $selenium_watch ./;
