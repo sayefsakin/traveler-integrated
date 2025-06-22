@@ -127,7 +127,7 @@ string EseManKDT::constructKDTPerTrack(size_t start_index, size_t end_index, siz
         return result_uuid;
     }
 
-    string splitting_rule("MAX-DISTANCE");
+    string splitting_rule("FAIR");
     char* ntask_str = getenv("ESEMAN_SPLITTING_RULE");
     if(ntask_str != NULL) splitting_rule = string(ntask_str);
 
@@ -205,6 +205,209 @@ string EseManKDT::constructKDTPerTrack(size_t start_index, size_t end_index, siz
         }
     }
     
+    saveNodeToLMDB(cur_node);
+    result_uuid = cur_node->uuid;
+    delete cur_node;
+    return result_uuid;
+}
+
+// This is following only the sliding midpoint rule.
+string EseManKDT::constructTwoDKDT(double start_time, double end_time, size_t start_track, size_t end_track, int depth) {
+    string result_uuid("");
+    if (start_track < 0 || end_track < 0 
+        || start_track >= event_tracks.size() || end_track >= event_tracks.size() 
+        || start_track > end_track || start_time > end_time) return result_uuid;
+
+    if (start_track == end_track) {
+        // If only one track, construct KDT for that track
+        auto& data_vector = event_data_values[start_track];
+        auto cmp_start = [this](const EventDict& dict, double t) { return getEventTime(dict) < t; };
+
+        auto start_it = std::lower_bound(data_vector.begin(), data_vector.end(), start_time, cmp_start);
+        auto end_it = std::lower_bound(data_vector.begin(), data_vector.end(), end_time, cmp_start);
+
+        size_t start_index = std::distance(data_vector.begin(), start_it);
+        size_t end_index = std::distance(data_vector.begin(), end_it);
+
+        if (start_index > end_index || start_index >= data_vector.size() || end_index >= data_vector.size() || end_index == 0) {
+            return result_uuid;
+        }
+        EsemanNode* cur_node = nullptr;
+        if (start_index % 2 == 1) { // odd index
+            if (getEventTime(data_vector[start_index]) < start_time) start_index++;
+            else {
+                // create here a split node from start_time to start_index.time as a left child and the rest as a right child
+                cur_node = new EsemanNode(start_time, end_time, start_track);
+
+                EsemanNode* l_node = new EsemanNode(start_time, getEventTime(data_vector[start_index]), start_track);
+                for (const auto& [key, indexes] : data_vector[start_index]) {
+                    if (key == "time") continue;
+                    size_t attr_index = event_data_attributes[key].get_track_index(get<string>(indexes));
+                    l_node->addAttribute(key, attr_index);
+                }
+                saveNodeToLMDB(l_node);
+                cur_node->left_child = l_node->uuid;
+                delete l_node;
+
+                start_index++;
+                cur_node->right_child = constructKDTPerTrack(start_index, end_index, start_track);
+            }
+        } else { // even index
+            if (getEventTime(data_vector[start_index]) < start_time) {
+                // create here a split node from start_time to start_index+1.time as a left child and the rest as a right child
+                cur_node = new EsemanNode(start_time, end_time, start_track);
+
+                EsemanNode* l_node = new EsemanNode(start_time, getEventTime(data_vector[start_index+1]), start_track);
+                for (const auto& [key, indexes] : data_vector[start_index+1]) {
+                    if (key == "time") continue;
+                    size_t attr_index = event_data_attributes[key].get_track_index(get<string>(indexes));
+                    l_node->addAttribute(key, attr_index);
+                }
+                saveNodeToLMDB(l_node);
+                cur_node->left_child = l_node->uuid;
+                delete l_node;
+
+                start_index++;
+                cur_node->right_child = constructKDTPerTrack(start_index+1, end_index, start_track);
+            } else {
+                // do nothing
+            }
+        }
+
+        if (end_index % 2 == 1) { // odd index
+            if (getEventTime(data_vector[end_index]) > end_time) {
+                // create here a split node from end_index-1.time to end_time as a right child and the rest as a left child
+                cur_node = new EsemanNode(start_time, end_time, start_track);
+
+                EsemanNode* r_node = new EsemanNode(getEventTime(data_vector[end_index-1]), end_time, start_track);
+                for (const auto& [key, indexes] : data_vector[end_index-1]) {
+                    if (key == "time") continue;
+                    size_t attr_index = event_data_attributes[key].get_track_index(get<string>(indexes));
+                    r_node->addAttribute(key, attr_index);
+                }
+                saveNodeToLMDB(r_node);
+                cur_node->right_child = r_node->uuid;
+                delete r_node;
+
+                end_index--;
+                cur_node->left_child = constructKDTPerTrack(start_index, end_index-1, start_track);
+            }
+            else {
+                // do nothing
+            }
+        } else { // even index
+            if (getEventTime(data_vector[end_index]) > end_time) end_index--;
+            else {
+                // create here a split node from end_index.time to end_time as a right child and the rest as a left child
+                cur_node = new EsemanNode(start_time, end_time, start_track);
+
+                EsemanNode* r_node = new EsemanNode(getEventTime(data_vector[end_index]), end_time, start_track);
+                for (const auto& [key, indexes] : data_vector[end_index]) {
+                    if (key == "time") continue;
+                    size_t attr_index = event_data_attributes[key].get_track_index(get<string>(indexes));
+                    r_node->addAttribute(key, attr_index);
+                }
+                saveNodeToLMDB(r_node);
+                cur_node->right_child = r_node->uuid;
+                delete r_node;
+
+                end_index--;
+                cur_node->left_child = constructKDTPerTrack(start_index, end_index, start_track);
+            }
+        }
+
+        if (cur_node) {
+            if (cur_node->hasLeftChild()) {
+                EsemanNode* left_node = loadNodeFromLMDB(cur_node->left_child);
+                if(left_node) {
+                    for (const auto& [key, indexes] : left_node->attribute_lists) {
+                        for (size_t index : indexes) {
+                            cur_node->addAttribute(key, index);
+                        }
+                    }
+                    delete left_node;
+                }
+            }
+            if (cur_node->hasRightChild()) {
+                EsemanNode* right_node = loadNodeFromLMDB(cur_node->right_child);
+                if(right_node) {
+                    for (const auto& [key, indexes] : right_node->attribute_lists) {
+                        for (size_t index : indexes) {
+                            cur_node->addAttribute(key, index);
+                        }
+                    }
+                    delete right_node;
+                }
+            }
+
+            saveNodeToLMDB(cur_node);
+            result_uuid = cur_node->uuid;
+            delete cur_node;
+            return result_uuid;
+        }
+        return constructKDTPerTrack(start_index, end_index, start_track);
+    }
+
+    EsemanNode* cur_node = new EsemanNode(start_time, end_time, start_track);
+    cur_node->end_track = end_track;
+    if(depth % 2 == 0) {
+        double max_start = std::numeric_limits<double>::max();
+        double max_end = 0;
+        for (size_t t = start_track; t <= end_track; ++t) {
+            auto& data_vector = event_data_values[t];
+            auto cmp_start = [this](const EventDict& dict, double tt) { return getEventTime(dict) < tt; };
+
+            auto start_it = std::lower_bound(data_vector.begin(), data_vector.end(), start_time, cmp_start);
+            auto end_it = std::lower_bound(data_vector.begin(), data_vector.end(), end_time, cmp_start);
+
+            size_t start_index = std::distance(data_vector.begin(), start_it);
+            size_t end_index = std::distance(data_vector.begin(), end_it);
+
+            // if (start_index > end_index || start_index >= data_vector.size() || end_index >= data_vector.size() || end_index == 0) {
+            // continue;
+            // }
+            if(start_index%2 == 1) max_start = start_time;
+            else max_start = std::min(max_start, getEventTime(data_vector[start_index]));
+
+            if(end_index%2 == 1) max_end = end_time;
+            else if(end_index>0 && start_index+1<end_index) {
+                end_index--;
+                max_end = std::max(max_end, getEventTime(data_vector[end_index]));
+            }
+        }
+        if(max_end > 0) {
+            // Split by time
+            cur_node->left_child = constructTwoDKDT(max_start, std::floor((max_start + max_end ) / 2), start_track, end_track, depth + 1);
+            cur_node->right_child = constructTwoDKDT(std::floor((max_start + max_end ) / 2)+1, max_end, start_track, end_track, depth + 1);
+        }
+    } else {
+        // Split by track
+        cur_node->left_child = constructTwoDKDT(start_time, end_time, start_track, (start_track + end_track) >> 1, depth + 1);
+        cur_node->right_child = constructTwoDKDT(start_time, end_time, ((start_track + end_track) >> 1) + 1, end_track, depth + 1);
+    }
+
+    if (cur_node->hasLeftChild()) {
+        EsemanNode* left_node = loadNodeFromLMDB(cur_node->left_child);
+        if(left_node) {
+            for (const auto& [key, indexes] : left_node->attribute_lists) {
+                for (size_t index : indexes) {
+                    cur_node->addAttribute(key, index);
+                }
+            }
+            delete left_node;
+        }
+    }
+    if (cur_node->hasRightChild()) {
+        EsemanNode* right_node = loadNodeFromLMDB(cur_node->right_child);
+        if(right_node) {
+            for (const auto& [key, indexes] : right_node->attribute_lists) {
+                for (size_t index : indexes) {
+                    cur_node->addAttribute(key, index);
+                }
+            }
+            delete right_node;
+        }
+    }
     saveNodeToLMDB(cur_node);
     result_uuid = cur_node->uuid;
     delete cur_node;
@@ -289,7 +492,8 @@ void EseManKDT::findClusters(int64_t start_t, int64_t end_t, int64_t bin_size,
                 results.push_back(end_time);
             }
             max_depth_reached = std::max(max_depth_reached, current_depth);
-            PRINTLOG("Cluster: " << " Start: " << start_time << ", End: " << end_time << ", Depth: " << current_depth);
+            // PRINTLOG("Cluster: " << " Start: " << start_time << ", End: " << end_time << ", Depth: " << current_depth);
+            PRINTLOG("Cluster: " << " Start: " << start_time << ", End: " << end_time);
             continue;
         }
 
@@ -311,7 +515,7 @@ void EseManKDT::findClusters(int64_t start_t, int64_t end_t, int64_t bin_size,
                 results.push_back(end_time);
             }
             max_depth_reached = std::max(max_depth_reached, current_depth);
-            PRINTLOG("Cluster-Leaf: " << " Start: " << start_time << ", End: " << end_time << ", Depth: " << current_depth);
+            PRINTLOG("Cluster-Leaf: " << " Start: " << start_time << ", End: " << end_time);
             continue;
         }
 
@@ -372,6 +576,147 @@ vector<double> EseManKDT::binnedRangeQueryPerTrack(int64_t time_begin,
     return results;
 }
 
+LocDict EseManKDT::binnedRangeQueryAllTracks(int64_t time_begin, 
+                                            int64_t time_end, 
+                                            size_t track_begin, 
+                                            size_t track_end, uint64_t bins) {
+
+    LocDict locDict;
+    uint64_t bin_size(getBinSize(time_begin, time_end, bins));
+
+    EsemanNode* root = event_data_nodes[0];
+    if (!root) return locDict;
+
+    // Create a stack to store nodes with their depth
+    struct StackItem {
+        EsemanNode* node;
+        int depth;
+    };
+    stack<StackItem> nodeStack;
+    nodeStack.push({root, 0});
+    map<size_t, vector<pair<int64_t, int64_t>>> results;
+
+    while (!nodeStack.empty()) {
+        nodes_visited++;
+        auto current = nodeStack.top();
+        nodeStack.pop();
+        EsemanNode* c_node = current.node;
+        int current_depth = current.depth;
+
+        if (has_filter_query && !checkFiltersSatisfied(c_node)) continue;
+
+        int64_t start_time = (int64_t)c_node->start_time;
+        int64_t end_time = (int64_t)c_node->end_time;
+        if (start_time >= time_end || end_time <= time_begin) continue;
+        if (c_node->start_track > track_end || c_node->end_track < track_begin) continue;
+
+        // checkNodeAvailability(c_node, replace_node);
+
+        if ((int64_t)bin_size >= (end_time - start_time + 1) 
+            && c_node->start_track == c_node->end_track 
+            && c_node->start_track >= track_begin 
+            && c_node->end_track <= track_end) {
+            // if (has_return_attribute_key) {
+            //     if (!c_node->hasAttribute(return_attribute_key)) {
+            //         PRINTLOG("Attribute not found for key: " << return_attribute_key);
+            //         continue;
+            //     }
+            //     results.push_back((int64_t)(*c_node->attribute_lists.at(return_attribute_key).begin()));
+            // } else {
+            if (results.find(c_node->start_track) == results.end()) {
+                results[c_node->start_track] = vector<pair<int64_t, int64_t>>();
+            }
+            int64_t id = -1;
+            if (c_node->hasAttribute("ID")) {
+                id = (int64_t)(*c_node->attribute_lists.at("ID").begin());
+            }
+            results[c_node->start_track].push_back(pair<int64_t, int64_t>(start_time,id));
+            results[c_node->start_track].push_back(pair<int64_t, int64_t>(end_time,id));
+            
+            max_depth_reached = std::max(max_depth_reached, current_depth);
+            PRINTLOG("Cluster: " << " Start: " << start_time << ", End: " << end_time << ", s_track: " << c_node->start_track << ", e_track: " << c_node->end_track);
+            continue;
+        }
+
+        if (!c_node->hasLeftChild() && !c_node->hasRightChild()
+            && c_node->start_track == c_node->end_track
+            && c_node->start_track >= track_begin 
+            && c_node->end_track <= track_end) {
+            if (start_time < time_begin) {
+                start_time = time_begin;
+            }
+            if (end_time > time_end) {
+                end_time = time_end;
+            }
+            // if (has_return_attribute_key) {
+            //     if (!c_node->hasAttribute(return_attribute_key)) {
+            //         PRINTLOG("Attribute not found for key: " << return_attribute_key);
+            //         continue;
+            //     }
+            //     results.push_back((int64_t)(*c_node->attribute_lists.at(return_attribute_key).begin()));
+            // } else {
+            if (results.find(c_node->start_track) == results.end()) {
+                results[c_node->start_track] = vector<pair<int64_t, int64_t>>();
+            }
+            int64_t id = -1;
+            if (c_node->hasAttribute("ID")) {
+                id = (int64_t)(*c_node->attribute_lists.at("ID").begin());
+            }
+            results[c_node->start_track].push_back(pair<int64_t, int64_t>(start_time,id));
+            results[c_node->start_track].push_back(pair<int64_t, int64_t>(end_time,id));
+
+            max_depth_reached = std::max(max_depth_reached, current_depth);
+            PRINTLOG("Cluster-Leaf: " << " Start: " << start_time << ", End: " << end_time << ", s_track: " << c_node->start_track << ", e_track: " << c_node->end_track);
+            continue;
+        }
+
+        // Load children if not already loaded
+        if (!c_node->right_node) c_node->right_node = loadNodeFromLMDB(c_node->right_child);
+        if (!c_node->left_node) c_node->left_node = loadNodeFromLMDB(c_node->left_child);
+
+        // Push right child first (so left child gets processed first when popped)
+        if (c_node->right_node) {
+            nodeStack.push({c_node->right_node, current_depth + 1});
+        }
+        if (c_node->left_node) {
+            nodeStack.push({c_node->left_node, current_depth + 1});
+        }
+    }
+
+    for (const auto& [track_index, intervals] : results) {
+        vector<double> bins_vec(bins, 0.0);
+        size_t i = 0;
+        for (; i + 1 < intervals.size(); i += 2) {
+            int64_t start_time = intervals[i].first;
+            size_t j = i + 1;
+            for (; j < intervals.size(); j += 2) {
+                if(intervals[i].second != intervals[j].second)break;
+            }
+            int64_t end_time = intervals[j - 2].first;
+            i = j - 3;
+
+            if (end_time < time_begin || start_time > time_end) continue;
+            if (start_time < time_begin) start_time = time_begin;
+            if (end_time > time_end) end_time = time_end;
+
+            int64_t startingBin = getBinNumber(time_begin, time_end, bins, start_time);
+            int64_t endingBin = getBinNumber(time_begin, time_end, bins, end_time);
+            if (startingBin < 0 || endingBin < 0) continue;
+
+            for (int64_t bin_it = startingBin + 1; bin_it < endingBin && bin_it < (int64_t)bins && bins_vec[bin_it] < 0.5; bin_it++)
+                bins_vec[bin_it] = 1.0;
+
+            if (startingBin < (int64_t)bins && bins_vec[startingBin] < 0.5)
+                bins_vec[startingBin] = (start_time % bin_size) ? 0.5 : 1.0;
+            if (endingBin < (int64_t)bins && bins_vec[endingBin] < 0.5)
+                bins_vec[endingBin] = (end_time % bin_size) ? 0.5 : 1.0;
+        }
+        locDict[stol(event_tracks[track_index])] = vector<double>(bins_vec.begin(), bins_vec.end());
+        bins_vec.clear();
+    }
+    return locDict;
+}
+
 LocDict EseManKDT::binnedRangeQuery(int64_t time_begin, 
                                     int64_t time_end,
                                     vector<string> &locations,
@@ -396,23 +741,33 @@ LocDict EseManKDT::binnedRangeQuery(int64_t time_begin,
     leafs_read = 0;
     has_return_attribute_key = false;
     chrono::steady_clock::time_point clock_begin = chrono::steady_clock::now();
-    for (const string& loc : locations) {
-        size_t track_index = event_tracks.get_track_index(loc);
-        if(track_index == event_tracks.size()) {
-            PRINTLOG("Track not found in event tracks " << c_loc_str);
-            continue;
-        }
-        nodes_visited = 0;
-        EsemanNode* t_node = checkHotNodes(time_begin, time_end, track_index);
+    if(is_vertical_split) {
+        sort(locations.begin(), locations.end(), [](const string& a, const string& b) {
+            return stoi(a) < stoi(b);
+        });
+        size_t st_track = event_tracks.get_track_index(locations[0]);
+        size_t en_track = event_tracks.get_track_index(locations[locations.size()-1]);
+        locDict = binnedRangeQueryAllTracks(time_begin, time_end, st_track, en_track, bins);
+        PRINTLOG("From vertical split");
+    } else {
+        for (const string& loc : locations) {
+            size_t track_index = event_tracks.get_track_index(loc);
+            if(track_index == event_tracks.size()) {
+                PRINTLOG("Track not found in event tracks " << loc);
+                continue;
+            }
+            nodes_visited = 0;
+            EsemanNode* t_node = checkHotNodes(time_begin, time_end, track_index);
 #ifdef _DEBUG
             chrono::steady_clock::time_point track_clock_begin = chrono::steady_clock::now();
 #endif
-        locDict[stol(loc)] = binnedRangeQueryPerTrack(time_begin, time_end, track_index, bins, t_node);
+            locDict[stol(loc)] = binnedRangeQueryPerTrack(time_begin, time_end, track_index, bins, t_node);
 #ifdef _DEBUG
-        chrono::steady_clock::time_point track_clock_end = chrono::steady_clock::now();
+            chrono::steady_clock::time_point track_clock_end = chrono::steady_clock::now();
 #endif
-        total_nodes_visited = std::max(total_nodes_visited, nodes_visited);
-        PRINTLOG("Track index: " << track_index << " " << event_tracks[track_index] << " " << leafs_read << " " << chrono::duration_cast<chrono::microseconds>(track_clock_end - track_clock_begin).count());
+            total_nodes_visited = std::max(total_nodes_visited, nodes_visited);
+            PRINTLOG("Track index: " << track_index << " " << event_tracks[track_index] << " " << leafs_read << " " << chrono::duration_cast<chrono::microseconds>(track_clock_end - track_clock_begin).count());
+        }
     }
     chrono::steady_clock::time_point clock_end = chrono::steady_clock::now();
 
@@ -425,6 +780,14 @@ LocDict EseManKDT::binnedRangeQuery(int64_t time_begin,
         << horizontal_resolution_divisor << ","
         << chrono::duration_cast<chrono::microseconds>(clock_end - clock_begin).count()
         << endl;
+    
+    for (const auto& [track_index, bins_vec] : locDict) {
+        cout << "Track: " << track_index << " -> ";
+        for (double val : bins_vec) {
+            cout << val << " ";
+        }
+        cout << endl;
+    }
     return locDict;
 }
 
@@ -538,6 +901,7 @@ void EseManKDT::printKDTDot() {
 }
 
 void EseManKDT::buildKDT() {
+    string dataset_path = node_storage_base_path + "/" + dataset_id;
     string commands_remove_dir = "cd " + node_storage_base_path + " && mkdir -p " + dataset_id;
     int result = system(commands_remove_dir.c_str());
     if (result != 0) {
@@ -545,10 +909,57 @@ void EseManKDT::buildKDT() {
         return;
     }
 
+    if(is_vertical_split) {
+        vector<pair<string, EventDictList>> track_data_pairs;
+        for (size_t i = 0; i < event_tracks.size(); ++i) {
+            track_data_pairs.emplace_back(event_tracks[i], event_data_values[i]);
+        }
+        std::sort(track_data_pairs.begin(), track_data_pairs.end(),
+            [](const pair<string, EventDictList>& a, const pair<string, EventDictList>& b) {
+                return stoi(a.first) < stoi(b.first);
+            });
+        event_tracks.cleanMemory();
+        event_data_values.clear();
+        for (const auto& p : track_data_pairs) {
+            event_tracks.insert(p.first);
+            event_data_values.push_back(p.second);
+        }
+    }
+
     cleanNodesFromMemory(true);
     reloadNodesFromFile(false);
-    if(eseman_node_uuids.empty()) eseman_node_uuids = vector<string>(event_data_values.size(), "");
 
+    if(is_vertical_split) {
+        PRINTLOG("Building KDT with vertical split");
+        if(eseman_node_uuids.empty()) eseman_node_uuids = vector<string>(1, "");
+
+        double global_min = std::numeric_limits<double>::max();
+        double global_max = std::numeric_limits<double>::lowest();
+        for (const auto& data_vector : event_data_values) {
+            if (!data_vector.empty()) {
+                auto it_first = data_vector.front().find("time");
+                auto it_last = data_vector.back().find("time");
+                if (it_first != data_vector.front().end()) {
+                    double t_min = std::get<double>(it_first->second);
+                    if (t_min < global_min) global_min = t_min;
+                }
+                if (it_last != data_vector.back().end()) {
+                    double t_max = std::get<double>(it_last->second);
+                    if (t_max > global_max) global_max = t_max;
+                }
+            }
+        }
+        PRINTLOG("Global min time: " << global_min << ", max time: " << global_max);
+
+        openWritePermLMDB();
+        writeNodeUuidAtIndex(constructTwoDKDT(global_min, global_max, 0, event_tracks.size() - 1, 0), 0);
+        closeWritePermLMDB();
+        event_data_values.clear();
+        PRINTLOG("Vertical split KDT build completed");
+        return;
+    }
+
+    if(eseman_node_uuids.empty()) eseman_node_uuids = vector<string>(event_data_values.size(), "");
     char* ntask_str = getenv("ESEMAN_TASK_COUNT");
     int ntask = ntask_str ? atoi(ntask_str) : 0;
 
@@ -578,8 +989,6 @@ void EseManKDT::buildKDT() {
         event_data_values[i].clear();
     }
     event_data_values.clear();
-    // if(is_vertical_split)
-    //     event_data_nodes[0] = constructKDTPerTrack(0, event_data_values[i].size() - 1, i);
 }
 
 void EseManKDT::writeNodeUuidAtIndex(string new_uuid, size_t index) {
@@ -596,7 +1005,7 @@ void EseManKDT::writeNodeUuidAtIndex(string new_uuid, size_t index) {
         }
         uuid_file.close();
     }
-    if(!eseman_node_uuids.size()) eseman_node_uuids = vector<string>(event_data_values.size(), "");
+    if(!eseman_node_uuids.size()) eseman_node_uuids = vector<string>(is_vertical_split?1:event_data_values.size(), "");
     eseman_node_uuids[index] = new_uuid;
 
     ofstream w_uuid_file(dataset_path + "/eseman_node_uuids.dat");
@@ -723,7 +1132,7 @@ EsemanNode* EseManKDT::loadNodeFromLMDB(const string& uuid) {
     node->left_child = left_uuid;
     node->right_child = right_uuid;
     leafs_read++;
-    PRINTLOG("Loaded from LMDB with uuid: " << uuid);
+    // PRINTLOG("Loaded from LMDB with uuid: " << uuid);
     return node;
 }
 
@@ -839,20 +1248,20 @@ bool EseManKDT::reloadNodesFromFile(bool is_load_attributes) {
                 EsemanNode* node = findNodeInTimeRange(node_uid, -1, numeric_limits<int64_t>::max(), nullptr);
                 if (node) {
                     event_data_nodes.push_back(node);
-                    PRINTLOG("Loaded node with Grand root UUID: " << node_uid << " and current UUID: " << node->uuid);
+                    // PRINTLOG("Loaded node with Grand root UUID: " << node_uid << " and current UUID: " << node->uuid);
                 } else {
-                    PRINTLOG("Failed to load node with UUID: " << node_uid << " and current UUID: " << node->uuid);
+                    // PRINTLOG("Failed to load node with UUID: " << node_uid << " and current UUID: " << node->uuid);
                 }
             }
 
-            // Iterate over event_tracks vector
-            for(size_t i = 0; i < event_tracks.size(); i++) {
-                binnedRangeQueryPerTrack(event_data_nodes[i]->start_time,
-                                        event_data_nodes[i]->end_time,
-                                        i,
-                                        4000,
-                                        nullptr);
-            }
+            // // Iterate over event_tracks vector
+            // for(size_t i = 0; i < (is_vertical_split?1:event_tracks.size()); i++) {
+            //     binnedRangeQueryPerTrack(event_data_nodes[i]->start_time,
+            //                             event_data_nodes[i]->end_time,
+            //                             i,
+            //                             4000,
+            //                             nullptr);
+            // }
         }
         return true;
     } catch (const exception& e) {
@@ -944,24 +1353,35 @@ EsemanNode* EseManKDT::findNodeInTimeRange(string uuid, double s_time, double e_
 void test_cases_for_memory_check(EseManKDT *kdt) {
     // exact same range
     cout << "=========== TESTING EXACT SAME RANGE =================" << endl;
-    vector<string> locations = {"9"};
-    kdt->binnedRangeQuery(-1305029698, 2753780939, 
+    vector<string> locations = {"1","2"};
+    // LocDict result = kdt->binnedRangeQuery(-1305029698, 2753780939, 
+    //                         locations,
+    //                         100);
+    LocDict result = kdt->binnedRangeQuery(-1305029698, 2753780939,
                             locations,
-                            4000);
-    kdt->binnedRangeQuery(-1305029698, 2753780939, 
-                            locations,
-                            4000);
+                            10);
+    // Print LocDict result
+    for (const auto& [track_index, bins_vec] : result) {
+        cout << "Track: " << track_index << " -> ";
+        for (double val : bins_vec) {
+            cout << val << " ";
+        }
+        cout << endl;
+    }
+    // kdt->binnedRangeQuery(-1305029698, 2753780939, 
+    //                         locations,
+    //                         4000);
     cout << "======================================================" << endl;
 
     // first, zoom in overlapping range
-    cout << "=========== TESTING ZOOM IN AND PANNING =================" << endl;
-    kdt->binnedRangeQuery(1332325382,1333479725, 
-                            locations,
-                            4000);
-    kdt->binnedRangeQuery(1332308652,1333462998,
-                            locations,
-                            4000);
-    cout << "======================================================" << endl;
+    // cout << "=========== TESTING ZOOM IN AND PANNING =================" << endl;
+    // kdt->binnedRangeQuery(1332325382,1333479725, 
+    //                         locations,
+    //                         4000);
+    // kdt->binnedRangeQuery(1332308652,1333462998,
+    //                         locations,
+    //                         4000);
+    // cout << "======================================================" << endl;
 
     // // second, zoom out overlapping range
     // cout << "=========== TESTING PAN and ZOOM OUT =================" << endl;
@@ -984,6 +1404,10 @@ void test_cases_for_memory_check(EseManKDT *kdt) {
 void test_KDT_build() {
     EseManKDT *kdt = new EseManKDT();
     kdt->node_storage_base_path = "/mnt/d/tmp";
+
+    kdt->is_vertical_split = true;
+    kdt->setDatasetID("test_dataset");
+
     // kdt.insertDataIntoTree(5.0, 6.0, "12");
     // kdt.insertDataIntoTree(1.0, 2.0, "12");
     // kdt.insertDataIntoTree(1100.0, 1110.0, "12");
@@ -1021,7 +1445,7 @@ void test_KDT_build() {
     // }
     // input_file1.close();
 
-    // fstream input_file2(input_file_path + "14.location");
+    // fstream input_file2(input_file_path + "2.location");
     // if (!input_file2.is_open()) {
     //     PRINTLOG("Failed to open input file");
     //     return;
@@ -1031,11 +1455,22 @@ void test_KDT_build() {
     //     if (start_time == 74755483) {
     //         primitive_name = "second";
     //     }
-    //     kdt->insertDataIntoTree(start_time, end_time, "14", primitive_name, "iid_1");
+    //     kdt->insertDataIntoTree(start_time, end_time, "2", primitive_name, "iid_1");
     // }
     // input_file2.close();
 
     // kdt->buildKDT();
+
+
+
+    kdt->openReadOnlyLMDB();
+    kdt->reloadNodesFromFile(true);
+    test_cases_for_memory_check(kdt);
+    // string i_id = kdt->findNearestEvent(83188393, 9);
+    kdt->closeReadOnlyLMDB();
+    // cout << "Interval ID: " << i_id << endl;
+    
+
     // kdt.printKDTDot();
     // kdt.printKDTDot();
     // kdt.binnedRangeQuery(1, 1200, 
@@ -1044,13 +1479,7 @@ void test_KDT_build() {
     // kdt->addPrimitiveFilter("first");
     // kdt->addIDFilter("320000");
     // kdt->cleanNodesFromMemory(true);
-    kdt->openReadOnlyLMDB();
-    kdt->reloadNodesFromFile(true);
-    test_cases_for_memory_check(kdt);
-    
-    string i_id = kdt->findNearestEvent(83188393, 9);
-    kdt->closeReadOnlyLMDB();
-    cout << "Interval ID: " << i_id << endl;
+
     // int cm;
     // cin >> cm;
     

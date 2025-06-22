@@ -396,7 +396,8 @@ int main(int argc, char *argv[])
     } else if(profiled_ds == ESEMAN) {
         esemanKDT = new EseManKDT();
         esemanKDT->horizontal_resolution_divisor = horizontal_resolution_divisor;
-        esemanKDT->dataset_id = urlparser.datasetId;
+        esemanKDT->is_vertical_split = true;
+        esemanKDT->setDatasetID(urlparser.datasetId);
         esemanKDT->node_storage_base_path = data_backup_location;
     }
 

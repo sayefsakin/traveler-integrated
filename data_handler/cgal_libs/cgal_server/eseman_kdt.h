@@ -66,6 +66,7 @@ private:
   int                              max_depth_reached;
   int                              leafs_read;
   int                              nodes_visited;
+  string                           dataset_id = "default_dataset";
 
   MDB_env                         *env;
   MDB_dbi                         dbi;
@@ -120,7 +121,13 @@ private:
   bool checkFiltersSatisfied(const EsemanNode* node);
 
   string constructKDTPerTrack(size_t start_index, size_t end_index, size_t track_index);
+  string constructTwoDKDT(double start_time, double end_time, size_t start_track, size_t end_track, int depth);
   void printKDTDotRecursive(string uuid, ofstream& dotFile);
+
+  LocDict binnedRangeQueryAllTracks(int64_t time_begin, 
+                                            int64_t time_end, 
+                                            size_t track_begin, 
+                                            size_t track_end, uint64_t bins);
   vector<double> binnedRangeQueryPerTrack(int64_t time_begin, 
                                       int64_t time_end,
                                       size_t track_index,
@@ -146,7 +153,6 @@ public:
   int vertical_resolution_divisor = 1;
   bool is_vertical_split = false;
   string node_storage_base_path = ".";
-  string dataset_id = "default_dataset";
   
   EseManKDT() {
       // Constructor logic if needed
@@ -188,6 +194,12 @@ public:
     mdb_env_close(env);
   }
 
+  void setDatasetID(const string& ds_id) {
+    dataset_id = ds_id;
+    if(is_vertical_split) {
+      dataset_id = "vertical_split_" + dataset_id;
+    }
+  }
   void insertDataIntoTree(double start_time, double end_time, string track, string primitive_name, string interval_id);
   void buildKDT();
   void printKDTDotPerTrack(size_t track_index);
