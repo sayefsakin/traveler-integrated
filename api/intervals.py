@@ -43,6 +43,8 @@ def get_intervals(datasetId: str, \
                 eid = dqi.GetAttributeOfEvent(begin, location, "segment_tree")
             elif dsp.profiled_ds == dsp.EKM:
                 eid = dqi.GetAttributeOfEvent(begin, location, "eseman_kdt")
+            elif dsp.profiled_ds == dsp.EKMTD:
+                eid = dqi.GetAttributeOfEvent(begin, location, "eseman_kdt_twod")
             elif dsp.profiled_ds == dsp.AGC:
                 eid = dqi.GetAttributeOfEvent(begin, location, "agglomerative_clustering")
             elif dsp.profiled_ds.startswith("db"):

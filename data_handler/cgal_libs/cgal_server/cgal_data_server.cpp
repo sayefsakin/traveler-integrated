@@ -226,7 +226,7 @@ Document processReceivedRequest(AgglomerateClusters *agglomerateClusters,
         if(ds_request == AGCLUSTER) {
             if(DEBUG) cout << "got agglomerate cluster request" << endl;
             return binnedAGCSearchQuery(agglomerateClusters, time_begin, time_end, locationsList, bins, primitive);
-        } else if(ds_request == ESEMAN) {
+        } else if(ds_request.rfind(ESEMAN, 0) == 0) {
             if(DEBUG) cout << "got eseman cluster request" << endl;
             return binnedESEMANSearchQuery(emk, time_begin, time_end, locationsList, bins, primitive);
         } else {
@@ -238,7 +238,7 @@ Document processReceivedRequest(AgglomerateClusters *agglomerateClusters,
         uint64_t cTime = stol(((*d)["time"].GetString())) < 0 ? 0 : stoul(((*d)["time"].GetString()));
         uint64_t cLocation = stol((*d)["location"].GetString());
 
-        if(ds_request == ESEMAN) {
+        if(ds_request.rfind(ESEMAN, 0) == 0) {
             if(DEBUG) cout << "got ESEMAN get attribute request" << endl;
             return esemanGetAttributeQuery(emk, cTime, cLocation, tree_build_time);
         } else {
@@ -393,10 +393,12 @@ int main(int argc, char *argv[])
     if(profiled_ds == AGCLUSTER) {
         agglomerateClusters = new AgglomerateClusters();
         agglomerateClusters->horizontal_resolution_divisor = horizontal_resolution_divisor;
-    } else if(profiled_ds == ESEMAN) {
+    } else if(profiled_ds.rfind(ESEMAN, 0) == 0) {
         esemanKDT = new EseManKDT();
         esemanKDT->horizontal_resolution_divisor = horizontal_resolution_divisor;
-        esemanKDT->is_vertical_split = true;
+        if (profiled_ds.size() >= 4 && profiled_ds.compare(profiled_ds.size() - 4, 4, "twod") == 0) {
+            esemanKDT->is_vertical_split = true;
+        }
         esemanKDT->setDatasetID(urlparser.datasetId);
         esemanKDT->node_storage_base_path = data_backup_location;
     }
@@ -411,7 +413,7 @@ int main(int argc, char *argv[])
     uint64_t maxLocation = 0;
     uint64_t tree_build_time = 0;
 
-    if( profiled_ds == ESEMAN && !is_build_dataset) {
+    if( profiled_ds.rfind(ESEMAN, 0) == 0 && !is_build_dataset) {
         esemanKDT->openReadOnlyLMDB();
         std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
         if(esemanKDT->reloadNodesFromFile(true)) {
@@ -461,7 +463,7 @@ int main(int argc, char *argv[])
                                                     v.GetObject()["Location"].GetString(),
                                                     cPrimitive,
                                                     v.GetObject()["intervalId"].GetString());
-        } else if(profiled_ds == ESEMAN) {
+        } else if(profiled_ds.rfind(ESEMAN, 0) == 0) {
             esemanKDT->insertDataIntoTree((double)v.GetObject()["enter"]["Timestamp"].GetInt64(),
                                           (double)v.GetObject()["leave"]["Timestamp"].GetInt64(),
                                           v.GetObject()["Location"].GetString(),
@@ -495,7 +497,7 @@ int main(int argc, char *argv[])
             minLocation, maxLocation, 
             primitiveMapping
         );
-    } else if(profiled_ds == ESEMAN) {
+    } else if(profiled_ds.rfind(ESEMAN, 0) == 0) {
         std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
         esemanKDT->buildKDT();
         std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();

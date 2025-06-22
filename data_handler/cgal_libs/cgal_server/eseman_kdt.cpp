@@ -221,6 +221,7 @@ string EseManKDT::constructTwoDKDT(double start_time, double end_time, size_t st
     if (start_track == end_track) {
         // If only one track, construct KDT for that track
         auto& data_vector = event_data_values[start_track];
+        if(data_vector.size() == 0) return result_uuid;
         auto cmp_start = [this](const EventDict& dict, double t) { return getEventTime(dict) < t; };
 
         auto start_it = std::lower_bound(data_vector.begin(), data_vector.end(), start_time, cmp_start);
@@ -228,8 +229,9 @@ string EseManKDT::constructTwoDKDT(double start_time, double end_time, size_t st
 
         size_t start_index = std::distance(data_vector.begin(), start_it);
         size_t end_index = std::distance(data_vector.begin(), end_it);
+        if(end_index >= data_vector.size()) end_index = data_vector.size() - 1;
 
-        if (start_index > end_index || start_index >= data_vector.size() || end_index >= data_vector.size() || end_index == 0) {
+        if (start_index > end_index || start_index >= data_vector.size() || end_index > data_vector.size() || end_index == 0) {
             return result_uuid;
         }
         EsemanNode* cur_node = nullptr;
@@ -774,20 +776,16 @@ LocDict EseManKDT::binnedRangeQuery(int64_t time_begin,
     filters.clear(); // automatically clear filters after query
     has_filter_query = false;
 
-    cout << "ESEMAN," << "ds_window";
+    string profiled_ds("ESEMAN");
+    if(is_vertical_split) {
+        profiled_ds = "ESEMAN_TWOD";
+    }
+    cout << profiled_ds << ",ds_window";
     if(filters.size() > 0) cout << "_cond";
     cout << "," << time_begin << "," << time_end << "," 
         << horizontal_resolution_divisor << ","
         << chrono::duration_cast<chrono::microseconds>(clock_end - clock_begin).count()
         << endl;
-    
-    for (const auto& [track_index, bins_vec] : locDict) {
-        cout << "Track: " << track_index << " -> ";
-        for (double val : bins_vec) {
-            cout << val << " ";
-        }
-        cout << endl;
-    }
     return locDict;
 }
 
@@ -1353,11 +1351,11 @@ EsemanNode* EseManKDT::findNodeInTimeRange(string uuid, double s_time, double e_
 void test_cases_for_memory_check(EseManKDT *kdt) {
     // exact same range
     cout << "=========== TESTING EXACT SAME RANGE =================" << endl;
-    vector<string> locations = {"1","2"};
+    vector<string> locations = {"2"};
     // LocDict result = kdt->binnedRangeQuery(-1305029698, 2753780939, 
     //                         locations,
     //                         100);
-    LocDict result = kdt->binnedRangeQuery(-1305029698, 2753780939,
+    LocDict result = kdt->binnedRangeQuery(1307411956, 1445679055,
                             locations,
                             10);
     // Print LocDict result
@@ -1408,11 +1406,7 @@ void test_KDT_build() {
     kdt->is_vertical_split = true;
     kdt->setDatasetID("test_dataset");
 
-    // kdt.insertDataIntoTree(5.0, 6.0, "12");
-    // kdt.insertDataIntoTree(1.0, 2.0, "12");
-    // kdt.insertDataIntoTree(1100.0, 1110.0, "12");
-    // kdt.insertDataIntoTree(11.0, 12.0, "12");
-    // kdt.insertDataIntoTree(14.0, 18.0, "12");
+    
 
 
     // string input_file_path = "/mnt/c/Users/sayef/IdeaProjects/traveler-integrated/data_handler/cgal_libs/cgal_server/location_data/";

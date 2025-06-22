@@ -24,7 +24,7 @@ else
 fi
 
 #change these for each experiment
-export TOTAL_SAMPLE=20
+export TOTAL_SAMPLE=5
 export HORIZONTAL_RESOLUTION_DIVISOR=1
 
 echo "Running experiment on dataset: $DATASET_ID"
@@ -42,11 +42,11 @@ echo "Running experiment with iterations: $TOTAL_SAMPLE"
 echo "======================================"
 
 
-traveler_base_directory="/home/sci/sayefsakin/traveler-integrated"
-profile_directory="/home/sci/sayefsakin/traveler-benchmarks"
-python_env_directory="/home/sci/sayefsakin/installed_programs/env"
-export DATASET_LOCATION="/home/sci/sayefsakin/all_data/json_data"
-traveler_discache_location="/home/sci/sayefsakin/all_data/"${dataset_names[$DATASET_ID]}
+traveler_base_directory="/mnt/c/Users/sayef/IdeaProjects/traveler-integrated"
+profile_directory="/mnt/d/ldav25_profiled_data"
+python_env_directory=$traveler_base_directory"/traveler39"
+export DATASET_LOCATION="/mnt/d/all_traveler_otf2_files/all_data/json_data"
+traveler_discache_location="/mnt/d/all_traveler_otf2_files/all_data/"${dataset_names[$DATASET_ID]}
 
 LOCALHOST_URL="http://localhost:8000"
 # LONEPEAK_URL="http://lonepeak2:8000"
@@ -54,7 +54,7 @@ LONEPEAK_URL="http://"$(hostname)":8000"
 export BASE_URL=$LONEPEAK_URL
 
 # this is where eseman stores lmdb files
-export LMDB_DATA_BACKUP_LOCATION="/home/sci/sayefsakin/lmdb_dataset_backups"
+export LMDB_DATA_BACKUP_LOCATION="/mnt/d/traveler_dataset_backups"
 export LMDB_DATABASE_TOTAL_SIZE=$((2*1000*1000*1000))
 # 20971520, 50GB
 
@@ -89,14 +89,14 @@ traveler(){
 
 cgal(){
   # run the cgal server
-  if [[ $PROFILED_DS != $KDT && $PROFILED_DS != $AGC && $PROFILED_DS != $ESEMAN ]]; then
+  if [[ $PROFILED_DS != $KDT && $PROFILED_DS != $AGC && $PROFILED_DS != $ESEMAN && $PROFILED_DS != $ESEMAN_TD ]]; then
     return 0;
   fi
   cgal_watch=$profile_directory"/"$PROFILED_DS"_"$QUERY_TYPE"_cgal_check"
   echo "Writing CGAL server output to file: "$cgal_watch
   cd $traveler_base_directory"/data_handler/cgal_libs/cgal_server"
   rm -f "cgal_server_check"
-  LD_LIBRARY_PATH=~/installed_programs/lmdb/lib ./cgal_data_server $DATASET_ID false > $cgal_watch &
+  ./cgal_data_server $DATASET_ID false > $cgal_watch &
   while true; do
     if [ -f "cgal_server_check" ]; then
         break;
@@ -111,13 +111,13 @@ cgal(){
 
 build_lmdb(){
   # run the cgal server
-  if [[ $PROFILED_DS != $ESEMAN ]]; then
+  if [[ $PROFILED_DS != $ESEMAN && $PROFILED_DS != $ESEMAN_TD ]]; then
     return 0;
   fi
   cgal_watch=$profile_directory"/"$PROFILED_DS"_"$DATASET_ID"_cgal_check_build_"$ESEMAN_TASK_ID
   echo "Writing CGAL server output to file: "$cgal_watch
   cd $traveler_base_directory"/data_handler/cgal_libs/cgal_server"
-  LD_LIBRARY_PATH=~/installed_programs/lmdb/lib ./cgal_data_server $DATASET_ID true > $cgal_watch
+  ./cgal_data_server $DATASET_ID true > $cgal_watch
   export CGAL_PROCESS_ID=`ps -u $USER | grep cgal_data_serve | awk '{print $1}'`
   sleep 1
 }
@@ -184,7 +184,7 @@ prompt_help(){
 }
 
 killing_cgal(){
-  if [[ $PROFILED_DS != $KDT && $PROFILED_DS != $AGC && $PROFILED_DS != $ESEMAN ]]; then
+  if [[ $PROFILED_DS != $KDT && $PROFILED_DS != $AGC && $PROFILED_DS != $ESEMAN && $PROFILED_DS != $ESEMAN_TD ]]; then
     return 0;
   fi
   if pgrep -x cgal_data_serve >/dev/null; then
@@ -249,7 +249,7 @@ prepare_and_merge_files(){
 
   cp $serve_watch $NDDIR;
 
-  if [[ $PROFILED_DS == $KDT || $PROFILED_DS == $AGC || $PROFILED_DS == $ESEMAN ]]; then
+  if [[ $PROFILED_DS == $KDT || $PROFILED_DS == $AGC || $PROFILED_DS == $ESEMAN || $PROFILED_DS == $ESEMAN_TD ]]; then
     linenumber=$(grep -n "Server is now listening" "$cgal_watch" | head -n 1 | cut -d: -f1);
     sed -i "1,${linenumber}d" "$cgal_watch";
     sed -i '$d' $cgal_watch;

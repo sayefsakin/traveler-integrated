@@ -12,6 +12,7 @@ class DSProfiler:
         self.SAT = "summed_area_table"
         self.AGC = "agglomerative_clustering"
         self.EKM = "eseman_kdt"
+        self.EKMTD = "eseman_kdt_twod"
         self.DUCK = "db_duck"
         self.POSTGRES = "db_postgres"
         self.DBTYPE_MIN_MAX = "min_max"

@@ -107,7 +107,7 @@ def get_utilization_histogram(datasetId: str,
 
     calcHistorgramTimer = 0
     if locations:
-        if dsp.profiled_ds == dsp.KDT or dsp.profiled_ds == dsp.SGT or dsp.profiled_ds == dsp.AGC or dsp.profiled_ds == dsp.EKM:
+        if dsp.profiled_ds == dsp.KDT or dsp.profiled_ds == dsp.SGT or dsp.profiled_ds == dsp.AGC or dsp.profiled_ds == dsp.EKM or dsp.profiled_ds == dsp.EKMTD:
             ret['locations'] = dqi.GetDataInRange(bins, begin, end, locations, primitive, dsp.profiled_ds)
         else:
             ret['locations'] = {}
