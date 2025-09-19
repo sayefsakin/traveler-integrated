@@ -3,3 +3,6 @@
 	url = git@github.com:sayefsakin/hclust-cpp.git
 [submodule "data_handler/cgal_libs/cgal_server/eseman"]
 	path = data_handler/cgal_libs/cgal_server/eseman
+[submodule "data_handler/cgal_libs/cgal_server/rapidjson"]
+	path = data_handler/cgal_libs/cgal_server/rapidjson
+	url = https://github.com/Tencent/rapidjson.git
