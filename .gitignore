@@ -7,3 +7,7 @@ serve.log
 profiling_tools/_cCalcBin.*.so
 .idea/*
 .vscode/*
+node_modules/*
+package-lock.json
+package.json
+traveler-integrated.code-workspace

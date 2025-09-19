@@ -363,7 +363,7 @@ int main(int argc, char *argv[])
     if(argc>2) is_build_dataset = (string(argv[2]) == "true");
 
     char *pds = getenv("PROFILED_DS");
-    char *pds2 = getenv("HORIZONTAL_RESOLUTION_DIVISOR");
+    char *pds2 = getenv("PIXEL_WINDOW");
     char *pds3 = getenv("LMDB_DATA_BACKUP_LOCATION");
     string profiled_ds = pds == NULL ? string("summed_area_table") : string(pds);
     int horizontal_resolution_divisor = pds2 == NULL ? 1 : atoi(pds2);

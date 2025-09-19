@@ -25,7 +25,7 @@ fi
 
 #change these for each experiment
 export TOTAL_SAMPLE=5
-export HORIZONTAL_RESOLUTION_DIVISOR=1
+export PIXEL_WINDOW=16
 
 echo "Running experiment on dataset: $DATASET_ID"
 echo "Running experiment on algorithm: $PROFILED_DS"
@@ -37,10 +37,9 @@ else
   export SELECTED_PRIMITIVE=$4
   echo "Running experiment on selected primitive: $SELECTED_PRIMITIVE"
 fi
-echo "Running experiment on hrd: $HORIZONTAL_RESOLUTION_DIVISOR"
+echo "Running experiment with PIXEL WINDOW: $PIXEL_WINDOW"
 echo "Running experiment with iterations: $TOTAL_SAMPLE"
 echo "======================================"
-
 
 traveler_base_directory="/mnt/c/Users/sayef/IdeaProjects/traveler-integrated"
 profile_directory="/mnt/d/ldav25_profiled_data"
@@ -126,8 +125,8 @@ profile_window_query(){
   cd $profile_directory;
 
   HRDS='';
-  if [[ $HORIZONTAL_RESOLUTION_DIVISOR -ne 1 ]]; then
-    HRDS=$HORIZONTAL_RESOLUTION_DIVISOR"_";
+  if [[ $PIXEL_WINDOW -ne 1 ]]; then
+    HRDS=$PIXEL_WINDOW"_";
   fi
   NDDIR=$HRDS$DATASET_ID;
   mkdir -p $NDDIR;
@@ -154,8 +153,8 @@ profile_cond_query(){
   cd $profile_directory;
   
   HRDS='';
-  if [[ $HORIZONTAL_RESOLUTION_DIVISOR -ne 1 ]]; then
-    HRDS=$HORIZONTAL_RESOLUTION_DIVISOR"_";
+  if [[ $PIXEL_WINDOW -ne 1 ]]; then
+    HRDS=$PIXEL_WINDOW"_";
   fi
   NDDIR=$HRDS$DATASET_ID;
   mkdir -p $NDDIR;
@@ -235,8 +234,8 @@ prepare_and_merge_files(){
   cd $profile_directory;
   
   HRDS='';
-  if [[ $HORIZONTAL_RESOLUTION_DIVISOR -ne 1 ]]; then
-    HRDS=$HORIZONTAL_RESOLUTION_DIVISOR"_";
+  if [[ $PIXEL_WINDOW -ne 1 ]]; then
+    HRDS=$PIXEL_WINDOW"_";
   fi
   NDDIR=$HRDS$DATASET_ID;
 

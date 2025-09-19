@@ -824,7 +824,7 @@ if __name__ == '__main__':
         'dataset': os.getenv('DATASET_ID', DGEM_ID),
         'baseUrl': os.getenv('BASE_URL', "http://localhost:8000"),
         'prfiledDS': os.getenv('PROFILED_DS', "summed_area_table"),
-        'hrd': os.getenv('HORIZONTAL_RESOLUTION_DIVISOR', "1"),
+        'hrd': os.getenv('PIXEL_WINDOW', "1"),
         'exportLocation': "."
     }
     TOTAL_SAMPLE = int(os.getenv('TOTAL_SAMPLE', 10))
