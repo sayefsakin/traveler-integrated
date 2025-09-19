@@ -3,6 +3,7 @@
 import PrimitiveSelection from '../selections/PrimitiveSelection.js';
 
 import RenameModal from '../../views/RenameModal/RenameModal.js';
+import ChangeColorModal from '../../views/ChangeColorModal/ChangeColorModal.js';
 import TreeView from "../../views/TreeView/TreeView.js";
 import DependencyTreeView from "../../views/DependencyTreeView/DependencyTreeView.js";
 import TaskDependencySelection from "../selections/TaskDependencySelection.js";
