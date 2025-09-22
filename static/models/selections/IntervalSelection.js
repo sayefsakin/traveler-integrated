@@ -102,14 +102,16 @@ class IntervalSelection extends Selection {
         }
       });
     }
-    links.push(...this.intervalDetails.children.map(childId => {
-      return {
-        label: `Select child: ${childId}`,
-        pivot: () => {
-          window.controller.currentDataset.selectIntervalById(childId);
-        }
-      };
-    }));
+    if (this.intervalDetails.children) {
+      links.push(...this.intervalDetails.children.map(childId => {
+        return {
+          label: `Select child: ${childId}`,
+          pivot: () => {
+            window.controller.currentDataset.selectIntervalById(childId);
+          }
+        };
+      }));
+    }
     return links;
   }
 }

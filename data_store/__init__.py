@@ -11,7 +11,7 @@ import diskcache
 diskCacheIndices = ['info', 'primitives', 'primitiveLinks', 'intervals', 'guids', 'events', 'procMetrics']
 requiredDiskCacheIndices = ['info', 'primitives', 'primitiveLinks']
 pickles = ['trees', 'physl', 'python', 'cpp', 'sparseUtilizationList', 'intervalIndex', 'dependencyTree', 'dataStores']
-requiredPickleDicts = ['trees']
+requiredPickleDicts = []
 defaultInfo = {
     'sourceFiles': [],
     'tags': {},
@@ -218,3 +218,4 @@ class DataStore:
     from ._code_functions import processCode, processCodeFile
     from ._log_functions import processPhylanxLog, processPhylanxLogFile
     from ._otf2_functions import processEvent, processOtf2, processRawTrace, combineIntervals, buildIntervalTree, connectIntervals, buildSparseUtilizationLists, buildDependencyTree
+    from ._json_functions import processJSON, processRawJSON

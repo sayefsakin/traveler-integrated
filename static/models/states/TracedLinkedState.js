@@ -148,7 +148,7 @@ class TracedLinkedState extends LinkedState {
   async getAvailableViews () {
     const views = await super.getAvailableViews();
     const otf2Status = this.info.sourceFiles
-      .find(d => d.fileType === 'otf2').stillLoading
+      .find(d => d.fileType === 'otf2' || d.fileType === 'json').stillLoading
       ? VIEW_STATUS.LOADING
       : VIEW_STATUS.AVAILABLE;
 
@@ -161,11 +161,13 @@ class TracedLinkedState extends LinkedState {
     };
     views.LineChartView = { status: otf2Status, variants: [] };
     views.FunctionalBoxPlotView = { status: otf2Status, variants: [] };
-    for (const metric of this.info.procMetricList) {
-      if (metric.toUpperCase().startsWith('PAPI')) {
-        views.FunctionalBoxPlotView.variants.push(metric);
-      } else {
-        views.LineChartView.variants.push(metric);
+    if (this.info.procMetricList !== undefined && this.info.procMetricList.length > 0) {
+      for (const metric of this.info.procMetricList) {
+        if (metric.toUpperCase().startsWith('PAPI')) {
+          views.FunctionalBoxPlotView.variants.push(metric);
+        } else {
+          views.LineChartView.variants.push(metric);
+        }
       }
     }
 
@@ -208,38 +210,39 @@ class TracedLinkedState extends LinkedState {
     const availableViews = await this.getAvailableViews();
     const openViews = await this.getOpenViews();
 
-    // First, create submenus...
-    // ... for regular metrics
-    const metricSubmenu = {
-      label: 'Metrics',
-      subEntries: this.info.procMetricList
-        .filter(metric => {
-          const upper = metric.toUpperCase();
-          return !upper.startsWith('LM_SENSORS') && !upper.startsWith('PAPI');
-        })
-        .map(metric => {
-          return this.createViewMenuEntry(metric, 'LineChartView', metric, availableViews, openViews);
-        })
-    };
-    // ... for LM_SENSORS
-    const lmSensorSubmenu = {
-      label: 'LM_SENSORS',
-      subEntries: this.info.procMetricList
-        .filter(metric => metric.toUpperCase().startsWith('LM_SENSORS'))
-        .map(metric => {
-          return this.createViewMenuEntry(metric, 'LineChartView', metric, availableViews, openViews);
-        })
-    };
-    // ... for PAPI
-    const papiSubmenu = {
-      label: 'PAPI',
-      subEntries: this.info.procMetricList
-        .filter(metric => metric.toUpperCase().startsWith('PAPI'))
-        .map(metric => {
-          return this.createViewMenuEntry(metric, 'FunctionalBoxPlotView', metric, availableViews, openViews);
-        })
-    };
-
+    if (this.info.procMetricList !== undefined) { 
+      // First, create submenus...
+      // ... for regular metrics
+      const metricSubmenu = {
+        label: 'Metrics',
+        subEntries: this.info.procMetricList
+          .filter(metric => {
+            const upper = metric.toUpperCase();
+            return !upper.startsWith('LM_SENSORS') && !upper.startsWith('PAPI');
+          })
+          .map(metric => {
+            return this.createViewMenuEntry(metric, 'LineChartView', metric, availableViews, openViews);
+          })
+      };
+      // ... for LM_SENSORS
+      const lmSensorSubmenu = {
+        label: 'LM_SENSORS',
+        subEntries: this.info.procMetricList
+          .filter(metric => metric.toUpperCase().startsWith('LM_SENSORS'))
+          .map(metric => {
+            return this.createViewMenuEntry(metric, 'LineChartView', metric, availableViews, openViews);
+          })
+      };
+      // ... for PAPI
+      const papiSubmenu = {
+        label: 'PAPI',
+        subEntries: this.info.procMetricList
+          .filter(metric => metric.toUpperCase().startsWith('PAPI'))
+          .map(metric => {
+            return this.createViewMenuEntry(metric, 'FunctionalBoxPlotView', metric, availableViews, openViews);
+          })
+      };
+    }
     const baseMenu = await super.getViewMenu();
     baseMenu.push(...[
       // Singular views
@@ -248,12 +251,12 @@ class TracedLinkedState extends LinkedState {
       this.createViewMenuEntry('Interval Histogram', 'IntervalHistogramView', null, availableViews, openViews),
       this.createViewMenuEntry('Task Dependency Tree', 'DependencyTreeView', null, availableViews, openViews)
     ]);
-    // Submenus
-    for (const menu of [metricSubmenu, lmSensorSubmenu, papiSubmenu]) {
-      if (menu.subEntries.length > 0) {
-        baseMenu.push(menu);
-      }
-    }
+    // // Submenus
+    // for (const menu of [metricSubmenu, lmSensorSubmenu, papiSubmenu]) {
+    //   if (menu.subEntries.length > 0) {
+    //     baseMenu.push(menu);
+    //   }
+    // }
     return baseMenu;
   }
 

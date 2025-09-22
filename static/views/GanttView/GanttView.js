@@ -328,14 +328,15 @@ class GanttView extends ZoomableTimelineView { // abstracts a lot of common logi
       .attr('text-anchor', 'end')
       .attr('y', '0.35em')
       .text(d => {
-        const a = BigInt(d);
-        const c = BigInt(32);
-        const node = BigInt(a >> c);
-        const thread = (d & 0x0FFFFFFFF);
-        let aggText = '';
-        aggText += node + ' - T';
-        aggText += thread;
-        return aggText;
+        return d;
+        // const a = BigInt(d);
+        // const c = BigInt(32);
+        // const node = BigInt(a >> c);
+        // const thread = (d & 0x0FFFFFFFF);
+        // let aggText = '';
+        // aggText += node + ' - T';
+        // aggText += thread;
+        // return aggText;
       });
 
     // Set the y label

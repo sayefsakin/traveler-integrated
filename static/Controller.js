@@ -67,7 +67,7 @@ class Controller extends uki.ui.ThemeableView {
       // handle any of its pending event callbacks, and preserve state like its
       // current view layout + selection)
       const priorLinkedState = this.datasetList[this.datasetLookup[info.datasetId]];
-      if (info.sourceFiles.some(d => d.fileType === 'otf2')) {
+      if (info.sourceFiles.some(d => d.fileType === 'otf2' || d.fileType === 'json')) {
         linkedState = new TracedLinkedState({ info, priorLinkedState });
       } else {
         linkedState = new LinkedState({ info, priorLinkedState });

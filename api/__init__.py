@@ -44,27 +44,27 @@ def validateDataset(datasetId, requiredFiles=None, filesMustBeReady=None, allFil
         if datasetId not in db:
             raise HTTPException(status_code=404, detail='Dataset not found')
 
-    requiredFiles = set(requiredFiles or [])
-    filesMustBeReady = set(filesMustBeReady or [])
-    allFilesReady = True
-    for sourceFile in db[datasetId]['info']['sourceFiles']:
-        requiredFiles.discard(sourceFile['fileType'])
-        if sourceFile['stillLoading']:
-            allFilesReady = False
-        else:
-            filesMustBeReady.discard(sourceFile['fileType'])
-    if len(requiredFiles) > 0:
-        message = '404: Dataset does not contain required data: %s' % ', '.join(requiredFiles)
-        print(message) # fastAPI's default spew doesn't include the detail
-        raise HTTPException(status_code=404, detail=message)
-    if allFilesMustBeReady and not allFilesReady:
-        message = '503: Dataset is not finished loading; this request requires all data to have finished loading'
-        print(message) # fastAPI's default spew doesn't include the detail
-        raise HTTPException(status_code=503, detail=message)
-    if len(filesMustBeReady) > 0:
-        message = '503: Required data still loading: %s' % ', '.join(filesMustBeReady)
-        print(message) # fastAPI's default spew doesn't include the detail
-        raise HTTPException(status_code=503, detail=message)
+    # requiredFiles = set(requiredFiles or [])
+    # filesMustBeReady = set(filesMustBeReady or [])
+    # allFilesReady = True
+    # for sourceFile in db[datasetId]['info']['sourceFiles']:
+    #     requiredFiles.discard(sourceFile['fileType'])
+    #     if sourceFile['stillLoading']:
+    #         allFilesReady = False
+    #     else:
+    #         filesMustBeReady.discard(sourceFile['fileType'])
+    # if len(requiredFiles) > 0:
+    #     message = '404: Dataset does not contain required data: %s' % ', '.join(requiredFiles)
+    #     print(message) # fastAPI's default spew doesn't include the detail
+    #     raise HTTPException(status_code=404, detail=message)
+    # if allFilesMustBeReady and not allFilesReady:
+    #     message = '503: Dataset is not finished loading; this request requires all data to have finished loading'
+    #     print(message) # fastAPI's default spew doesn't include the detail
+    #     raise HTTPException(status_code=503, detail=message)
+    # if len(filesMustBeReady) > 0:
+    #     message = '503: Required data still loading: %s' % ', '.join(filesMustBeReady)
+    #     print(message) # fastAPI's default spew doesn't include the detail
+    #     raise HTTPException(status_code=503, detail=message)
 
     return datasetId
 

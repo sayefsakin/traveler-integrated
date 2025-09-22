@@ -30,6 +30,8 @@ parser.add_argument('-p', '--performance', dest='performance', type=str, metavar
                     help='Input performance CSV as its own file')
 parser.add_argument('-g', '--graph', dest='graph', type=str, metavar='path', nargs='*', default=[],
                     help='Input DOT-formatted links as its own file')
+parser.add_argument('-j', '--json', dest='json', type=str, metavar='path', nargs='*', default=[],
+                    help='Input JSON trace')
 parser.add_argument('-o', '--otf2', dest='otf2', type=str, metavar='path', nargs='*', default=[],
                     help='Input otf2 trace (e.g. OTF2_archive/APEX.otf2)')
 parser.add_argument('-y', '--physl', dest='physl', type=str, metavar='path', nargs='*', default=[],
@@ -74,7 +76,7 @@ async def main():
     if labelRegex.groups == 0:
         # We're in normal mode; one path per argument
         inputs[args['label']] = {}
-        for arg in ['input', 'tree', 'performance', 'graph', 'otf2', 'physl', 'python', 'cpp']:
+        for arg in ['input', 'tree', 'performance', 'graph', 'otf2', 'physl', 'python', 'cpp', 'json']:
             if len(args[arg]) == 1:
                 inputs[args['label']][arg] = args[arg][0]
             elif len(args[arg]) > 1:
@@ -90,7 +92,7 @@ async def main():
         singlePhysl = args['physl'][0] if len(args['physl']) == 1 else None
         singlePython = args['python'][0] if len(args['python']) == 1 else None
         singleCpp = args['cpp'][0] if len(args['cpp']) == 1 else None
-        for arg in ['input', 'tree', 'performance', 'graph', 'otf2', 'physl', 'python', 'cpp']:
+        for arg in ['input', 'tree', 'performance', 'graph', 'otf2', 'physl', 'python', 'cpp', 'json']:
             if arg == 'physl' and singlePhysl is not None:
                 continue
             if arg == 'python' and singlePython is not None:
@@ -172,6 +174,11 @@ async def main():
             if 'otf2' in paths:
                 db.addSourceFile(datasetId, paths['otf2'], 'otf2')
                 await db.processOtf2(datasetId, FakeFile(paths['otf2']))
+            
+            # Handle json
+            if 'json' in paths:
+                db.addSourceFile(datasetId, paths['json'], 'json')
+                await db.processJSON(datasetId, paths['json'])
 
 
             # Save all the data

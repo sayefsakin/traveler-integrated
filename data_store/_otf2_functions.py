@@ -345,6 +345,7 @@ async def buildIntervalTree(self, datasetId, log):
             # Need to add one because IntervalTree can't handle zero-length intervals
             # (and because IntervalTree is not inclusive of upper bounds in queries)
             if enter == leave:
+                print("returning from here ", intervalId, enter, leave)
                 continue
             iTreeInterval = Interval(enter, leave, intervalId)
 
