@@ -318,7 +318,7 @@ void BinnedKDT::outputToDot(string fileName) {
     cout << "Output stream is not open" << endl;
     return;
   }
-  tree.write_graphviz(dotFile);
+ // tree.write_graphviz(dotFile);
   // cout << "Exporting to dot file: " << fileName << endl;
 
   // dotFile << "digraph BinnedKDT {\n";

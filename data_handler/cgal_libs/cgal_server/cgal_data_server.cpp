@@ -268,7 +268,7 @@ void startServerListening(AgglomerateClusters *agglomerateClusters,
                         int64_t minTime, int64_t maxTime,
                         uint64_t minLocation, uint64_t maxLocation,
                         Primtive_mapping pm) {
-    int PORT = 8080;
+    int PORT = 8081;
     int server_fd, new_socket;
     struct sockaddr_in address;
     int opt = 1;

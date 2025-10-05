@@ -13,7 +13,7 @@ class DataQueriesInterface:
     # https://github.com/grantjenks/python-diskcache/pull/74
 
     host = os.getenv('ESEMAN_SERVER_HOST', "127.0.0.1")
-    port = 8080
+    port = 8081
 
     def byte_length(self, i):
         return i.bit_length() + 7
